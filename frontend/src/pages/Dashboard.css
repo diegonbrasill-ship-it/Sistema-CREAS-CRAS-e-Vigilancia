@@ -1,0 +1,43 @@
+/* Garante que o container preencha a tela no modo apresentação e tenha um fundo branco */
+.dashboard-container.presentation-mode {
+  background-color: white;
+  padding: 2.5rem;
+  height: 100%;
+  width: 100%;
+  overflow-y: auto; /* Permite rolar se o conteúdo for muito grande */
+}
+
+/* Esconde o card de filtros quando em modo apresentação */
+.presentation-mode .card-filtros {
+  display: none;
+}
+
+/* Aumenta o tamanho das fontes dos títulos e subtítulos */
+.presentation-mode h1, .presentation-mode .text-2xl {
+  font-size: 2.25rem !important; /* Aumenta o título principal */
+}
+.presentation-mode h2, .presentation-mode .text-lg {
+  font-size: 1.75rem !important; /* Aumenta os subtítulos das seções */
+}
+.presentation-mode .text-base {
+    font-size: 1.2rem !important;
+}
+.presentation-mode .text-sm {
+    font-size: 1rem !important;
+}
+
+/* Aumenta especificamente o tamanho do número principal nos cards de KPI */
+.presentation-mode .kpi-value-large {
+  font-size: 4rem !important;
+  line-height: 1;
+}
+.presentation-mode .kpi-value-medium {
+  font-size: 2.5rem !important; 
+  line-height: 1.2;
+}
+
+/* Garante que os gráficos ocupem mais espaço vertical */
+.presentation-mode .recharts-responsive-container {
+  height: 450px !important;
+  width: 100% !important;
+}

@@ -1,0 +1,75 @@
+/*
+ * Arquivo: /src/pages/PainelVigilancia/PainelVigilancia.css
+ */
+.painel-container {
+  padding: 2rem;
+  background-color: #f8f9fa; /* Um cinza bem claro para o fundo */
+}
+
+.painel-title {
+  margin-bottom: 2rem;
+  color: #343a40;
+}
+
+.painel-row {
+  display: grid;
+  /* Cria 3 colunas, mas por enquanto só usaremos 1 */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem; /* Espaçamento entre os cards */
+}
+
+.error-message {
+  color: #dc3545;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 1rem;
+  border-radius: 8px;
+}
+/* Adicione isto ao final de /src/pages/PainelVigilancia/PainelVigilancia.css */
+.painel-row--gap {
+  margin-top: 2rem;
+}
+
+.painel-col-8 {
+  grid-column: span 8;
+}
+
+.painel-col-4 {
+  grid-column: span 4;
+}
+
+/* Ajuste o grid principal para ter 12 colunas */
+.painel-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr); /* MUDANÇA AQUI */
+  gap: 1.5rem;
+}
+
+.painel-subtitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 1rem;
+}
+
+.placeholder-box {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  color: #adb5bd;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+/* Sobrescrevendo o grid para a primeira linha de cards */
+.painel-row:first-of-type {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.modal-em-destaque {
+  z-index: 2000;
+}

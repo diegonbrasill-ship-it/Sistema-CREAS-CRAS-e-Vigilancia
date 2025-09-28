@@ -1,0 +1,27 @@
+.mapa-container {
+  width: 100%;
+  height: 450px; /* Altura do mapa */
+  border-radius: 8px;
+  overflow: hidden; /* Garante que o mapa não vaze das bordas arredondadas */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.mapa {
+  width: 100%;
+  height: 100%;
+}
+/* Adicione isto ao final de /src/components/vigilancia/MapaCalor.css */
+
+.mapa-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  color: #6c757d;
+  font-style: italic;
+}
+/* Adicione isto ao final do seu arquivo MapaCalor.css */
+
+.leaflet-interactive {
+  cursor: pointer;
+}
