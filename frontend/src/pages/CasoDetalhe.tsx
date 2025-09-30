@@ -251,29 +251,27 @@ export default function CasoDetalhe() {
   if (isLoading) { return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>; }
   if (!caso) { return <div className="text-center p-10">Não foi possível carregar os dados do caso. Tente novamente mais tarde.</div>; }
   
-  const canManageCase = user && (user.role === 'coordenador' || user.role === 'gestor');
   const dataCadastroFormatada = new Date(caso.dataCad).toLocaleDateString( "pt-BR", { timeZone: "UTC" });
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-start flex-wrap gap-4">
-        <Button asChild variant="outline">
-          <Link to="/consulta"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para a Lista de Casos</Link>
-        </Button>
-        <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4"/>Editar Dados</Button>
-            {canManageCase && (
-              <>
-                {caso.status === 'Ativo' ? (
-                  <Button variant="outline" size="sm" onClick={handleDesligarCaso} disabled={isActionLoading}><PowerOff className="mr-2 h-4 w-4"/>Desligar Caso</Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4"/>Reativar Caso</Button>
-                )}
-                <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
-              </>
-            )}
-        </div>
+  <div className="space-y-6">
+    <div className="flex justify-between items-start flex-wrap gap-4">
+      <Button asChild variant="outline">
+        <Link to="/consulta"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para a Lista de Casos</Link>
+      </Button>
+      {/* 2. O wrapper de permissão foi removido daqui */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4"/>Editar Dados</Button>
+        
+        {/* Estes botões agora estão visíveis para todos */}
+        {caso.status === 'Ativo' ? (
+          <Button variant="outline" size="sm" onClick={handleDesligarCaso} disabled={isActionLoading}><PowerOff className="mr-2 h-4 w-4"/>Desligar Caso</Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4"/>Reativar Caso</Button>
+        )}
+        <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
       </div>
+    </div>
 
       <Card>
         <CardHeader>

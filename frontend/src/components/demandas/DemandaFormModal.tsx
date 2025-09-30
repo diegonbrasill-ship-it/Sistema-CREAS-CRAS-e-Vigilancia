@@ -99,18 +99,45 @@ export default function DemandaFormModal({ isOpen, onClose, onSuccess }: Demanda
   };
 
   const handleSubmit = async () => {
-    setIsSaving(true);
-    try {
-      await createDemanda(formData);
-      toast.success("Nova demanda registrada com sucesso!");
-      onSuccess(); // Chama a função de sucesso para atualizar a lista na página-pai
-      onClose(); // Fecha o modal
-    } catch (error: any) {
-      toast.error(`Erro ao salvar demanda: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-    }
+  // --- 1. VALIDAÇÃO ADICIONADA ---
+  const requiredFields = {
+    instituicao_origem: 'Instituição de Origem',
+    tipo_documento: 'Tipo de Documento',
+    assunto: 'Assunto',
+    tecnico_designado_id: 'Técnico Designado',
   };
+
+  for (const [key, label] of Object.entries(requiredFields)) {
+    if (!formData[key as keyof typeof formData]) {
+      toast.warn(`O campo "${label}" é obrigatório.`);
+      return; // Interrompe o salvamento
+    }
+  }
+
+  setIsSaving(true);
+  try {
+    // --- 2. PREPARAÇÃO E LIMPEZA DOS DADOS (PAYLOAD) ---
+    const payload = {
+      ...formData,
+      // Garante que o ID do técnico seja um número ou nulo, nunca uma string vazia
+      tecnico_designado_id: formData.tecnico_designado_id ? parseInt(formData.tecnico_designado_id, 10) : null,
+      // Garante que o ID do caso seja nulo se não estiver definido
+      caso_associado_id: formData.caso_associado_id || null,
+    };
+    
+    await createDemanda(payload); // Envia o payload limpo para a API
+    
+    toast.success("Nova demanda registrada com sucesso!");
+    onSuccess(); // Chama a função de sucesso para atualizar a lista na página-pai
+    onClose(); // Fecha o modal
+  } catch (error: any) {
+    // Tenta extrair uma mensagem de erro mais específica da resposta da API
+    const errorMessage = error.response?.data?.message || error.message;
+    toast.error(`Erro ao salvar demanda: ${errorMessage}`);
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

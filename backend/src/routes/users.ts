@@ -8,7 +8,7 @@ import { logAction } from "../services/logger";
 
 const router = Router();
 
-router.use(authMiddleware, checkRole(['coordenador', 'gestor']));
+router.use(authMiddleware, checkRole(['coordenador', 'gestor', 'Técnico', 'vigilancia']));
 
 router.get("/", async (req: Request, res: Response) => {
   try {
