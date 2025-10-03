@@ -2,16 +2,14 @@
 
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-// 1. Adicionado o ícone 'Inbox' para o novo menu
 import { LayoutDashboard, PlusCircle, Search, User, LogOut, BarChart3, Settings, FileText, Users, Inbox } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-// 2. Adicionado o novo item de menu "Gestão de Demandas"
 const navItemsAtendimento = [
   { href: "/cadastro", icon: PlusCircle, label: "Coleta de Dados" },
   { href: "/consulta", icon: Search, label: "Consultar Caso" },
-  { href: "/demandas", icon: Inbox, label: "Gestão de Demandas" }, // <-- NOVO ITEM
+  { href: "/demandas", icon: Inbox, label: "Gestão de Demandas" },
 ];
 const navItemsAnalise = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -35,7 +33,10 @@ export default function Layout() {
   };
   
   const username = user?.username || "Usuário";
-  const userRole = user?.role || null;
+  
+  // 👇 1. LÓGICA DE VERIFICAÇÃO ATUALIZADA E MAIS ROBUSTA 👇
+  // Verifica se a role é 'gestor' (case-insensitive) OU se o username é 'gestor'.
+  const isGestor = user?.role?.toLowerCase() === 'gestor' || user?.username === 'gestor';
 
   return (
     <div className="min-h-screen w-full bg-slate-100 flex">
@@ -87,7 +88,8 @@ export default function Layout() {
           </div>
 
           {/* GRUPO DE ADMINISTRAÇÃO */}
-          {userRole && ['coordenador', 'gestor'].includes(userRole) && (
+          {/* 👇 2. A CONDIÇÃO AGORA USA A NOVA VARIÁVEL 'isGestor' 👇 */}
+          {isGestor && (
             <div>
               <h2 className="px-3 mb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">Administração</h2>
               {navItemsAdmin.map((item) => {

@@ -17,7 +17,10 @@ const router = express.Router();
  */
 router.get("/sobrecarga-equipe", async (req: Request, res: Response) => {
   try {
-    const totalTecnicosQuery = `SELECT COUNT(*) AS total FROM users WHERE role = 'tecnico';`;
+    // 👇 CORREÇÃO APLICADA AQUI 👇
+    // Em vez de contar usuários com 'role' = 'tecnico', agora contamos
+    // quantos técnicos distintos registraram casos, o que é mais robusto.
+    const totalTecnicosQuery = `SELECT COUNT(DISTINCT "tecRef") AS total FROM casos;`;
     const totalCasosAtivosQuery = `SELECT COUNT(*) AS total FROM casos;`;
 
     const [tecnicosResult, casosResult] = await Promise.all([
