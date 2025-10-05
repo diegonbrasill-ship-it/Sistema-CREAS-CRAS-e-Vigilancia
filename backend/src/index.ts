@@ -10,6 +10,7 @@ import { initDb } from "./db";
 // Importações das Rotas
 import authRoutes from "./routes/auth";
 import usersRoutes from "./routes/users";
+import mseRoutes from "./routes/mse.routes";
 import casosRoutes from "./routes/casos";
 import dashboardRoutes from './routes/dashboard';
 import acompanhamentosRoutes from "./routes/acompanhamentos";
@@ -40,6 +41,7 @@ const PORT = process.env.PORT || 4000;
     // Rotas de Autenticação e Gerenciamento
     app.use("/auth", authRoutes);
     app.use("/api/users", usersRoutes);
+    app.use("/api/mse", mseRoutes);
     app.use("/api/casos", casosRoutes);
     app.use('/api/dashboard', dashboardRoutes);
     app.use('/api/vigilancia', vigilanciaRoutes);
