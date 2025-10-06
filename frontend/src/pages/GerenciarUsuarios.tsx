@@ -18,34 +18,36 @@ import UserEditModal from '@/components/users/UserEditModal';
 import ReassignCasesModal from '@/components/users/ReassignCasesModal';
 
 // ========================================================
-// 📌 Módulos de Mapeamento de Nomenclatura (CENTRALIZADO AQUI)
+// 📌 Módulos de Mapeamento de Nomenclatura
 // ========================================================
 
-// 1. Unidades (Com nomes de UX)
 const UNIDADES_DISPONIVEIS = [
-    { id: 1, nome: 'CREAS' },
-    { id: 2, nome: 'Vigilancia SocioAssistencial' },
-    { id: 3, nome: 'CRAS Geralda Medeiros' },
-    { id: 4, nome: 'CRAS Mariana Alves' },
-    { id: 5, nome: 'CRAS Matheus leitao' },
-    { id: 6, nome: 'CRAS Severina Celestino' },
-    { id: 7, nome: 'Centro POP' },
-    { id: 8, nome: 'Conselho Tutelar Norte' },
+    { id: 1, nome: 'CREAS' },
+    { id: 2, nome: 'Vigilancia SocioAssistencial' }, 
+    { id: 3, nome: 'CRAS Geralda Medeiros' },
+    { id: 4, nome: 'CRAS Mariana Alves' },
+    { id: 5, nome: 'CRAS Matheus leitao' },
+    { id: 6, nome: 'CRAS Severina Celestino' },
+    { id: 7, nome: 'Centro POP' },
+    { id: 8, nome: 'Conselho Tutelar Norte' },
 ];
 
-// 2. Perfis (Com rótulos amigáveis para a UX - Agora com níveis corrigidos)
 const PROFILE_OPTIONS = [
-    // Perfis atualizados conforme suas diretrizes
-    { value: "tecnico_superior", label: "Técnico de Nível Superior" },
-    { value: "tecnico_medio", label: "Técnico de Nível Médio" },
-    { value: "coordenador", label: "Coordenador(a) da Unidade" },
-    { value: "gestor", label: "Secretário(a) / Gestor Geral" },
-    { value: "vigilancia", label: "Vigilância Socioassistencial" },
+    { value: "tecnico_superior", label: "Técnico de Nível Superior" },
+    { value: "tecnico_medio", label: "Técnico de Nível Médio" },
+    { value: "coordenador", label: "Coordenador(a) da Unidade" },
+    { value: "gestor", label: "Secretário(a) / Gestor Geral" },
+    { value: "vigilancia", label: "Vigilância Socioassistencial" },
 ];
-// Função auxiliar para encontrar o rótulo de exibição
+
 const getProfileLabel = (roleValue: string) => {
-    return PROFILE_OPTIONS.find(p => p.value === roleValue)?.label || roleValue;
+    return PROFILE_OPTIONS.find(p => p.value === roleValue)?.label || roleValue;
 };
+
+interface NewUserState {
+    username: string; password: string; role: string; nome_completo: string; cargo: string;
+    unit_id: number | null; 
+}
 
 
 export default function GerenciarUsuarios() {
@@ -53,13 +55,13 @@ export default function GerenciarUsuarios() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [newUser, setNewUser] = useState({ 
-    username: '', 
-    password: '', 
-    role: PROFILE_OPTIONS[0].value, // Define o padrão para o primeiro da lista
-    nome_completo: '', 
-    cargo: '', 
-    unit_id: user?.unit_id || 1 
+  const [newUser, setNewUser] = useState<NewUserState>({ 
+    username: '', 
+    password: '', 
+    role: PROFILE_OPTIONS[0].value, 
+    nome_completo: '', 
+    cargo: '', 
+    unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1 
 });
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -68,7 +70,9 @@ export default function GerenciarUsuarios() {
 
   const fetchUsers = async () => {
     try {
-      const usersData = await getUsers();
+      const response = await getUsers();
+      // 📌 FIX CRÍTICO: Tenta extrair o array de dados de forma segura (como sugerido)
+      const usersData = Array.isArray(response) ? response : response?.rows || response?.data || response?.results || [];
       setUsers(usersData);
     } catch (error: any) {
       toast.error(`Erro ao carregar servidores: ${error.message}`);
@@ -84,7 +88,7 @@ export default function GerenciarUsuarios() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewUser(prev => ({ ...prev, [name]: value }));
+    setNewUser(prev => ({ ...prev, [name]: value } as NewUserState));
   };
 
   const handleRoleChange = (value: string) => {
@@ -92,22 +96,27 @@ export default function GerenciarUsuarios() {
   };
   
   const handleUnitChange = (value: string) => {
-    const selectedUnitId = parseInt(value, 10);
+    const selectedUnitId = value && value !== 'null' ? parseInt(value, 10) : null;
     setNewUser(prev => ({ ...prev, unit_id: selectedUnitId }));
   };
 
   const handleCreateUser = async () => {
-    if (!newUser.username || !newUser.password || !newUser.role || !newUser.nome_completo || !newUser.cargo || !newUser.unit_id) {
+    // Validação
+    if (!newUser.username || !newUser.password || !newUser.role || !newUser.nome_completo || !newUser.cargo || newUser.unit_id === null) {
       toast.warn('Todos os campos (incluindo Unidade) são obrigatórios.');
       return;
     }
-    
+    
     setIsSaving(true);
     try {
       await createUser(newUser); 
       toast.success(`Servidor "${newUser.nome_completo}" criado com sucesso!`);
-      setNewUser({ username: '', password: '', role: PROFILE_OPTIONS[0].value, nome_completo: '', cargo: '', unit_id: user?.unit_id || 1 });
-      fetchUsers();
+      
+      // 📌 FIX FINAL: Recarrega a lista DEPOIS do sucesso
+      await fetchUsers(); 
+      
+      // Limpa e reseta o default APÓS a recarga
+      setNewUser({ username: '', password: '', role: PROFILE_OPTIONS[0].value, nome_completo: '', cargo: '', unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1 });
     } catch (error: any) {
       toast.error(`Erro ao criar servidor: ${error.message}`);
     } finally {
@@ -146,7 +155,7 @@ export default function GerenciarUsuarios() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Gestão de Servidores</h1>
-      <p className="text-slate-500">Gerencie contas de acesso da equipe do SUAS-Patos/PB. (Sua Unidade: {UNIDADES_DISPONIVEIS.find(u => u.id === user?.unit_id)?.nome})</p>
+      <p className="text-slate-500">Gerencie contas de acesso da equipe do SUAS-Patos/PB. (Sua Unidade: {UNIDADES_DISPONIVEIS.find(u => u.id === user?.unit_id)?.nome || "Não Atribuída"})</p>
 
       <Card>
         <CardHeader>
@@ -158,16 +167,17 @@ export default function GerenciarUsuarios() {
             <div className="space-y-2 col-span-2"><Label htmlFor="nome_completo">Nome Completo</Label><Input name="nome_completo" placeholder="Ex: João Paulo da Silva" value={newUser.nome_completo} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="cargo">Cargo/Função</Label><Input name="cargo" placeholder="Ex: Psicólogo, Assistente Social" value={newUser.cargo} onChange={handleInputChange} /></div>
               
-              {/* 📌 SELETOR DE UNIDADE (MOSTRA TODAS AS UNIDADES) */}
-            <div className="space-y-2"><Label htmlFor="unit_id">Unidade</Label><Select value={String(newUser.unit_id)} onValueChange={handleUnitChange}><SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger><SelectContent>
-                {UNIDADES_DISPONIVEIS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
-              </SelectContent></Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p></div>
+            <div className="space-y-2"><Label htmlFor="unit_id">Unidade</Label><Select value={String(newUser.unit_id ?? '')} onValueChange={handleUnitChange}>
+                <SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger>
+                <SelectContent>
+                    {UNIDADES_DISPONIVEIS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                </SelectContent>
+            </Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p></div>
 
             <div className="space-y-2"><Label htmlFor="username">Nome de Usuário</Label><Input name="username" placeholder="ex: joao.silva" value={newUser.username} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="password">Senha Provisória</Label><Input name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="role">Perfil de Acesso</Label><Select value={newUser.role} onValueChange={handleRoleChange}><SelectTrigger id="role"><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>
-                {/* 📌 RÓTULOS DE ACESSO MELHORADOS (CORRIGIDO) */}
-                {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
+                {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.label}>{p.label}</SelectItem>))}
             </SelectContent></Select></div>
           </div>
           <Button onClick={handleCreateUser} disabled={isSaving}>
@@ -187,7 +197,7 @@ export default function GerenciarUsuarios() {
                 <TableHead>Cargo/Função</TableHead>
                 <TableHead>Usuário</TableHead>
                 <TableHead>Perfil</TableHead>
-                <TableHead>Unidade</TableHead> 
+                <TableHead>Unidade</TableHead> 
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -199,7 +209,7 @@ export default function GerenciarUsuarios() {
                   <TableCell>{user.cargo}</TableCell>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{getProfileLabel(user.role)}</TableCell> 
-                    <TableCell>{UNIDADES_DISPONIVEIS.find(u => u.id === user.unit_id)?.nome}</TableCell> 
+                    <TableCell>{UNIDADES_DISPONIVEIS.find(u => u.id === user.unit_id)?.nome}</TableCell> 
                   <TableCell><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'Ativo' : 'Inativo'}</Badge></TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => openEditModal(user)}>

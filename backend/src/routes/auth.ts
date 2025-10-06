@@ -15,14 +15,8 @@ router.post("/login", async (req, res) => {
     }
     
     try {
-        // 📌 MUDANÇA CRÍTICA: SIMPLIFICAÇÃO DA QUERY
-        // Seleciona apenas as colunas mínimas essenciais (id e passwordhash).
-        // As colunas de permissão (role, unit_id, is_active) são selecionadas opcionalmente,
-        // minimizando o risco de falha SQL se o esquema estiver incompleto.
-        const result = await pool.query(
-            'SELECT id, username, passwordhash, role, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', 
-            [username]
-        );
+        // 1. Seleciona todos os campos necessários, incluindo unit_id
+        const result = await pool.query('SELECT id, username, role, passwordhash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
         
         if (result.rowCount === 0) {
             await logAction({ username, action: 'LOGIN_FAILURE', details: { reason: 'User not found' } });
@@ -31,7 +25,13 @@ router.post("/login", async (req, res) => {
         
         const user = result.rows[0];
         
-        // 📌 VERIFICAÇÃO DA SENHA (ANTES DE QUALQUER CHECAGEM DE PERMISSÃO)
+        // 2. Checa unit_id (se for null, bloqueia, exceto se for Gestor que tem unit_id=null)
+        if (!user.unit_id && user.role !== 'gestor') { // Gestor é a única exceção
+             console.error(`ERRO CRÍTICO: Usuário ${username} não possui unit_id. Cadastro incompleto.`);
+             await logAction({ userId: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User unit_id is missing' } });
+             return res.status(403).json({ message: "Erro de configuração do usuário: Unidade de trabalho não definida." });
+        }
+        
         const isPasswordCorrect = await bcrypt.compare(password, user.passwordhash);
         
         if (!isPasswordCorrect) {
@@ -39,34 +39,22 @@ router.post("/login", async (req, res) => {
             return res.status(401).json({ message: "Usuário ou senha inválidos." });
         }
         
-        // 📌 CHECAGENS DE PERMISSÃO E CONFIGURAÇÃO (AGORA MAIS TOLERANTES A CAMPOS NULOS)
-        
-        // 1. Checando Status Ativo
-        if (user.is_active === false) { // Usamos '=== false' para cobrir o caso 'undefined'/'null'
+        if (user.is_active === false) {
             await logAction({ userId: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User is inactive' } });
             return res.status(403).json({ message: "Este usuário foi desativado. Entre em contato com o gestor." });
         }
-        
-        // 2. Checando Unit ID (CRÍTICO) - Se for nulo/undefined, é bloqueado com 403.
-        if (!user.unit_id) {
-             console.error(`ERRO CRÍTICO: Usuário ${username} não possui unit_id. Cadastro incompleto.`);
-             await logAction({ userId: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User unit_id is missing' } });
-             return res.status(403).json({ message: "Erro de configuração: Unidade de trabalho não definida." });
-        }
-        
-        // 3. Checando Role (CRÍTICO) - Se for nulo/undefined, usa 'tecnico' como fallback.
-        const userRole = user.role || 'tecnico'; // Fallback para evitar quebra total
 
         await logAction({ userId: user.id, username: user.username, action: 'LOGIN_SUCCESS', details: { unitId: user.unit_id } });
         
+        // 3. 📌 FIX CRÍTICO: Incluir unit_id no payload do JWT
         const tokenPayload = {
             id: user.id,
             username: user.username,
-            role: userRole,
+            role: user.role,
             nome_completo: user.nome_completo,
             cargo: user.cargo,
             is_active: user.is_active,
-            unit_id: user.unit_id
+            unit_id: user.unit_id, // 🔥 ESTA LINHA CORRIGE O ERRO DE SEGURANÇA
         };
         
         const token = jwt.sign(
@@ -81,7 +69,7 @@ router.post("/login", async (req, res) => {
             user: { 
                 id: user.id, 
                 username: user.username, 
-                role: userRole,
+                role: user.role,
                 nome_completo: user.nome_completo,
                 cargo: user.cargo,
                 is_active: user.is_active,

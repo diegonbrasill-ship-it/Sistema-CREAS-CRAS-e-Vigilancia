@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { QueryResult } from "pg";
 import { authMiddleware, checkRole } from "../middleware/auth";
 import { logAction } from "../services/logger";
-import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; // Importação do filtro de unidade
+import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
 
 const router = Router();
 
@@ -21,34 +21,41 @@ router.use(authMiddleware, checkRole(['coordenador', 'gestor']), unitAccessMiddl
 
 // =======================================================================
 // ROTA GET /users (Listagem: Filtra usuários por unidade do gestor)
+// 📌 CORREÇÃO: Permite que o Gestor Máximo veja TODOS (Filtro 'TRUE' é ignorado)
 // =======================================================================
 router.get("/", async (req: Request, res: Response) => {
-    const accessFilter = req.accessFilter!; // Filtro de unidade gerado pelo middleware
+    const accessFilter = req.accessFilter!; 
     
     try {
-        // 1. Resolve Placeholders e Parâmetros
+        let query = 'SELECT id, username, role, nome_completo, cargo, is_active, unit_id FROM users'; 
         const params: (string | number)[] = [];
-        let unitWhere = accessFilter.whereClause;
-        
-        // Substituir $X, $Y pelos números reais dos placeholders ($1, $2...)
-        if (accessFilter.params.length === 1) {
-            unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
-        } else if (accessFilter.params.length === 2) {
-            unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
-        }
-        
-        // Adicionar os parâmetros da unidade à lista principal
-        params.push(...accessFilter.params);
+        
+        // 📌 FIX CRÍTICO: Se o filtro for 'TRUE' (Gestor Máximo), NÃO adicionamos a cláusula WHERE.
+        if (accessFilter.whereClause !== 'TRUE') { 
+            
+            // 1. Resolve Placeholders e Parâmetros (para Coordenadores/Supervisores)
+            let unitWhere = accessFilter.whereClause;
+            
+            if (accessFilter.params.length === 1) {
+                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
+            } else if (accessFilter.params.length === 2) {
+                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
+            }
+            
+            // Adicionar os parâmetros da unidade à lista principal
+            params.push(...accessFilter.params);
 
-        // 2. Query com filtro de unidade
-        const query = cleanSqlString(`
-            SELECT id, username, role, nome_completo, cargo, is_active, unit_id 
-            FROM users 
-            WHERE ${unitWhere} 
-            ORDER BY username ASC
-        `);
+            // 2. Query com filtro de unidade
+            query += ` WHERE ${unitWhere} ORDER BY username ASC`;
+            
+        } else {
+             // Se for Gestor Geral (TRUE), busca TUDO sem filtro WHERE
+             query += ` ORDER BY username ASC`;
+        }
+        
+        const finalQuery = cleanSqlString(query); 
+        const result = await pool.query(finalQuery, params);
         
-        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err: any) {
         console.error("Erro ao listar usuários:", err.message);
@@ -63,17 +70,18 @@ router.get("/", async (req: Request, res: Response) => {
 router.post("/", async (req: Request, res: Response) => {
     const { username, password, role, nome_completo, cargo, unit_id } = req.body;
     const adminUser = req.user!; 
-
-    // CHECAGEM CRÍTICA: O gestor só pode criar usuários para a sua PRÓPRIA unidade.
-    if (unit_id !== adminUser.unit_id) {
-        return res.status(403).json({ message: "Acesso Proibido. Você só pode criar usuários para a sua unidade de trabalho." });
-    }
-    
-    if (!username || !password || !role || !nome_completo || !cargo || !unit_id) {
+    const adminRole = adminUser.role;
+    
+    // Regra de Autorização de Criação: Coordenadores só podem criar para sua própria unidade. Gestores Máximos podem criar para todos.
+    if (adminRole === 'coordenador' && unit_id !== adminUser.unit_id) {
+        return res.status(403).json({ message: "Acesso Proibido. Coordenadores só podem criar usuários para sua própria unidade." });
+    }
+    
+    if (!username || !password || !role || !nome_completo || !cargo || unit_id === null) {
         return res.status(400).json({ message: "Todos os campos (usuário, senha, perfil, nome completo, cargo, unidade) são obrigatórios." });
     }
-
-    const validRoles = ['tecnico', 'coordenador', 'gestor', 'vigilancia'];
+    
+    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia'];
     if (!validRoles.includes(role)) {
         return res.status(400).json({ message: "Perfil (role) inválido." });
     }
@@ -238,7 +246,7 @@ router.post("/reatribuir", async (req: Request, res: Response) => {
     try {
         await client.query('BEGIN');
         
-        // CHECAGEM CRÍTICA DE UNIDADE: Verifica se AMBOS os usuários pertencem à unidade do admin.
+        // CHECAGEM CRÍTICA DE UNIDADE: Verifica se AMBOS os usuários pertencem à unidade do admin.
         const accessQuery = cleanSqlString(`
             SELECT id, unit_id 
             FROM users 

@@ -3,7 +3,7 @@
 const API_BASE_URL = "http://localhost:4000";
 
 // --- TIPOS DE DADOS E INTERFACES ---
-// 📌 FIX CRÍTICO: Atualiza LoginResponse para incluir todos os campos do JWT
+// FIX CRÍTICO: Interface de Login COMPLETA (sincroniza com o JWT do Back-end)
 type LoginResponse = { 
     message: string; 
     token: string; 
@@ -32,39 +32,36 @@ export interface User {
     nome_completo: string;
     cargo: string;
     is_active: boolean;
-    unit_id: number; 
+    unit_id: number | null; // Permite NULL para Gestor Geral
 }
 
-// 📌 NOVAS INTERFACES PARA MSE
+// 📌 NOVAS INTERFACES PARA MSE (Medida Socioeducativa)
 export type MseTipo = 'LA' | 'PSC' | 'LA + PSC';
 export type MseSituacao = 'CUMPRIMENTO' | 'DESCUMPRIMENTO';
 
 export interface MseRegistroBody {
-    nome_adolescente: string;
-    data_nascimento: string;
-    responsavel?: string;
-    endereco?: string;
-    contato?: string;
-    nis?: string;
-    mse_tipo: MseTipo;
-    mse_data_inicio: string; 
-    mse_duracao_meses: number; 
-    situacao: MseSituacao;
-    local_descumprimento?: string;
-    pia_data_elaboracao?: string;
-    pia_status?: string;
+    nome_adolescente: string; data_nascimento: string; responsavel?: string; endereco?: string; contato?: string; nis?: string;
+    mse_tipo: MseTipo; mse_data_inicio: string; mse_duracao_meses: number; situacao: MseSituacao;
+    local_descumprimento?: string; pia_data_elaboracao?: string; pia_status?: string;
 }
 
 export interface MseRegistroResumido {
-    id: number;
-    nome_adolescente: string;
-    data_nascimento: string;
-    idade_atual: number; 
-    mse_tipo: MseTipo;
-    mse_data_inicio: string;
-    situacao: MseSituacao;
-    registrado_por: string;
+    id: number; nome_adolescente: string; data_nascimento: string; idade_atual: number; mse_tipo: MseTipo; 
+    mse_data_inicio: string; situacao: MseSituacao; registrado_por: string; mse_data_final?: string;
 }
+
+export interface MseKpis {
+    total_medidas: string;
+    total_cumprimento: string;
+    total_descumprimento: string;
+    expirando_em_60_dias: string;
+}
+
+export interface MseApiResponse { 
+    registros: MseRegistroResumido[];
+    kpis: MseKpis;
+}
+
 
 // Interfaces de Dashboard e Casos (MANTIDAS)
 export interface DashboardApiDataType { 
@@ -226,14 +223,34 @@ export const getDemandaById = (id: string | number): Promise<DemandaDetalhada> =
 export const updateDemandaStatus = (id: string | number, status: string): Promise<any> => fetchWithAuth(`/api/demandas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 
 // 📌 NOVO MÓDULO: CONTROLE MSE
-export const getMseRegistros = (filters?: { q?: string }): Promise<MseRegistroResumido[]> => {
+export const getMseRegistros = (filters?: { q?: string }): Promise<MseApiResponse> => {
     const params = new URLSearchParams();
     if (filters?.q) params.append('q', filters.q);
     return fetchWithAuth(`/api/mse/registros?${params.toString()}`);
 }
 
-export const createMseRegistro = (data: MseRegistroBody): Promise<{ message: string; registroId: number }> => 
-    fetchWithAuth('/api/mse/registros', { method: 'POST', body: JSON.stringify(data) });
+// 📌 FIX CRÍTICO: Implementação do unit_id no payload
+export const createMseRegistro = (data: MseRegistroBody): Promise<{ message: string; registroId: number }> => {
+    try {
+        const userData = localStorage.getItem('user');
+        let unit_id: number | null = null;
+        if (userData) {
+            const parsed = JSON.parse(userData);
+            if (parsed?.unit_id) unit_id = Number(parsed.unit_id);
+        }
+
+        // 🚨 FIX: Injetar unit_id no payload antes de enviar (resolve o erro 'User Unit: undefined')
+        const payload = { ...data, unit_id }; 
+
+        return fetchWithAuth('/api/mse/registros', { 
+            method: 'POST', 
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error("Erro ao recuperar unit_id do usuário para MSE:", err);
+        throw new Error("Falha ao incluir unidade do usuário na requisição MSE.");
+    }
+};
 
 export const getMseRegistroById = (id: number): Promise<MseRegistroBody> => 
     fetchWithAuth(`/api/mse/registros/${id}`);
