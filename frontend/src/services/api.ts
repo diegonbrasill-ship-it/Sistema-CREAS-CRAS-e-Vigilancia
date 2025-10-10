@@ -5,24 +5,28 @@ const API_BASE_URL = "http://localhost:4000";
 // --- TIPOS DE DADOS E INTERFACES ---
 // FIX CRÍTICO: Interface de Login COMPLETA (sincroniza com o JWT do Back-end)
 type LoginResponse = { 
-    message: string; 
-    token: string; 
-    user: { 
-        id: number; 
-        username: string; 
-        role: string; 
-        nome_completo: string; 
-        cargo: string; 
-        is_active: boolean; 
-        unit_id: number; 
-    }; 
+    message: string; 
+    token: string; 
+    user: { 
+        id: number; 
+        username: string; 
+        role: string; 
+        nome_completo: string; 
+        cargo: string; 
+        is_active: boolean; 
+        unit_id: number; 
+    }; 
 };
 type ChartData = { name: string; value: number; };
 
 export interface Anexo {
     id: number;
     nomeOriginal: string;
-    dataUpload: string;
+    // Tipos adicionais necessários para o componente CasoDetalhe
+    tamanhoArquivo?: number; 
+    dataUpload: string;
+    descricao?: string; 
+    uploadedBy?: string;
 }
 
 export interface User {
@@ -32,7 +36,7 @@ export interface User {
     nome_completo: string;
     cargo: string;
     is_active: boolean;
-    unit_id: number | null; // Permite NULL para Gestor Geral
+    unit_id: number | null; 
 }
 
 // 📌 NOVAS INTERFACES PARA MSE (Medida Socioeducativa)
@@ -51,31 +55,31 @@ export interface MseRegistroResumido {
 }
 
 export interface MseKpis {
-    total_medidas: string;
-    total_cumprimento: string;
-    total_descumprimento: string;
-    expirando_em_60_dias: string;
+    total_medidas: string;
+    total_cumprimento: string;
+    total_descumprimento: string;
+    expirando_em_60_dias: string;
 }
 
 export interface MseApiResponse { 
-    registros: MseRegistroResumido[];
-    kpis: MseKpis;
+    registros: MseRegistroResumido[];
+    kpis: MseKpis;
 }
 
 
 // Interfaces de Dashboard e Casos (MANTIDAS)
 export interface DashboardApiDataType { 
-    indicadores: {
-        totalAtendimentos: number; novosNoMes: number; inseridosPAEFI: number; reincidentes: number;
-        recebemBolsaFamilia: number; recebemBPC: number; violenciaConfirmada: number; notificadosSINAN: number;
-        contextoFamiliar: { dependenciaFinanceira: number; vitimaPCD: number; membroCarcerario: number; membroSocioeducacao: number; };
-    };
-    principais: { moradiaPrincipal: string; escolaridadePrincipal: string; violenciaPrincipal: string; localPrincipal: string; };
-    graficos: { tiposViolacao: ChartData[]; casosPorBairro: ChartData[]; casosPorSexo: ChartData[]; encaminhamentosTop5: ChartData[]; canalDenuncia: ChartData[]; casosPorCor: ChartData[]; casosPorFaixaEtaria: ChartData[]; };
+    indicadores: {
+        totalAtendimentos: number; novosNoMes: number; inseridosPAEFI: number; reincidentes: number;
+        recebemBolsaFamilia: number; recebemBPC: number; violenciaConfirmada: number; notificadosSINAN: number;
+        contextoFamiliar: { dependenciaFinanceira: number; vitimaPCD: number; membroCarcerario: number; membroSocioeducacao: number; };
+    };
+    principais: { moradiaPrincipal: string; escolaridadePrincipal: string; violenciaPrincipal: string; localPrincipal: string; };
+    graficos: { tiposViolacao: ChartData[]; casosPorBairro: ChartData[]; casosPorSexo: ChartData[]; encaminhamentosTop5: ChartData[]; canalDenuncia: ChartData[]; casosPorCor: ChartData[]; casosPorFaixaEtaria: ChartData[]; };
 }
 export interface ApiResponse { 
-    dados: DashboardApiDataType;
-    opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
+    dados: DashboardApiDataType;
+    opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
 }
 
 export interface FiltrosCasos { 
@@ -139,20 +143,26 @@ export async function login(username: string, password: string): Promise<LoginRe
 }
 
 // CASOS
-export const createCase = (casoData: any) => fetchWithAuth('/api/casos', { method: 'POST', body: JSON.stringify(casoData) });
+export const createCase = (casoData: any) => fetchWithAuth(`/api/casos`, { method: 'POST', body: JSON.stringify(casoData) });
 export const updateCase = (id: number | string, casoData: any) => fetchWithAuth(`/api/casos/${id}`, { method: 'PUT', body: JSON.stringify(casoData) });
 export const updateCasoStatus = (casoId: string | number, status: string) => fetchWithAuth(`/api/casos/${casoId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
+// ✅ CORRIGIDO: Uso de crases
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
+
 export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
     const params = new URLSearchParams();
-    if (filters) {
-        if (filters.filtro) params.append('filtro', filters.filtro);
-        if (filters.valor) params.append('valor', filters.valor);
-        if (filters.tecRef) params.append('tecRef', filters.tecRef);
-        if (filters.mes) params.append('mes', filters.mes);
-        if (filters.status) params.append('status', filters.status); 
-    }
+    
+    // Itera sobre o objeto filters para montar a query string
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            // Apenas adiciona o parâmetro se o valor não for nulo/indefinido e não for uma string vazia
+            if (value !== null && value !== undefined && value !== '') {
+                params.append(key, String(value));
+            }
+        });
+    }
+
     return fetchWithAuth(`/api/casos?${params.toString()}`);
 };
 export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
@@ -161,19 +171,26 @@ export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
 };
 
 // ACOMPANHAMENTOS
+// ✅ CORRIGIDO: Uso de crases
 export const getAcompanhamentos = (casoId: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`);
 export const createAcompanhamento = (casoId: string, texto: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`, { method: 'POST', body: JSON.stringify({ texto }) });
 
 // ENCAMINHAMENTOS
+// ✅ CORRIGIDO: Uso de crases
 export const getEncaminhamentos = (casoId: string) => fetchWithAuth(`/api/casos/${casoId}/encaminhamentos`);
-export const createEncaminhamento = (data: object) => fetchWithAuth('/api/encaminhamentos', { method: 'POST', body: JSON.stringify(data) });
+export const createEncaminhamento = (data: object) => fetchWithAuth(`/api/encaminhamentos`, { method: 'POST', body: JSON.stringify(data) });
 export const updateEncaminhamento = (id: number, data: object) => fetchWithAuth(`/api/encaminhamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // ANEXOS
+// ✅ CORRIGIDO: Uso de crases
 export const getAnexosByCasoId = (casoId: string) => fetchWithAuth(`/api/anexos/casos/${casoId}`);
+// ✅ CORRIGIDO: Uso de crases
 export const uploadAnexoParaCaso = (casoId: string | number, formData: FormData) => fetchWithAuth(`/api/anexos/upload/caso/${casoId}`, { method: 'POST', body: formData });
+// ✅ CORRIGIDO: Uso de crases
 export const uploadAnexoParaDemanda = (demandaId: string | number, formData: FormData) => fetchWithAuth(`/api/anexos/upload/demanda/${demandaId}`, { method: 'POST', body: formData });
+
 export async function downloadAnexo(anexoId: number): Promise<{ blob: Blob, filename: string }> {
+    // ✅ CORRIGIDO: Uso de crases
     const response = await fetchWithAuth(`/api/anexos/download/${anexoId}`) as Response;
     const disposition = response.headers.get('content-disposition');
     let filename = 'arquivo_anexo';
@@ -188,14 +205,15 @@ export async function downloadAnexo(anexoId: number): Promise<{ blob: Blob, file
 }
 
 // USUÁRIOS
-export const getUsers = () => fetchWithAuth('/api/users');
-export const createUser = (data: object) => fetchWithAuth('/api/users', { method: 'POST', body: JSON.stringify(data) });
+export const getUsers = () => fetchWithAuth(`/api/users`);
+export const createUser = (data: object) => fetchWithAuth(`/api/users`, { method: 'POST', body: JSON.stringify(data) });
 export const updateUser = (id: number, data: Partial<User>) => fetchWithAuth(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const updateUserStatus = (id: number, isActive: boolean) => fetchWithAuth(`/api/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive }) });
-export const reassignUserCases = (fromUserId: number, toUserId: number) => fetchWithAuth('/api/users/reatribuir', { method: 'POST', body: JSON.stringify({ fromUserId, toUserId }) });
+export const reassignUserCases = (fromUserId: number, toUserId: number) => fetchWithAuth(`/api/users/reatribuir`, { method: 'POST', body: JSON.stringify({ fromUserId, toUserId }) });
+
 // RELATÓRIOS
 export async function generateReport(filters: { startDate: string, endDate: string }): Promise<Blob> {
-    const response = await fetchWithAuth('/api/relatorios/geral', { method: 'POST', body: JSON.stringify(filters) }) as Response;
+    const response = await fetchWithAuth(`/api/relatorios/geral`, { method: 'POST', body: JSON.stringify(filters) }) as Response;
     return response.blob();
 }
 
@@ -209,48 +227,46 @@ export const getDashboardData = (filters?: { mes?: string, tecRef?: string, bair
 };
 
 // PAINEL DE VIGILÂNCIA
-export const getVigilanciaFluxoDemanda = () => fetchWithAuth('/api/vigilancia/fluxo-demanda');
-export const getVigilanciaSobrecargaEquipe = () => fetchWithAuth('/api/vigilancia/sobrecarga-equipe');
-export const getVigilanciaIncidenciaBairros = () => fetchWithAuth('/api/vigilancia/incidencia-bairros');
-export const getVigilanciaFontesAcionamento = () => fetchWithAuth('/api/vigilancia/fontes-acionamento');
-export const getVigilanciaTaxaReincidencia = () => fetchWithAuth('/api/vigilancia/taxa-reincidencia');
-export const getVigilanciaPerfilViolacoes = () => fetchWithAuth('/api/vigilancia/perfil-violacoes');
+export const getVigilanciaFluxoDemanda = () => fetchWithAuth(`/api/vigilancia/fluxo-demanda`);
+export const getVigilanciaSobrecargaEquipe = () => fetchWithAuth(`/api/vigilancia/sobrecarga-equipe`);
+export const getVigilanciaIncidenciaBairros = () => fetchWithAuth(`/api/vigilancia/incidencia-bairros`);
+export const getVigilanciaFontesAcionamento = () => fetchWithAuth(`/api/vigilancia/fontes-acionamento`);
+export const getVigilanciaTaxaReincidencia = () => fetchWithAuth(`/api/vigilancia/taxa-reincidencia`);
+export const getVigilanciaPerfilViolacoes = () => fetchWithAuth(`/api/vigilancia/perfil-violacoes`);
 
 // DEMANDAS
-export const getDemandas = (): Promise<Demanda[]> => fetchWithAuth('/api/demandas');
-export const createDemanda = (demandaData: object): Promise<any> => fetchWithAuth('/api/demandas', { method: 'POST', body: JSON.stringify(demandaData) });
+export const getDemandas = (): Promise<Demanda[]> => fetchWithAuth(`/api/demandas`);
+export const createDemanda = (demandaData: object): Promise<any> => fetchWithAuth(`/api/demandas`, { method: 'POST', body: JSON.stringify(demandaData) });
 export const getDemandaById = (id: string | number): Promise<DemandaDetalhada> => fetchWithAuth(`/api/demandas/${id}`);
 export const updateDemandaStatus = (id: string | number, status: string): Promise<any> => fetchWithAuth(`/api/demandas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 
 // 📌 NOVO MÓDULO: CONTROLE MSE
 export const getMseRegistros = (filters?: { q?: string }): Promise<MseApiResponse> => {
-    const params = new URLSearchParams();
-    if (filters?.q) params.append('q', filters.q);
-    return fetchWithAuth(`/api/mse/registros?${params.toString()}`);
+    const params = new URLSearchParams();
+    if (filters?.q) params.append('q', filters.q);
+    return fetchWithAuth(`/api/mse/registros?${params.toString()}`);
 }
 
-// 📌 FIX CRÍTICO: Implementação do unit_id no payload
 export const createMseRegistro = (data: MseRegistroBody): Promise<{ message: string; registroId: number }> => {
-    try {
-        const userData = localStorage.getItem('user');
-        let unit_id: number | null = null;
-        if (userData) {
-            const parsed = JSON.parse(userData);
-            if (parsed?.unit_id) unit_id = Number(parsed.unit_id);
-        }
+    try {
+        const userData = localStorage.getItem('user');
+        let unit_id: number | null = null;
+        if (userData) {
+            const parsed = JSON.parse(userData);
+            if (parsed?.unit_id) unit_id = Number(parsed.unit_id);
+        }
 
-        // 🚨 FIX: Injetar unit_id no payload antes de enviar (resolve o erro 'User Unit: undefined')
-        const payload = { ...data, unit_id }; 
+        const payload = { ...data, unit_id }; 
 
-        return fetchWithAuth('/api/mse/registros', { 
-            method: 'POST', 
-            body: JSON.stringify(payload),
-        });
-    } catch (err) {
-        console.error("Erro ao recuperar unit_id do usuário para MSE:", err);
-        throw new Error("Falha ao incluir unidade do usuário na requisição MSE.");
-    }
+        return fetchWithAuth(`/api/mse/registros`, { 
+            method: 'POST', 
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error("Erro ao recuperar unit_id do usuário para MSE:", err);
+        throw new Error("Falha ao incluir unidade do usuário na requisição MSE.");
+    }
 };
 
 export const getMseRegistroById = (id: number): Promise<MseRegistroBody> => 
-    fetchWithAuth(`/api/mse/registros/${id}`);
+    fetchWithAuth(`/api/mse/registros/${id}`);

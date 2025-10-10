@@ -1,94 +1,84 @@
+"use strict";
 // backend/src/db.ts
-
-import { Pool } from "pg";
-import dotenv from "dotenv";
-
-dotenv.config();
-
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initDb = initDb;
+const pg_1 = require("pg");
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 // Configuração de conexão com PostgreSQL usando variáveis de ambiente
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_DATABASE,
-  password: process.env.DB_PASSWORD,
-  port: Number(process.env.DB_PORT),
+const pool = new pg_1.Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: Number(process.env.DB_PORT),
 });
-
 // Flag de controle para inicialização única
 let isDbInitialized = false;
-
-export async function initDb() {
-  if (isDbInitialized) {
-    return pool;
-  }
-
-  const client = await pool.connect();
-  console.log("🐘 Conectado ao PostgreSQL com sucesso!");
-
-  try {
-    // --- 1. Tabela unidades ---
-    await client.query(`
+async function initDb() {
+    if (isDbInitialized) {
+        return pool;
+    }
+    const client = await pool.connect();
+    console.log("🐘 Conectado ao PostgreSQL com sucesso!");
+    try {
+        // --- 1. Tabela unidades ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS unidades (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
         type VARCHAR(50) NOT NULL
       );
     `.trim());
-
-    // --- 2. Tabela users ---
-    await client.query(`
+        // --- 2. Tabela users ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         passwordHash TEXT NOT NULL
       );
     `.trim());
-
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nome_completo TEXT`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cargo TEXT`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50)`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
-
-    console.log("Tabela 'users' e 'unidades' verificada/atualizada.");
-
-    // --- 3. Tabelas roles e permissions ---
-    await client.query(`
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nome_completo TEXT`.trim());
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cargo TEXT`.trim());
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`.trim());
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50)`.trim());
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
+        console.log("Tabela 'users' e 'unidades' verificada/atualizada.");
+        // --- 3. Tabelas roles e permissions ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS roles (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
         description TEXT
       );
     `.trim());
-
-    await client.query(`
+        await client.query(`
       CREATE TABLE IF NOT EXISTS permissions (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
         description TEXT
       );
     `.trim());
-
-    await client.query(`
+        await client.query(`
       CREATE TABLE IF NOT EXISTS user_roles (
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
         PRIMARY KEY (user_id, role_id)
       );
     `.trim());
-
-    await client.query(`
+        await client.query(`
       CREATE TABLE IF NOT EXISTS role_permissions (
         role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
         permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
         PRIMARY KEY (role_id, permission_id)
       );
     `.trim());
-
-    console.log("Tabelas de papéis e permissões verificadas/criadas.");
-
-    // --- 4. Tabela casos ---
-    await client.query(`
+        console.log("Tabelas de papéis e permissões verificadas/criadas.");
+        // --- 4. Tabela casos ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS casos (
         id SERIAL PRIMARY KEY,
         "dataCad" DATE NOT NULL,
@@ -99,12 +89,10 @@ export async function initDb() {
         "userId" INTEGER NOT NULL REFERENCES users(id)
       );
     `.trim());
-
-    await client.query(`ALTER TABLE casos ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
-    console.log("Tabela 'casos' verificada/criada.");
-
-    // --- 5. Tabela registros_mse ---
-    await client.query(`
+        await client.query(`ALTER TABLE casos ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
+        console.log("Tabela 'casos' verificada/criada.");
+        // --- 5. Tabela registros_mse ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS registros_mse (
         id SERIAL PRIMARY KEY,
         nome_adolescente VARCHAR(255) NOT NULL,
@@ -128,10 +116,9 @@ export async function initDb() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `.trim());
-    console.log("Tabela 'registros_mse' verificada/criada.");
-
-    // --- 6. Tabela logs ---
-    await client.query(`
+        console.log("Tabela 'registros_mse' verificada/criada.");
+        // --- 6. Tabela logs ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS logs (
         id SERIAL PRIMARY KEY,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -141,9 +128,8 @@ export async function initDb() {
         details JSONB
       );
     `.trim());
-
-    // --- 7. Tabela acompanhamentos ---
-    await client.query(`
+        // --- 7. Tabela acompanhamentos ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS acompanhamentos (
         id SERIAL PRIMARY KEY,
         texto TEXT NOT NULL,
@@ -152,9 +138,8 @@ export async function initDb() {
         "userId" INTEGER NOT NULL REFERENCES users(id)
       );
     `.trim());
-
-    // --- 8. Tabela encaminhamentos ---
-    await client.query(`
+        // --- 8. Tabela encaminhamentos ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS encaminhamentos (
         id SERIAL PRIMARY KEY,
         "casoId" INTEGER NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
@@ -167,9 +152,8 @@ export async function initDb() {
         "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `.trim());
-
-    // --- 9. Tabela anexos ---
-    await client.query(`
+        // --- 9. Tabela anexos ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS anexos (
         id SERIAL PRIMARY KEY,
         "casoId" INTEGER REFERENCES casos(id) ON DELETE CASCADE,
@@ -183,9 +167,8 @@ export async function initDb() {
         "dataUpload" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `.trim());
-
-    // --- 10. Tabela demandas ---
-    await client.query(`
+        // --- 10. Tabela demandas ---
+        await client.query(`
       CREATE TABLE IF NOT EXISTS demandas (
         id SERIAL PRIMARY KEY,
         tipo_documento VARCHAR(100) NOT NULL,
@@ -201,32 +184,22 @@ export async function initDb() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `.trim());
-
-    // --- 11. Alterações e índices ---
-    await client.query(`ALTER TABLE demandas ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
-    await client.query(`ALTER TABLE anexos ADD COLUMN IF NOT EXISTS "demandaId" INTEGER REFERENCES demandas(id) ON DELETE CASCADE`.trim());
-
-    await client.query(`
+        // --- 11. Alterações e índices ---
+        await client.query(`ALTER TABLE demandas ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
+        await client.query(`ALTER TABLE anexos ADD COLUMN IF NOT EXISTS "demandaId" INTEGER REFERENCES demandas(id) ON DELETE CASCADE`.trim());
+        await client.query(`
       CREATE INDEX IF NOT EXISTS idx_casos_dados_completos_gin ON casos USING GIN (dados_completos);
     `.trim());
-
-    console.log("✅ Esquema do banco de dados (todas as tabelas) verificado/criado com sucesso.");
-
-    isDbInitialized = true;
-  } catch (err: any) {
-    console.error("❌ ERRO FATAL: Falha na execução do DDL.", err);
-    throw err;
-  } finally {
-    client.release();
-  }
-
-  return pool;
+        console.log("✅ Esquema do banco de dados (todas as tabelas) verificado/criado com sucesso.");
+        isDbInitialized = true;
+    }
+    catch (err) {
+        console.error("❌ ERRO FATAL: Falha na execução do DDL.", err);
+        throw err;
+    }
+    finally {
+        client.release();
+    }
+    return pool;
 }
-
-export default pool;
-
-
-
-
-
-
+exports.default = pool;

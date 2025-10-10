@@ -20,6 +20,7 @@ import {
   downloadAnexo,
   updateCasoStatus,
   deleteCaso,
+  Anexo // Importado o tipo Anexo
 } from "../services/api";
 
 // Importações de componentes UI
@@ -36,7 +37,9 @@ import { ArrowLeft, Loader2, CheckCircle, Upload, Download, FileText, Power, Pow
 
 // Tipagens locais
 interface Encaminhamento { id: number; servicoDestino: string; dataEncaminhamento: string; status: string; observacoes: string; tecRef: string; }
-interface Anexo { id: number; nomeOriginal: string; tamanhoArquivo: number; dataUpload: string; descricao: string; uploadedBy: string; }
+// A interface Anexo foi movida para api.ts, mas o componente a usa.
+// interface Anexo { id: number; nomeOriginal: string; tamanhoArquivo: number; dataUpload: string; descricao: string; uploadedBy: string; } 
+
 
 // Componente auxiliar
 function DataItem({ label, value }: { label: string; value: any }) {
@@ -53,14 +56,19 @@ const listaDeServicos = [ "CRAS", "CREAS", "Conselho Tutelar", "Ministério Púb
 
 
 export default function CasoDetalhe() {
+  // ✅ EXTRAÇÃO SIMPLES: Confia no React Router para passar a string ID
   const { id } = useParams<{ id: string }>();
+  
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // REGRA CORRIGIDA: Todos os perfis operacionais têm autonomia sobre o prontuário.
-  const userRole = user?.role;
-  const isOperacional = userRole === 'gestor' || userRole === 'coordenador' || userRole === 'tecnico' || userRole === 'vigilancia'; 
-  const canDelete = isOperacional; 
+  // REGRA CORRIGIDA: Todos os perfis operacionais têm autonomia sobre o prontuário.
+  // ⭐️ CORREÇÃO AQUI: Garante que userRole é uma string vazia se for null/undefined
+  const userRole = user?.role || ''; 
+  
+  const isOperacional = userRole.includes('gestor') || userRole.includes('coordenador') || 
+                        userRole.includes('tecnico') || userRole.includes('vigilancia'); 
+  const canDelete = isOperacional;  
 
   const [caso, setCaso] = useState<CasoDetalhado | null>(null);
   const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
@@ -80,8 +88,9 @@ export default function CasoDetalhe() {
   const [anexoDescricao, setAnexoDescricao] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // O useCallback garante que a função de busca não mude, o que é importante para o useEffect.
+  // O useCallback garante que a função de busca não mude, o que é importante para o useEffect.
   const fetchData = useCallback(async () => {
+    // Usa o ID extraído
     if (!id) return;
     try {
       const [casoData, acompanhamentosData, encaminhamentosData, anexosData] =
@@ -112,10 +121,10 @@ export default function CasoDetalhe() {
       toast.warn("O texto do acompanhamento não pode estar vazio.");
       return;
     }
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para registrar acompanhamentos.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para registrar acompanhamentos.");
+        return;
+    }
     setIsSaving(true);
     try {
       await createAcompanhamento(id, novoAcompanhamento);
@@ -134,10 +143,10 @@ export default function CasoDetalhe() {
       toast.warn("Serviço de Destino e Data são obrigatórios.");
       return;
     }
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para registrar encaminhamentos.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para registrar encaminhamentos.");
+        return;
+    }
     setIsSavingEnc(true);
     try {
       await createEncaminhamento({
@@ -159,10 +168,10 @@ export default function CasoDetalhe() {
   };
 
   const handleAtualizarStatus = async (encaminhamentoId: number, novoStatus: string) => {
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para atualizar status.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para atualizar status.");
+        return;
+    }
     setUpdatingEncId(encaminhamentoId);
     try {
       await updateEncaminhamento(encaminhamentoId, { status: novoStatus });
@@ -186,10 +195,10 @@ export default function CasoDetalhe() {
       toast.warn("Por favor, selecione um arquivo para enviar.");
       return;
     }
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para anexar documentos.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para anexar documentos.");
+        return;
+    }
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -210,7 +219,7 @@ export default function CasoDetalhe() {
   };
 
   const handleDownloadAnexo = async (anexoId: number) => {
-    // Downloads são permitidos para todos que podem ver o caso (Back-end checa)
+    // Downloads são permitidos para todos que podem ver o caso (Back-end checa)
     setDownloadingAnexoId(anexoId);
     try {
       const { blob, filename } = await downloadAnexo(anexoId);
@@ -231,10 +240,10 @@ export default function CasoDetalhe() {
 
   const handleDesligarCaso = async () => {
     if (!id || !window.confirm("Você tem certeza que deseja DESLIGAR este caso?")) return;
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para mudar o status do caso.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para mudar o status do caso.");
+        return;
+    }
     setIsActionLoading(true);
     try {
       await updateCasoStatus(id, "Desligado");
@@ -249,10 +258,10 @@ export default function CasoDetalhe() {
 
   const handleReativarCaso = async () => {
     if (!id || !window.confirm("Você tem certeza que deseja REATIVAR este caso?")) return;
-    if (!isOperacional) {
-        toast.error("Você não tem permissão para mudar o status do caso.");
-        return;
-    }
+    if (!isOperacional) {
+        toast.error("Você não tem permissão para mudar o status do caso.");
+        return;
+    }
     setIsActionLoading(true);
     try {
       await updateCasoStatus(id, "Ativo");
@@ -267,10 +276,10 @@ export default function CasoDetalhe() {
 
   const handleExcluirCaso = async () => {
     if (!id || !window.confirm("!!! ATENÇÃO !!!\nVocê tem certeza que deseja EXCLUIR PERMANENTEMENTE este caso? Esta ação não pode ser desfeita.")) return;
-    if (!canDelete) {
-        toast.error("Você não tem permissão para excluir este caso.");
-        return;
-    }
+    if (!canDelete) {
+        toast.error("Você não tem permissão para excluir este caso.");
+        return;
+    }
     setIsActionLoading(true);
     try {
       await deleteCaso(id);
@@ -294,23 +303,23 @@ export default function CasoDetalhe() {
       <Button asChild variant="outline">
         <Link to="/consulta"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para a Lista de Casos</Link>
       </Button>
-      
+      
       <div className="flex items-center gap-2 flex-wrap">
-        {/* 📌 BOTÕES OPERACIONAIS (Visível para TODOS os Operacionais) */}
-        {isOperacional && (
-          <>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4"/>Editar Dados</Button>
-            
-            {caso.status === 'Ativo' ? (
-              <Button variant="outline" size="sm" onClick={handleDesligarCaso} disabled={isActionLoading}><PowerOff className="mr-2 h-4 w-4"/>Desligar Caso</Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4"/>Reativar Caso</Button>
-            )}
-            
-            {/* 📌 EXCLUSÃO PERMANENTE (Visível para TODOS os Operacionais) */}
-            <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
-          </>
-        )}
+        {/* 📌 BOTÕES OPERACIONAIS (Visível para TODOS os Operacionais) */}
+        {isOperacional && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4"/>Editar Dados</Button>
+            
+            {caso.status === 'Ativo' ? (
+              <Button variant="outline" size="sm" onClick={handleDesligarCaso} disabled={isActionLoading}><PowerOff className="mr-2 h-4 w-4"/>Desligar Caso</Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4"/>Reativar Caso</Button>
+            )}
+            
+            {/* 📌 EXCLUSÃO PERMANENTE (Visível para TODOS os Operacionais) */}
+            <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
+          </>
+        )}
       </div>
     </div>
 
@@ -334,9 +343,9 @@ export default function CasoDetalhe() {
       
       {/* Módulos Operacionais visíveis para todos */}
       {isOperacional && (
-        <div className="space-y-6">
-        
-        {caso.demandasVinculadas && caso.demandasVinculadas.length > 0 && (
+        <div className="space-y-6">
+        
+        {caso.demandasVinculadas && caso.demandasVinculadas.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center"><Inbox className="mr-2 h-5 w-5 text-slate-600" />Demandas Externas Vinculadas</CardTitle>
@@ -406,9 +415,9 @@ export default function CasoDetalhe() {
               </div>
           </CardContent>
         </Card>
-        
-          </div>   
-    )}
-  </div>       
+        
+          </div>   
+    )}
+  </div>       
 );
 }

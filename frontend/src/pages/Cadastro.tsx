@@ -88,9 +88,9 @@ export default function Cadastro() {
       tecRef: "",
     },
   });
-  
-  // 📌 Estado para controlar o carregamento na edição
-  const [isDataLoading, setIsDataLoading] = useState(isEditMode);
+  
+  // 📌 Estado para controlar o carregamento na edição
+  const [isDataLoading, setIsDataLoading] = useState(isEditMode);
 
   const [activeTab, setActiveTab] = useState("atendimento");
 
@@ -99,37 +99,37 @@ export default function Cadastro() {
     if (isEditMode && id) {
       const loadCasoData = async () => {
         try {
-            setIsDataLoading(true);
+            setIsDataLoading(true);
             // Chama a API para buscar os dados do caso existente
           const casoData = await getCasoById(id);
-            
-            // Corrige a formatação da data para o input type="date"
-            const dataCadFormatada = casoData.dataCad ? new Date(casoData.dataCad).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            
+            // Corrige a formatação da data para o input type="date"
+            const dataCadFormatada = casoData.dataCad ? new Date(casoData.dataCad).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
-            // Usa o spread para preencher todos os campos do formulário
+            // Usa o spread para preencher todos os campos do formulário
           reset({ ...casoData, dataCad: dataCadFormatada });
         } catch (error) {
           toast.error("Não foi possível carregar os dados do caso para edição.");
           navigate("/consulta");
         } finally {
-            setIsDataLoading(false);
-        }
+            setIsDataLoading(false);
+        }
       };
       loadCasoData();
     } else if (user) {
-        // Modo CRIAÇÃO: Preenche o Técnico de Referência automaticamente
-        const nomeCompleto = user.nome_completo || user.username;
-        const cargo = user.cargo || "";
-        // Verifica se a role é tecnico_superior ou tecnico_medio e define a referencia
-        const tecRefFormatado = user.role.includes('tecnico') && cargo 
-            ? `${nomeCompleto} - ${cargo}` 
-            : (nomeCompleto || "");
-        
-        reset({
-            dataCad: new Date().toISOString().split('T')[0],
-            tecRef: tecRefFormatado,
-        });
-        setIsDataLoading(false);
+        // Modo CRIAÇÃO: Preenche o Técnico de Referência automaticamente
+        const nomeCompleto = user.nome_completo || user.username;
+        const cargo = user.cargo || "";
+        // Verifica se a role é tecnico_superior ou tecnico_medio e define a referencia
+        const tecRefFormatado = user.role.includes('tecnico') && cargo 
+            ? `${nomeCompleto} - ${cargo}` 
+            : (nomeCompleto || "");
+        
+        reset({
+            dataCad: new Date().toISOString().split('T')[0],
+            tecRef: tecRefFormatado,
+        });
+        setIsDataLoading(false);
     }
   }, [id, isEditMode, reset, navigate, user, setValue]);
 
@@ -138,38 +138,60 @@ export default function Cadastro() {
   const encaminhamentoValue = watch("encaminhamento");
 
   const onSubmit = async (data: CasoForm) => {
-    // Limpa campos vazios ou nulos que não devem ser enviados
-    const payload = Object.fromEntries(
-        Object.entries(data).filter(([_, v]) => v !== null && v !== undefined && v !== '')
-    ) as CasoForm;
-    
+    // Limpa campos vazios ou nulos que não devem ser enviados
+    const payload = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== null && v !== undefined && v !== '')
+    ) as CasoForm;
+    
     try {
       if (isEditMode) {
         const dirtyData: Partial<CasoForm> = {};
-        
-        // Mapeia APENAS os campos modificados (dirtyFields)
+        
+        // Mapeia APENAS os campos modificados (dirtyFields)
         (Object.keys(dirtyFields) as Array<keyof CasoForm>).forEach(key => {
-            const value = getValues(key);
-            // Garante que campos vazios de texto sejam enviados como string vazia ou nula (Back-end lida)
+            const value = getValues(key);
+            // Garante que campos vazios de texto sejam enviados como string vazia ou nula (Back-end lida)
           (dirtyData as any)[key] = (value === null || value === undefined) ? '' : value; 
         });
         
-        // Garante que pelo menos um campo modificado + o ID seja enviado
-        if (Object.keys(dirtyData).length === 0) {
+        // ⭐️ REINTRODUZ DADOS OBRIGATÓRIOS DO CASO ⭐️
+        // Garante que dataCad e tecRef sempre sejam enviados no PUT para evitar a quebra do Back-end.
+        (dirtyData as any).dataCad = data.dataCad; 
+        (dirtyData as any).tecRef = data.tecRef;
+        
+        // Garante que pelo menos um campo modificado + o ID seja enviado
+        if (Object.keys(dirtyFields).length === 0) { // Agora checa apenas se HOUVE modificação de aba
           toast.info("Nenhuma alteração para salvar.");
           return;
         }
-        
-        // 📌 Ação de Edição (PUT)
+        
+        // 📌 Ação de Edição (PUT)
         await updateCase(id, dirtyData);
         toast.success("✅ Progresso salvo com sucesso!");
-        reset(data, { keepValues: true, keepDefaultValues: true }); // Reseta o dirty state
-        
+        reset(data, { keepValues: true, keepDefaultValues: true }); // Reseta o dirty state
+        
       } else {
-        // 📌 Ação de Criação (POST)
-        const response = await createCase(payload);
+        // 📌 Ação de Criação (POST)
+        
+        // ⭐️ CORREÇÃO 1: Inclui o unit_id do usuário logado no payload
+        const payloadComUnidade = { 
+            ...payload, 
+            unit_id: user?.unit_id // ✅ Adiciona o ID da unidade
+        }; 
+
+        const response = await createCase(payloadComUnidade);
+        
+        // ⭐️ CORREÇÃO 2: Captura o ID do caso que o backend retorna como 'id'
+        const novoCasoId = response.id; 
+
+        if (!novoCasoId) {
+            toast.error("❌ Erro de comunicação: ID do novo caso não foi retornado.");
+            return;
+        }
+
         toast.success("✅ Registro inicial criado! Continue preenchendo as abas.");
-        navigate(`/cadastro/${response.casoId}`, { replace: true }); // Redireciona para o modo edição
+        // ✅ CORRIGIDO: Redireciona usando response.id
+        navigate(`/cadastro/${novoCasoId}`, { replace: true }); // Redireciona para o modo edição
       }
     } catch (error: any) {
       toast.error(`❌ Falha ao salvar: ${error?.message ?? String(error)}`);
@@ -186,17 +208,17 @@ export default function Cadastro() {
 
   const handleClearForm = () => {
     // Limpa o formulário apenas no modo CRIAÇÃO
-    if (isEditMode) {
-        toast.warn("Não é possível limpar um prontuário em edição. Use o botão 'Novo Registro Limpo'.");
-        return;
-    }
+    if (isEditMode) {
+        toast.warn("Não é possível limpar um prontuário em edição. Use o botão 'Novo Registro Limpo'.");
+        return;
+    }
     navigate('/cadastro', { replace: true });
     toast.info("Formulário limpo para um novo registro.");
   };
 
   if (isDataLoading) {
-    return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /> <span>Carregando dados do prontuário...</span></div>;
-  }
+    return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /> <span>Carregando dados do prontuário...</span></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -363,6 +385,7 @@ export default function Cadastro() {
           </div>
         </div>
       </form>
+      
     </div>
   );
 }

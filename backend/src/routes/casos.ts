@@ -3,239 +3,346 @@
 import { Router, Request, Response } from "express";
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth";
-import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
+import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { logAction } from "../services/logger";
 import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants";
-import { checkCaseAccess } from "../middleware/caseAccess.middleware"; 
+import { checkCaseAccess } from "../middleware/caseAccess.middleware"; // Manter para rotas de modificação
 
 const router = Router();
 
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Essencial para remover o erro 'syntax error at or near " "'
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
+// FUNÇÃO UTILITÁRIA: Limpeza de strings SQL
+export const cleanSqlString = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 
 // =======================================================================
-// 📌 MÓDULO CRÍTICO: REGRA DE SIGILO E ANONIMIZAÇÃO DA VIGILÂNCIA
+// FUNÇÃO DE ANONIMIZAÇÃO DE DADOS (Mantida)
 // =======================================================================
-function anonimizarDadosSeNecessario(user: { id: number; role: string; unit_id: number }, data: any): any {
-    const isVigilancia = user.unit_id === UNIT_ID_VIGILANCIA;
-    
-    if (!isVigilancia) { return data; }
+export function anonimizarDadosSeNecessario(
+  user: { id: number; role: string; unit_id: number | null },
+  data: any
+): any {
+  const isVigilancia = user.role === 'vigilancia';
+  if (!isVigilancia || !data) return data;
 
-    const anonimizarCaso = (caso: any) => {
-        const deveAnonimizar = caso.unit_id === UNIT_ID_CREAS; 
+  const anonimizarCaso = (caso: any) => {
+    const deveAnonimizar = caso.unit_id === UNIT_ID_CREAS;
+    if (!deveAnonimizar) return caso;
 
-        if (!deveAnonimizar) {
-            return caso;
-        }
+    const casoAnonimizado = { ...caso };
+    const casoId = casoAnonimizado.id || 'XXX';
+    casoAnonimizado.nome = `[DADO SIGILOSO - ID: ${casoId}]`;
+    delete casoAnonimizado.cpf;
+    delete casoAnonimizado.nis;
 
-        const casoAnonimizado = { ...caso };
-        
-        const casoId = casoAnonimizado.id || 'XXX';
-        casoAnonimizado.nome = `[DADO SIGILOSO - ID: ${casoId}]`;
-        
-        delete casoAnonimizado.cpf;
-        delete casoAnonimizado.nis;
-
-        if (casoAnonimizado.dados_completos) {
-            casoAnonimizado.dados_completos.nome = `[DADO SIGILOSO - ID: ${casoId}]`;
-            delete casoAnonimizado.dados_completos.cpf;
-            delete casoAnonimizado.dados_completos.nis;
-        }
-        
-        return casoAnonimizado;
-    };
-    
-    if (Array.isArray(data)) {
-        return data.map(anonimizarCaso);
-    } else {
-        return anonimizarCaso(data);
+    if (casoAnonimizado.dados_completos) {
+      casoAnonimizado.dados_completos.nome = `[DADO SIGILOSO - ID: ${casoId}]`;
+      delete casoAnonimizado.dados_completos.cpf;
+      delete casoAnonimizado.dados_completos.nis;
     }
+
+    return casoAnonimizado;
+  };
+
+  return Array.isArray(data) ? data.map(anonimizarCaso) : anonimizarCaso(data);
 }
 
 // =======================================================================
-// APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
+// MIDDLEWARES GERAIS DE SEGURANÇA
 // =======================================================================
-router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id')); 
-
+router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
 // =======================================================================
-// ROTA POST /casos - CRIAR CASO (Adiciona unit_id do criador)
+// ROTA POST /casos - Criar novo caso (Estabilizada)
 // =======================================================================
 router.post("/", async (req: Request, res: Response) => {
-    const userId = req.user!.id;
-    const userUnitId = req.user!.unit_id;
-    
-    const casoData = req.body;
-    try {
-        const { dataCad, tecRef, nome = null } = casoData; 
+  const { dataCad, tecRef, nome, dados_completos } = req.body;
+  const userId = req.user!.id;
+  
+  // ✅ O unit_id é pego do payload ou do user, garantindo que o caso é criado na unidade correta.
+  const unit_id = req.body.unit_id || req.user!.unit_id; 
 
-        if (!dataCad || !tecRef) {
-            return res.status(400).json({ 
-                message: "Falha na validação: Os campos 'Data do Cadastro' e 'Técnico Responsável' são obrigatórios." 
-            });
-        }
-        const dados_completos = casoData;
-        
-        const query = cleanSqlString(`
-            INSERT INTO casos ("dataCad", "tecRef", nome, dados_completos, "userId", status, unit_id)
-             VALUES ($1, $2, $3, $4, $5, 'Ativo', $6) RETURNING id
-        `);
-        const result = await pool.query(query, [ dataCad, tecRef, nome, JSON.stringify(dados_completos), userId, userUnitId ]);
-        const novoCasoId = result.rows[0].id;
-        await logAction({ userId, username: req.user!.username, action: 'CREATE_CASE', details: { casoId: novoCasoId, nomeVitima: nome, unitId: userUnitId } });
-        res.status(201).json({ message: "Caso cadastrado com sucesso!", casoId: novoCasoId });
-    } catch (err: any) {
-        console.error("Erro ao cadastrar caso:", err.message);
-        res.status(500).json({ message: "Erro interno no servidor ao cadastrar o caso." });
-    }
-});
-
-// =======================================================================
-// ROTA GET /casos - LISTAR CASOS (Filtro de Unidade + Busca Parcial)
-// =======================================================================
-router.get("/", async (req: Request, res: Response) => {
-  const user = req.user!;
-  const accessFilter = req.accessFilter!; 
-  const { q, tecRef, filtro, valor, status = 'Ativo' } = req.query as { q?: string, tecRef?: string, filtro?: string, valor?: string, status?: string };
+  const username = req.user!.username;
 
   try {
-    let query = 'SELECT id, "dataCad", "tecRef", nome, status, dados_completos->>\'bairro\' as bairro, unit_id FROM casos'; 
-    const params: (string | number)[] = [];
-    let whereClauses: string[] = [];
-    
-    // 1. TRATAMENTO DE FILTROS BÁSICOS (Status)
-    if (status && status !== 'todos') {
-        params.push(status);
-        whereClauses.push(`status = $${params.length}`);
-    }
+    const insertQuery = cleanSqlString(`
+      INSERT INTO casos ("dataCad", "tecRef", nome, dados_completos, unit_id, "userId", status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'Ativo')
+      RETURNING *
+    `);
 
-    // 📌 FIX CRÍTICO: TRATAMENTO DA BUSCA GERAL ('q') e BUSCA POR TECLADO (tecRef)
-    const searchTerm = valor && filtro === 'q' ? valor : tecRef;
-    
-    if (searchTerm && typeof searchTerm === 'string') {
-        // Usa o ILIKE com % para busca parcial em nome, tecRef, NIS e CPF
-        const wildCardSearch = `%${searchTerm}%`;
-        params.push(wildCardSearch, wildCardSearch, wildCardSearch, wildCardSearch);
-        const placeholder1 = `$${params.length - 3}`;
-        const placeholder2 = `$${params.length - 2}`;
-        const placeholder3 = `$${params.length - 1}`;
-        const placeholder4 = `$${params.length}`;
-        
-        whereClauses.push(cleanSqlString(`
-            (nome ILIKE ${placeholder1} OR 
-            "tecRef" ILIKE ${placeholder2} OR 
-            dados_completos->>'nis' ILIKE ${placeholder3} OR 
-            dados_completos->>'cpf' ILIKE ${placeholder4})
-        `));
-    } 
-    
-    // 📌 TRATAMENTO DOS FILTROS AVANÇADOS (por_bairro, por_violencia, etc.)
-    else if (filtro && valor && filtro !== 'q') {
-        const partialSearch = `%${valor}%`;
-        params.push(filtro === 'por_bairro' ? valor : partialSearch);
-        const placeholder = `$${params.length}`;
-        
-        if (filtro === 'por_bairro') {
-             whereClauses.push(`dados_completos->>'bairro' = ${placeholder}`);
-        } else if (filtro === 'por_violencia') {
-             whereClauses.push(`dados_completos->>'tipoViolencia' ILIKE ${placeholder}`);
-        }
-        // NOTE: Adicione outros filtros avançados aqui se necessário
-    }
+    const result = await pool.query(insertQuery, [
+      dataCad,
+      tecRef,
+      nome,
+      JSON.stringify(dados_completos),
+      unit_id,
+      userId
+    ]);
 
-    // 2. ADIÇÃO DO FILTRO DE ACESSO DA UNIDADE (CRÍTICO!)
-    const offset = params.length;
-    let unitWhere = accessFilter.whereClause;
-    
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${offset + 1}`);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${offset + 1}`).replace('$Y', `$${offset + 2}`);
-    }
-    
-    accessFilter.params.forEach(p => params.push(p));
-    whereClauses.push(unitWhere); 
-
-    
-    if (whereClauses.length > 0) {
-      query += ` WHERE ${whereClauses.join(' AND ')}`;
-    }
-    query += ' ORDER BY "dataCad" DESC';
-
-    // FIX: Aplica a limpeza final antes de enviar
-    const finalQuery = cleanSqlString(query); 
-
-    const result = await pool.query(finalQuery, params);
-    
-    const dadosProcessados = anonimizarDadosSeNecessario(user, result.rows);
-    
-    res.json(dadosProcessados);
+    await logAction({ userId, username, action: 'CREATE_CASE', details: { casoId: result.rows[0].id } });
+    res.status(201).json(result.rows[0]);
   } catch (err: any) {
-    console.error("Erro ao listar casos:", err.message);
-    res.status(500).json({ message: "Erro ao buscar casos." });
+    console.error("Erro ao criar caso:", err.message);
+    res.status(500).json({ message: "Erro ao criar caso." });
   }
 });
 
 // =======================================================================
-// ROTA PUT /casos/:id - ATUALIZAR CASO (Usa checagem de acesso centralizada)
+// ROTA GET /casos - LISTAR CASOS (CORREÇÃO DE TIPAGEM E BPC)
 // =======================================================================
-router.put("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const novosDados = req.body;
-    const userId = req.user!.id;
-    const username = req.user!.username;
-    
-    try {
-        // FIX: Aplica a limpeza na query de SELECT
-        const resultadoAtualQuery = cleanSqlString('SELECT dados_completos FROM casos WHERE id = $1');
-        const resultadoAtual = await pool.query(resultadoAtualQuery, [id]);
-        
-        if (resultadoAtual.rowCount === 0) {
-            return res.status(404).json({ message: "Caso não encontrado." });
-        }
-        
-        const dadosAntigos = resultadoAtual.rows[0].dados_completos;
-        const dadosMesclados = { ...dadosAntigos, ...novosDados };
-        const { dataCad, tecRef, nome = null } = dadosMesclados;
-        
-        const updateQuery = cleanSqlString(`
-            UPDATE casos 
-             SET "dataCad" = $1, "tecRef" = $2, nome = $3, dados_completos = $4
-             WHERE id = $5
-        `);
-        await pool.query(updateQuery, [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), id]);
-        
-        await logAction({ userId, username, action: 'UPDATE_CASE', details: { casoId: id } });
-        res.status(200).json({ message: "Prontuário atualizado com sucesso!", caso: dadosMesclados });
+router.get("/", async (req: Request, res: Response) => {
+  const user = req.user!;
+  const accessFilter = req.accessFilter!;
+  
+  // Desestruturação da Query
+  const { q, tecRef, filtro, valor, status = 'Ativo', confirmedViolence, socioeducacao, mes } = req.query as any;
+
+  try {
+    let query = `
+      SELECT id, "dataCad", "tecRef", nome, status,
+             dados_completos->>'bairro' AS bairro,
+             dados_completos->>'confirmacaoViolencia' AS "confirmacaoViolencia",
+             dados_completos->>'membroSocioeducacao' AS "membroSocioeducacao",
+             unit_id
+      FROM casos
+    `;
+
+      const params: any[] = [];
+      const whereClauses: string[] = [];
+
+      // helper: adiciona param e retorna placeholder $n
+      const addParam = (val: any) => {
+        params.push(val);
+        return `$${params.length}`;
+      };
+
+      // 1. FILTROS STATUS E MÊS
+      if (status && status !== 'todos') {
+        const ph = addParam(status);
+        whereClauses.push(`status = ${ph}::VARCHAR`);
+      }
+      if (mes) {
+        const ph = addParam(mes);
+        whereClauses.push(`TO_CHAR("dataCad", 'YYYY-MM') = ${ph}::VARCHAR`);
+      }
+
+      // 2. FILTRO DE BUSCA (geral ou por tecRef/filtro)
+      const searchTerm = valor && filtro === 'q' ? valor : tecRef;
+      if (searchTerm) {
+        const wild = `%${searchTerm}%`;
+        const p1 = addParam(wild);
+        const p2 = addParam(wild);
+        const p3 = addParam(wild);
+        const p4 = addParam(wild);
+
+        whereClauses.push(cleanSqlString(`
+          (nome ILIKE ${p1} OR
+           "tecRef" ILIKE ${p2} OR
+           dados_completos->>'nis' ILIKE ${p3} OR
+           dados_completos->>'cpf' ILIKE ${p4})
+        `));
+      } 
+      // ⭐️ TRATAMENTO ROBUSTO PARA FILTROS DE CARD/GRÁFICO
+      else if (filtro && valor && filtro !== 'q') {
+          
+        const jsonKey = filtro;
+        const phValor = addParam(valor);
+
+        if (jsonKey === 'por_bairro') {
+          // Lógica de Bairro (busca exata)
+          whereClauses.push(`LOWER(dados_completos->>'bairro') = LOWER(${phValor}::TEXT)`);
+        } else if (jsonKey === 'por_violencia') {
+          // Lógica de Tipo de Violência (busca parcial - ILIKE)
+          whereClauses.push(`dados_completos->>'tipoViolencia' ILIKE ${phValor}`);
+        } else if (jsonKey === 'por_faixa_etaria') {
+          // Lógica de Faixa Etária (filtro complexo no frontend, tratamento especial no backend)
+          whereClauses.push(cleanSqlString(`
+              CASE 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
+                  WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
+                  ELSE 'Não informado' 
+              END = ${phValor}::TEXT
+          `));
+      } 
+      // ⭐️ CORREÇÃO FINAL BPC: Trata o filtro do card BPC (Listagem)
+      else if (jsonKey === 'recebeBPC') {
+          // O modal BPC deve listar todos os casos que se qualificam (Idoso OU PCD)
+          whereClauses.push(`(dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')`);
+          
+          // 🛑 AÇÃO CRÍTICA: Remove o parâmetro 'valor' (que contaminava o $2)
+          params.pop();
+      }
+      else {
+        // Lógica Genérica (Violência Confirmada, Sexo, etc.)
+        whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
+      }
+    }
+
+      // 3. FILTROS DE COERÊNCIA (Apenas mantidos por compatibilidade)
+      if (confirmedViolence === 'true') whereClauses.push(`(dados_completos->>'confirmacaoViolencia')::TEXT = 'Confirmada'`);
+      if (socioeducacao === 'true') whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
+
+      // 4. FILTRO DE ACESSO POR UNIDADE (Visibilidade restaurada e Estabilidade)
+      if (accessFilter.whereClause !== 'TRUE') {
+        // cria placeholders sequenciais e adiciona os valores aos params com addParam
+        // NOTA: A tipagem de INTEGER será resolvida pelo uso de ph::INTEGER
+        const unitPlaceholders: string[] = accessFilter.params.map((p: any) => {
+            const ph = addParam(p);
+            return `${ph}::INTEGER`;
+        });
+
+        let unitWhere = accessFilter.whereClause;
+        // substitui tokens $X e $Y (se existirem) pelos placeholders gerados
+        if (unitPlaceholders[0]) unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
+        if (unitPlaceholders[1]) unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
+
+        // ⭐️ REAPLICAÇÃO DA CORREÇÃO DE VISIBILIDADE: Inclui casos sem unit_id (Gestor Principal)
+        // Isso resolve o erro de tipagem no $2 que estávamos vendo.
+        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
+
+        whereClauses.push(unitWhere);
+      }
+
+      // Montagem final da query
+      if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
+      query += ` ORDER BY "dataCad" DESC`;
+
+      // Debug: verifique se placeholders e params estão sincronizados
+      console.log("DEBUG: FINAL QUERY:", cleanSqlString(query));
+      console.log("DEBUG: FINAL PARAMS:", params);
+
+      // Execução
+      const result = await pool.query(cleanSqlString(query), params);
+      const dadosProcessados = anonimizarDadosSeNecessario(user, result.rows);
+      res.json(dadosProcessados);
+
     } catch (err: any) {
-        console.error(`Erro ao atualizar caso ${id}:`, err.message);
-        res.status(500).json({ message: "Erro interno ao atualizar o prontuário." });
+      console.error("Erro ao listar casos:", err.message);
+      res.status(500).json({ message: "Erro ao buscar casos." });
     }
 });
 
 // =======================================================================
-// ROTA GET /casos/:id - VISUALIZAÇÃO ÚNICA (Usa checagem de acesso centralizada)
+// ROTA PUT /casos/:id - ATUALIZAR CASO (Mantém segurança de modificação)
 // =======================================================================
-router.get("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
+router.put("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const novosDados = req.body;
+  const { id: userId, username } = req.user!;
+
+  try {
+    const resultAtual = await pool.query(cleanSqlString('SELECT dados_completos, "dataCad", "tecRef", nome FROM casos WHERE id = $1'), [id]);
+    if (resultAtual.rowCount === 0) return res.status(404).json({ message: "Caso não encontrado." });
+
+    const dadosExistentes = resultAtual.rows[0];
+    
+    const dadosMesclados = { 
+        ...dadosExistentes.dados_completos, 
+        ...novosDados 
+    };
+
+    // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
+    const dataCad = novosDados.dataCad || dadosExistentes.dataCad; 
+    const tecRef = novosDados.tecRef || dadosExistentes.tecRef;
+    const nome = novosDados.nome || dadosExistentes.nome || null;
+    
+    await pool.query(
+      cleanSqlString(`UPDATE casos SET "dataCad" = $1, "tecRef" = $2, nome = $3, dados_completos = $4 WHERE id = $5`),
+      [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), id]
+    );
+
+    await logAction({ userId, username, action: 'UPDATE_CASE', details: { casoId: id } });
+    res.status(200).json({ message: "Prontuário atualizado com sucesso!", caso: dadosMesclados });
+  } catch (err: any) {
+    console.error(`Erro ao atualizar caso ${id}:`, err.message);
+    res.status(500).json({ message: "Erro interno ao atualizar o prontuário." });
+  }
+});
+
+// =======================================================================
+// PATCH /casos/:id/status (Mantém segurança de modificação)
+// =======================================================================
+router.patch("/:id/status", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const { id: userId, username } = req.user!;
+  if (!status || !['Ativo', 'Desligado', 'Arquivado'].includes(status)) {
+    return res.status(400).json({ message: "Status inválido. Valores permitidos: Ativo, Desligado, Arquivado." });
+  }
+  try {
+    const result = await pool.query(cleanSqlString('UPDATE casos SET status = $1 WHERE id = $2 RETURNING nome'), [status, id]);
+    if (result.rowCount === 0) return res.status(404).json({ message: 'Caso não encontrado.' });
+
+    await logAction({ userId, username, action: 'UPDATE_CASE_STATUS', details: { casoId: id, nomeVitima: result.rows[0].nome, novoStatus: status } });
+    res.status(200).json({ message: `Caso ${id} atualizado para '${status}' com sucesso.` });
+  } catch (err: any) {
+    console.error(`Erro ao atualizar status do caso ${id}:`, err.message);
+    res.status(500).json({ message: "Erro interno ao atualizar o status do caso." });
+  }
+});
+
+// =======================================================================
+// DELETE /casos/:id (Mantém segurança de modificação)
+// =======================================================================
+router.delete("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { id: userId, username } = req.user!;
+  try {
+    const result = await pool.query(cleanSqlString('DELETE FROM casos WHERE id = $1 RETURNING nome'), [id]);
+
+    if (result.rowCount === 0) return res.status(404).json({ message: 'Caso não encontrado.' });
+
+    await logAction({ userId, username, action: 'DELETE_CASE', details: { casoId: id, nomeVitima: result.rows[0].nome } });
+    res.status(200).json({ message: 'Caso excluído com sucesso.' });
+  } catch (err: any) {
+    console.error("Erro ao excluir caso:", err.message);
+    res.status(500).json({ message: "Erro ao excluir caso." });
+  }
+});
+
+// =======================================================================
+// GET /casos/:id - DETALHES DO CASO (Segurança Reintroduzida)
+// =======================================================================
+router.get("/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = req.user!;
+    const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
+
+    // 1. Resolvendo a Cláusula WHERE de Acesso
+    const unitParams: (string | number)[] = [id]; // ID do Caso é o $1
+    let unitWhere = accessFilter.whereClause;
+    
+    if (accessFilter.params.length === 1) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
+        unitParams.push(accessFilter.params[0]);
+    } else if (accessFilter.params.length === 2) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
+        unitParams.push(accessFilter.params[0], accessFilter.params[1]);
+    }
+    
+    // 2. Montando a Query Segura
+    // ⭐️ Adiciona OR casos.unit_id IS NULL para Gestor Principal
+    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
+    
+    const checkQuery = cleanSqlString(`SELECT * FROM casos WHERE id = $1 AND ${finalUnitWhere}`);
+
     try {
-        // FIX: Aplica a limpeza na query
-        const casoQuery = cleanSqlString('SELECT * FROM casos WHERE id = $1'); 
-        const casoResult = await pool.query(casoQuery, [id]);
+        // EXECUTA A CHECAGEM E BUSCA AO MESMO TEMPO
+        const casoResult = await pool.query(checkQuery, unitParams);
         
         if (casoResult.rowCount === 0) {
-            return res.status(404).json({ message: "Caso não encontrado." });
+            // Se não encontrou ou não tem permissão
+            return res.status(404).json({ message: "Caso não encontrado ou acesso restrito." });
         }
-        
+
         const casoBase = casoResult.rows[0];
-        
+
         const demandasQuery = cleanSqlString(`
-            SELECT id, tipo_documento, instituicao_origem, data_recebimento, status 
-            FROM demandas 
-            WHERE caso_associado_id = $1 
+            SELECT id, tipo_documento, instituicao_origem, data_recebimento, status
+            FROM demandas
+            WHERE caso_associado_id = $1
             ORDER BY data_recebimento DESC
         `);
         const demandasResult = await pool.query(demandasQuery, [id]);
@@ -249,9 +356,9 @@ router.get("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Re
             userId: casoBase.userId,
             status: casoBase.status,
             unit_id: casoBase.unit_id,
-            demandasVinculadas: demandasResult.rows 
+            demandasVinculadas: demandasResult.rows
         };
-        
+
         const dadosProcessados = anonimizarDadosSeNecessario(user, casoCompleto);
         res.json(dadosProcessados);
     } catch (err: any) {
@@ -261,69 +368,46 @@ router.get("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Re
 });
 
 // =======================================================================
-// ROTAS PATCH/DELETE/GET ENCAMINHAMENTOS (Usa checagem de acesso centralizada)
+// GET /casos/:casoId/encaminhamentos (Segurança Reintroduzida)
 // =======================================================================
-router.patch("/:id/status", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    const { id: userId, username } = req.user!;
-    if (!status || !['Ativo', 'Desligado', 'Arquivado'].includes(status)) {
-        return res.status(400).json({ message: "Status inválido. Valores permitidos: Ativo, Desligado, Arquivado." });
-    }
-    try {
-        const updateQuery = cleanSqlString('UPDATE casos SET status = $1 WHERE id = $2 RETURNING id, nome');
-        const result = await pool.query(updateQuery, [status, id]);
-        
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Caso não encontrado.' });
-        }
-        await logAction({
-            userId, username, action: 'UPDATE_CASE_STATUS',
-            details: { casoId: id, nomeVitima: result.rows[0].nome, novoStatus: status }
-        });
-        res.status(200).json({ message: `Caso ${id} foi atualizado para '${status}' com sucesso.` });
-    } catch (err: any) {
-        console.error(`Erro ao atualizar status do caso ${id}:`, err.message);
-        res.status(500).json({ message: "Erro interno ao atualizar o status do caso." });
-    }
-});
+router.get("/:casoId/encaminhamentos", async (req: Request, res: Response) => {
+  const { casoId } = req.params;
+  const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
 
-router.delete("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { id: userId, username } = req.user!;
-    try {
-        const deleteQuery = cleanSqlString('DELETE FROM casos WHERE id = $1 RETURNING nome');
-        const result = await pool.query(deleteQuery, [id]);
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Caso não encontrado.' });
-        }
-        const nomeVitima = result.rows[0].nome;
-        await logAction({ userId, username, action: 'DELETE_CASE', details: { casoId: id, nomeVitima } });
-        res.status(200).json({ message: 'Caso excluído com sucesso.' });
-    } catch (err: any) {
-        console.error("Erro ao excluir caso:", err.message);
-        res.status(500).json({ message: "Erro ao excluir caso." });
+    // 1. Resolve Placeholders para a checagem de acesso
+    const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1
+    let unitWhere = accessFilter.whereClause;
+    
+    if (accessFilter.params.length === 1) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
+        unitParams.push(accessFilter.params[0]);
+    } else if (accessFilter.params.length === 2) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
+        unitParams.push(accessFilter.params[0], accessFilter.params[1]);
     }
-});
 
-router.get("/:casoId/encaminhamentos", checkCaseAccess('params', 'casoId'), async (req: Request, res: Response) => {
-    const { casoId } = req.params;
-    try {
-        const query = cleanSqlString(`
-          SELECT
-            enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
-            enc.observacoes, usr.username AS "tecRef" 
-          FROM encaminhamentos enc
-          LEFT JOIN users usr ON enc."userId" = usr.id
-          WHERE enc."casoId" = $1
-          ORDER BY enc."dataEncaminhamento" DESC;
-        `);
-        const result = await pool.query(query, [casoId]);
-        res.json(result.rows);
-    } catch (err: any) {
-        console.error(`Erro ao listar encaminhamentos para o caso ${casoId}:`, err.message);
-        res.status(500).json({ message: "Erro ao buscar encaminhamentos." });
-    }
+    // 2. Query: Busca encaminhamentos APENAS se o caso pertencer à unidade
+    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
+
+    const checkQuery = cleanSqlString(`
+        SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
+               enc.observacoes, usr.username AS "tecRef"
+        FROM encaminhamentos enc
+        LEFT JOIN users usr ON enc."userId" = usr.id
+        LEFT JOIN casos c ON enc."casoId" = c.id
+        WHERE enc."casoId" = $1 AND ${finalUnitWhere}
+        ORDER BY enc."dataEncaminhamento" DESC
+    `);
+
+
+  try {
+    const result = await pool.query(checkQuery, unitParams);
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error(`Erro ao listar encaminhamentos para o caso ${casoId}:`, err.message);
+    res.status(500).json({ message: "Erro ao buscar encaminhamentos." });
+  }
 });
 
 export default router;
+

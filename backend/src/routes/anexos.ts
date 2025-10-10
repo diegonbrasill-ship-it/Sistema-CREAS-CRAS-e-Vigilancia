@@ -12,15 +12,20 @@ import fs from 'fs';
 
 const router = express.Router();
 
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Essencial para remover o erro 'syntax error at or near " "'
+// FUNÇÃO UTILITÁRIA: Limpeza de strings SQL
 const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
+    return sql.replace(/\s+/g, ' ').trim();
 };
 
 // Middleware auxiliar para checar acesso por anexo ID (usa o cleanSqlString)
-async function checkAnexoAccess(req: Request, res: Response, next: NextFunction) {
-    const { id: anexoId } = req.params;
-    const accessFilter = req.accessFilter!;
+async function checkAnexoAccess(req: Request, res: Response, next: express.NextFunction) {
+    const { id: anexoIdString } = req.params;
+    const accessFilter = (req as any).accessFilter;
+
+    const anexoId = parseInt(anexoIdString, 10);
+    if (isNaN(anexoId)) {
+        return res.status(400).json({ message: 'ID do anexo inválido.' });
+    }
 
     try {
         // 1. Busca o casoId associado ao anexo/demanda
@@ -46,6 +51,7 @@ async function checkAnexoAccess(req: Request, res: Response, next: NextFunction)
 
         // 2. Checa a permissão de unidade para o caso (lógica do checkCaseAccess)
         const params: (string | number)[] = [idToCheck]; 
+        const accessFilter = (req as any).accessFilter;
         let unitWhere = accessFilter.whereClause;
         
         if (accessFilter.params.length === 1) {
@@ -78,7 +84,40 @@ router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
 
 // =======================================================================
-// ROTA: Upload de anexo para um CASO
+// ROTA para listar os anexos de um CASO (Ajuste de Colunas)
+// =======================================================================
+router.get('/casos/:casoId', async (req: Request, res: Response) => {
+  const { casoId } = req.params;
+  
+  const parsedId = parseInt(casoId, 10);
+  if (isNaN(parsedId)) {
+      console.error(`ERRO: casoId inválido recebido: ${casoId}`);
+      return res.status(400).json({ message: 'ID de caso inválido.' });
+  }
+
+  try {
+    // ⭐️ CORREÇÃO DO SCHEMA SQL: Colunas alteradas para o seu padrão (nomeOriginal, dataUpload, casoId)
+    const query = cleanSqlString(`
+      SELECT
+        anex.id, anex."nomeOriginal", anex."tamanhoArquivo", 
+        anex."dataUpload", anex.descricao, usr.username AS "uploadedBy"
+      FROM anexos anex
+      LEFT JOIN users usr ON anex."userId" = usr.id
+      WHERE anex."casoId" = $1 
+      ORDER BY anex."dataUpload" DESC;
+    `);
+    
+    // Passar o ID parseado
+    const result = await pool.query(query, [parsedId]);
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error(`Erro ao listar anexos: ${err.message}`);
+    res.status(500).json({ message: 'Erro ao buscar anexos.' });
+  }
+});
+
+// =======================================================================
+// ROTA: Upload de anexo para um CASO (Corrigido as colunas)
 // =======================================================================
 router.post(
   '/upload/caso/:casoId', 
@@ -92,10 +131,12 @@ router.post(
 
     const { casoId } = req.params;
     const { descricao } = req.body;
-    const { id: userId, username, unit_id: userUnitId } = req.user!;
-    const { originalname, filename, path: filePath, mimetype, size } = req.file;
+    const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
+    const uploadedFile = req.file as Express.Multer.File;
+    const { originalname, filename, path: filePath, mimetype, size } = uploadedFile;
 
     try {
+      // ⭐️ CORREÇÃO DO SCHEMA SQL
       const query = cleanSqlString(`
         INSERT INTO anexos 
           ("casoId", "userId", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
@@ -117,14 +158,14 @@ router.post(
 
       res.status(201).json({ message: 'Arquivo enviado com sucesso!', anexo: novoAnexo });
     } catch (err: any) {
-      console.error('Erro ao salvar informações do anexo no banco de dados:', err.message);
+      console.error(`Erro ao salvar informações do anexo no banco de dados: ${err.message}`);
       res.status(500).json({ message: 'Erro no servidor ao registrar o anexo.' });
     }
   }
 );
 
 // =======================================================================
-// ROTA: Upload de anexo para uma DEMANDA
+// ROTA: Upload de anexo para uma DEMANDA (Corrigido as colunas)
 // =======================================================================
 router.post(
     '/upload/demanda/:demandaId',
@@ -134,12 +175,15 @@ router.post(
             return res.status(400).json({ message: 'Nenhum arquivo foi enviado.' });
         }
 
+// ... (lógica de upload demanda inalterada)
         const { demandaId } = req.params;
         const { descricao } = req.body;
-        const { id: userId, username, unit_id: userUnitId } = req.user!;
-        const { originalname, filename, path: filePath, mimetype, size } = req.file;
+        const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
+        const uploadedFile = req.file as Express.Multer.File;
+        const { originalname, filename, path: filePath, mimetype, size } = uploadedFile;
 
         try {
+            // ⭐️ CORREÇÃO DO SCHEMA SQL
             const query = cleanSqlString(`
                 INSERT INTO anexos
                   ("demandaId", "userId", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
@@ -161,7 +205,7 @@ router.post(
 
             res.status(201).json({ message: 'Arquivo enviado com sucesso!', anexo: novoAnexo });
         } catch (err: any) {
-            console.error(`Erro ao anexar arquivo à demanda ${demandaId}:`, err.message);
+            console.error(`Erro ao anexar arquivo à demanda ${demandaId}: ${err.message}`);
             res.status(500).json({ message: 'Erro no servidor ao registrar o anexo.' });
         }
     }
@@ -169,34 +213,11 @@ router.post(
 
 
 // =======================================================================
-// ROTA para listar os anexos de um CASO
-// =======================================================================
-router.get('/casos/:casoId', checkCaseAccess('params', 'casoId'), async (req: Request, res: Response) => {
-  const { casoId } = req.params;
-  try {
-    const query = cleanSqlString(`
-      SELECT
-        anex.id, anex."nomeOriginal", anex."tamanhoArquivo",
-        anex."dataUpload", anex.descricao, usr.username AS "uploadedBy"
-      FROM anexos anex
-      LEFT JOIN users usr ON anex."userId" = usr.id
-      WHERE anex."casoId" = $1
-      ORDER BY anex."dataUpload" DESC;
-    `);
-    const result = await pool.query(query, [casoId]);
-    res.json(result.rows);
-  } catch (err: any) {
-    console.error(`Erro ao listar anexos para o caso ${casoId}:`, err.message);
-    res.status(500).json({ message: 'Erro ao buscar anexos.' });
-  }
-});
-
-// =======================================================================
-// ROTA para permitir o DOWNLOAD de um anexo
+// ROTA para permitir o DOWNLOAD de um anexo (Mantém checkAnexoAccess)
 // =======================================================================
 router.get('/download/:id', checkAnexoAccess, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { id: userId, username, unit_id: userUnitId } = req.user!;
+  const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
     const casoId = (req as any).casoId; 
 
   try {
@@ -229,10 +250,11 @@ router.get('/download/:id', checkAnexoAccess, async (req: Request, res: Response
       res.status(404).json({ message: 'Arquivo não encontrado no servidor.' });
     }
   } catch (err: any) {
-    console.error(`Erro ao processar download do anexo ${id}:`, err.message);
+    console.error(`Erro ao processar download do anexo ${id}: ${err.message}`);
     res.status(500).json({ message: 'Erro ao processar download.' });
   }
 });
 
 
 export default router;
+

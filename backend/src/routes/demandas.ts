@@ -7,18 +7,20 @@ import { logAction } from "../services/logger";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
 import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants"; 
 import { checkCaseAccess } from "../middleware/caseAccess.middleware"; 
+import { AuthenticatedUser } from '../middleware/auth'; // Presumindo que esta tipagem seja usada no req.user
 
 const router = Router();
 
 // 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Essencial para remover o erro 'syntax error at or near " "'
 const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
+    return sql.replace(/\s+/g, ' ').trim();
 };
 
 // =======================================================================
-// 📌 MÓDULO CRÍTICO: ANONIMIZAÇÃO
+// 📌 MÓDULO CRÍTICO: ANONIMIZAÇÃO (Tipagem Corrigida)
 // =======================================================================
-function anonimizarDemandaSeNecessario(user: { unit_id: number }, demanda: any): any {
+// ✅ CORREÇÃO AQUI: Aceita unit_id como number ou null.
+function anonimizarDemandaSeNecessario(user: { unit_id: number | null }, demanda: any): any {
     const isVigilancia = user.unit_id === UNIT_ID_VIGILANCIA;
     
     if (!isVigilancia || !demanda.caso_id) { return demanda; }
@@ -50,7 +52,8 @@ router.use(authMiddleware, unitAccessMiddleware('c', 'unit_id'));
 // ROTA: Listar todas as demandas (GET /api/demandas)
 // =======================================================================
 router.get("/", async (req: Request, res: Response) => {
-    const user = req.user!;
+    // 🛑 CORREÇÃO: Passando o usuário completo, pois a função agora aceita number | null.
+    const user = req.user as AuthenticatedUser; 
     const accessFilter = req.accessFilter!;
     
     try {
@@ -58,7 +61,7 @@ router.get("/", async (req: Request, res: Response) => {
         const unitParams: (string | number)[] = [];
         let unitWhere = accessFilter.whereClause;
         
-        const startParamIndex = unitParams.length + 1;
+        const startParamIndex = unitParams.length + 1;
         
         if (accessFilter.params.length === 1) {
             unitWhere = unitWhere.replace('$X', `$${startParamIndex}`);
@@ -68,7 +71,7 @@ router.get("/", async (req: Request, res: Response) => {
             unitParams.push(accessFilter.params[0], accessFilter.params[1]);
         }
 
-        // 📌 FIX: Aplica a limpeza final na query. O alias 'c' está correto aqui.
+        // 📌 FIX: Aplica a limpeza final na query. O alias 'c' está correto aqui.
         const query = cleanSqlString(`
             SELECT
                 d.id, d.tipo_documento, d.instituicao_origem, d.data_recebimento,
@@ -88,7 +91,7 @@ router.get("/", async (req: Request, res: Response) => {
 
         res.json(dadosProcessados);
     } catch (err: any) {
-        console.error("Erro ao listar demandas:", err.message);
+        console.error(`Erro ao listar demandas: ${err.message}`);
         res.status(500).json({ message: "Erro interno ao buscar demandas." });
     }
 });
@@ -130,7 +133,7 @@ router.post("/", checkCaseAccess('body', 'caso_associado_id'), async (req: Reque
         
         res.status(201).json({ message: "Demanda registrada com sucesso!", demandaId: novaDemandaId });
     } catch (err: any) {
-        console.error("Erro ao registrar demanda:", err.message);
+        console.error(`Erro ao registrar demanda: ${err.message}`);
         res.status(500).json({ message: "Erro interno ao registrar a demanda." });
     }
 });
@@ -139,9 +142,10 @@ router.post("/", checkCaseAccess('body', 'caso_associado_id'), async (req: Reque
 // ROTA: Buscar uma demanda específica por ID (GET /api/demandas/:id)
 // =======================================================================
 router.get("/:id", async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const user = req.user!;
+    // 🛑 CORREÇÃO: Passando o usuário completo.
+    const user = req.user as AuthenticatedUser; 
     const accessFilter = req.accessFilter!;
+    const { id } = req.params;
 
     try {
         // 1. Resolve Placeholders e Parâmetros de Unidade (para o filtro de acesso no JOIN)
@@ -194,7 +198,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
         res.json(demandaDetalhada);
     } catch (err: any) {
-        console.error(`Erro ao buscar demanda ${id}:`, err.message);
+        console.error(`Erro ao buscar demanda ${id}: ${err.message}`);
         res.status(500).json({ message: "Erro interno ao buscar a demanda." });
     }
 });
@@ -250,7 +254,7 @@ router.patch("/:id/status", async (req: Request, res: Response) => {
         
         res.status(200).json({ message: `Status da demanda atualizado para '${status}'.` });
     } catch (err: any) {
-        console.error(`Erro ao atualizar status da demanda ${id}:`, err.message);
+        console.error(`Erro ao atualizar status da demanda ${id}: ${err.message}`);
         res.status(500).json({ message: "Erro interno ao atualizar status." });
     }
 });

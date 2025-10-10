@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge"; 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // 📌 NOVO: Componente Select para filtros
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
 
 // 🔹 Ícones
 import { FileSearch, Search, AlertTriangle, Filter } from "lucide-react"; 
@@ -21,7 +21,7 @@ import { FileSearch, Search, AlertTriangle, Filter } from "lucide-react";
 // 📌 Tipagem
 // ========================================================
 type CasoNaLista = {
-  id: number;
+  id: string; // Garantimos que o ID é tratado como string no frontend
   nome: string;
   tecRef: string;
   dataCad: string;
@@ -31,34 +31,34 @@ type CasoNaLista = {
 
 // Interface para o filtro ativo (Otimizada)
 interface ActiveFilter {
-    key: 'q' | 'status' | 'por_violencia' | 'por_bairro';
-    label: string;
-    placeholder: string;
-    isSelect?: boolean;
-    options?: { value: string; label: string }[];
+    key: 'q' | 'status' | 'por_violencia' | 'por_bairro';
+    label: string;
+    placeholder: string;
+    isSelect?: boolean;
+    options?: { value: string; label: string }[];
 }
 
 // ========================================================
 // 📌 Dados Estáticos de Filtros
 // ========================================================
 const FILTRO_OPCOES: ActiveFilter[] = [
-    { key: 'q', label: 'Busca Geral', placeholder: 'Nome, NIS, CPF, Técnico...' },
-    { key: 'status', label: 'Status do Caso', placeholder: 'Filtrar por status...', isSelect: true, options: [
-        { value: 'Ativo', label: 'Ativo' },
-        { value: 'Desligado', label: 'Desligado' },
-        { value: 'Arquivado', label: 'Arquivado' },
-        { value: 'todos', label: 'Todos os Status' },
-    ]},
-    // Mapeamos o label para o valor de 'filtro' que o Back-end espera
-    { key: 'por_violencia', label: 'Por Tipo de Violência', placeholder: 'Ex: Negligência, Física...' },
-    { key: 'por_bairro', label: 'Por Bairro', placeholder: 'Ex: Centro, Jardim...' },
+    { key: 'q', label: 'Busca Geral', placeholder: 'Nome, NIS, CPF, Técnico...' },
+    { key: 'status', label: 'Status do Caso', placeholder: 'Filtrar por status...', isSelect: true, options: [
+        { value: 'Ativo', label: 'Ativo' },
+        { value: 'Desligado', label: 'Desligado' },
+        { value: 'Arquivado', label: 'Arquivado' },
+        { value: 'todos', label: 'Todos os Status' },
+    ]},
+    // Mapeamos o label para o valor de 'filtro' que o Back-end espera
+    { key: 'por_violencia', label: 'Por Tipo de Violência', placeholder: 'Ex: Negligência, Física...' },
+    { key: 'por_bairro', label: 'Por Bairro', placeholder: 'Ex: Centro, Jardim...' },
 ];
 
 // Função auxiliar para mapear o Key do Front-end para o campo 'filtro' do Back-end
 const getFilterKeyForBackend = (key: string): string | undefined => {
-    if (key === 'por_violencia') return 'por_violencia';
-    if (key === 'por_bairro') return 'por_bairro';
-    return undefined;
+    if (key === 'por_violencia') return 'por_violencia';
+    if (key === 'por_bairro') return 'por_bairro';
+    return undefined;
 };
 
 
@@ -70,8 +70,8 @@ export default function Consulta() {
   const [casos, setCasos] = useState<CasoNaLista[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilterKey, setSelectedFilterKey] = useState<string>('q'); // Guarda a chave de filtro ativa
-  const [selectedFilter, setSelectedFilter] = useState<ActiveFilter>(FILTRO_OPCOES[0]); // Objeto do filtro ativo
+  const [selectedFilterKey, setSelectedFilterKey] = useState<string>('q'); // Guarda a chave de filtro ativa
+  const [selectedFilter, setSelectedFilter] = useState<ActiveFilter>(FILTRO_OPCOES[0]); // Objeto do filtro ativo
 
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -83,29 +83,31 @@ export default function Consulta() {
 
   const fetchCasos = async () => {
     setIsLoading(true);
-    
-    const filters: FiltrosCasos = {};
+    
+    const filters: FiltrosCasos = {};
 
-    // 📌 LÓGICA DE MONTAGEM DO FILTRO PARA O BACK-END
-    if (selectedFilterKey === 'q' && searchTerm) {
-        // Se for busca geral, Back-end entende 'q' no filtro e searchTerm no valor.
-        filters.filtro = 'q'; 
-        filters.valor = searchTerm; 
-    } else if (selectedFilterKey === 'status' && searchTerm) {
-        filters.status = searchTerm; 
-    } else if ((selectedFilterKey === 'por_violencia' || selectedFilterKey === 'por_bairro') && searchTerm) {
-        // Envia a chave e o valor para os filtros específicos (que usam a estrutura filtro + valor)
-        filters.filtro = getFilterKeyForBackend(selectedFilterKey);
-        filters.valor = searchTerm;
-    }
+    // 📌 LÓGICA DE MONTAGEM DO FILTRO PARA O BACK-END
+    if (selectedFilterKey === 'q' && searchTerm) {
+        // Se for busca geral, Back-end entende 'q' no filtro e searchTerm no valor.
+        filters.filtro = 'q'; 
+        filters.valor = searchTerm; 
+    } else if (selectedFilterKey === 'status' && searchTerm) {
+        filters.status = searchTerm; 
+    } else if ((selectedFilterKey === 'por_violencia' || selectedFilterKey === 'por_bairro') && searchTerm) {
+        // Envia a chave e o valor para os filtros específicos (que usam a estrutura filtro + valor)
+        filters.filtro = getFilterKeyForBackend(selectedFilterKey);
+        filters.valor = searchTerm;
+    }
 
-    // Nota: O Back-end já garante que apenas dados da unidade do usuário logado são retornados.
+    // Nota: O Back-end já garante que apenas dados da unidade do usuário logado são retornados.
 
     try {
       const data = await getCasosFiltrados(filters);
 
       const casosFormatados = data.map((caso: any) => ({
         ...caso,
+        // Garante que o ID é tratado como string
+        id: String(caso.id),
         dataCad: new Date(caso.dataCad).toLocaleDateString("pt-BR", {
           timeZone: "UTC",
         }),
@@ -119,13 +121,13 @@ export default function Consulta() {
       setIsLoading(false);
     }
   };
-  
-  const handleFilterChange = (filterLabel: string) => {
-    const newFilter = FILTRO_OPCOES.find(op => op.label === filterLabel) || FILTRO_OPCOES[0];
-    setSelectedFilter(newFilter);
-    setSelectedFilterKey(newFilter.key); // Atualiza a chave de filtro
-    setSearchTerm(newFilter.isSelect ? (newFilter.options?.[0].value || '') : ''); // Limpa a busca ou define o valor padrão do Select
-  };
+  
+  const handleFilterChange = (filterLabel: string) => {
+    const newFilter = FILTRO_OPCOES.find(op => op.label === filterLabel) || FILTRO_OPCOES[0];
+    setSelectedFilter(newFilter);
+    setSelectedFilterKey(newFilter.key); // Atualiza a chave de filtro
+    setSearchTerm(newFilter.isSelect ? (newFilter.options?.[0].value || '') : ''); // Limpa a busca ou define o valor padrão do Select
+  };
 
   // 📌 Lógica para mostrar alerta de anonimização (Visível apenas para a Vigilância)
   const isVigilancia = user?.role === 'vigilancia';
@@ -161,49 +163,49 @@ export default function Consulta() {
         <CardContent>
           <div className="flex gap-3 mb-4">
             {/* 1. SELETOR DE FILTRO AVANÇADO */}
-            {/* O valor do Select é o label do filtro, que aciona o handleFilterChange */}
-            <Select onValueChange={handleFilterChange} value={selectedFilter.label}> 
-                <SelectTrigger className="w-[200px]">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Tipo de Filtro" />
-                </SelectTrigger>
-                <SelectContent>
-                    {FILTRO_OPCOES.map(op => (
-                        <SelectItem key={op.label} value={op.label}>
-                            {op.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            {/* O valor do Select é o label do filtro, que aciona o handleFilterChange */}
+            <Select onValueChange={handleFilterChange} value={selectedFilter.label}> 
+                <SelectTrigger className="w-[200px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Tipo de Filtro" />
+                </SelectTrigger>
+                <SelectContent>
+                    {FILTRO_OPCOES.map(op => (
+                        <SelectItem key={op.label} value={op.label}>
+                            {op.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
 
-            {/* 2. CAMPO DE BUSCA (Adaptável) */}
-            {selectedFilter.isSelect ? (
-                // Se for um filtro de Select (ex: Status)
-                <Select onValueChange={setSearchTerm} value={searchTerm || selectedFilter.options?.[0].value}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder={selectedFilter.placeholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {selectedFilter.options?.map(op => (
-                            <SelectItem key={op.value} value={op.value}>
-                                {op.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            ) : (
-                // Se for um Input de texto livre (ex: Busca Geral, Bairro, Tipo de Violência)
-                <div className="relative w-full">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder={selectedFilter.placeholder}
-                        className="pl-9"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            )}
-          </div>
+            {/* 2. CAMPO DE BUSCA (Adaptável) */}
+            {selectedFilter.isSelect ? (
+                // Se for um filtro de Select (ex: Status)
+                <Select onValueChange={setSearchTerm} value={searchTerm || selectedFilter.options?.[0].value}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={selectedFilter.placeholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {selectedFilter.options?.map(op => (
+                            <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            ) : (
+                // Se for um Input de texto livre (ex: Busca Geral, Bairro, Tipo de Violência)
+                <div className="relative w-full">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder={selectedFilter.placeholder}
+                        className="pl-9"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            )}
+          </div>
 
           <div className="border rounded-md">
             <Table>

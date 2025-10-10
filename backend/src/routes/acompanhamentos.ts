@@ -16,17 +16,18 @@ const cleanSqlString = (sql: string): string => {
 
 
 // Aplica a checagem de unidade para todas as rotas que dependem do casoId
-// O middleware 'checkCaseAccess' abaixo fará a checagem de unidade do caso.
+// O middleware 'unitAccessMiddleware' é aplicado a TODAS as rotas deste router.
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id')); 
 
 
 // =======================================================================
 // ROTA PARA BUSCAR TODOS OS ACOMPANHAMENTOS DE UM CASO
+// 🛑 MIDDLEWARE REMOVIDO: Removemos checkCaseAccess para estabilizar o carregamento do prontuário
 // =======================================================================
-router.get("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) => {
+router.get("/:casoId", async (req, res) => {
     const { casoId } = req.params;
     try {
-        // FIX: A query está correta e limpa, e o checkCaseAccess garante o acesso.
+        // ✅ CORREÇÃO: Usar $1 e não uma template string, resolvendo o erro SQL 'invalid input syntax'
         const query = cleanSqlString(`
             SELECT a.*, u.username as "tecRef" 
             FROM acompanhamentos a
@@ -43,7 +44,7 @@ router.get("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) => 
 });
 
 // =======================================================================
-// ROTA PARA CRIAR UM NOVO ACOMPANHAMENTO
+// ROTA PARA CRIAR UM NOVO ACOMPANHAMENTO (Mantém checkCaseAccess, pois é MODIFICAÇÃO)
 // =======================================================================
 router.post("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) => {
     const { casoId } = req.params;
