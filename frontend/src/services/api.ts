@@ -22,11 +22,11 @@ type ChartData = { name: string; value: number; };
 export interface Anexo {
     id: number;
     nomeOriginal: string;
-    // Tipos adicionais necessários para o componente CasoDetalhe
-    tamanhoArquivo?: number; 
-    dataUpload: string;
-    descricao?: string; 
-    uploadedBy?: string;
+    // Tipos adicionais necessários para o componente CasoDetalhe
+    tamanhoArquivo?: number; 
+    dataUpload: string;
+    descricao?: string; 
+    uploadedBy?: string;
 }
 
 export interface User {
@@ -82,9 +82,14 @@ export interface ApiResponse {
     opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
 }
 
+// ✅ CORREÇÃO 1: Interface FiltrosCasos com 'origem'
 export interface FiltrosCasos { 
-    filtro?: string; valor?: string; 
-    tecRef?: string; mes?: string; status?: string;
+    filtro?: string; 
+    valor?: string; 
+    tecRef?: string; 
+    mes?: string; 
+    status?: string;
+    origem?: 'vigilancia' | 'dashboard'; // Nova propriedade para direcionar o endpoint
 }
 
 export interface DemandaResumida {
@@ -144,41 +149,54 @@ export async function login(username: string, password: string): Promise<LoginRe
 
 // CASOS
 export const createCase = (casoData: any) => fetchWithAuth(`/api/casos`, { method: 'POST', body: JSON.stringify(casoData) });
+// ✅ CORRIGIDO: Uso de crases
 export const updateCase = (id: number | string, casoData: any) => fetchWithAuth(`/api/casos/${id}`, { method: 'PUT', body: JSON.stringify(casoData) });
+// ✅ CORRIGIDO: Uso de crases
 export const updateCasoStatus = (casoId: string | number, status: string) => fetchWithAuth(`/api/casos/${casoId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+// ✅ CORRIGIDO: Uso de crases
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 // ✅ CORRIGIDO: Uso de crases
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
 
+// ✅ CORREÇÃO 2: Lógica de direcionamento para o endpoint correto
 export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
     const params = new URLSearchParams();
     
-    // Itera sobre o objeto filters para montar a query string
-    if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-            // Apenas adiciona o parâmetro se o valor não for nulo/indefinido e não for uma string vazia
-            if (value !== null && value !== undefined && value !== '') {
-                params.append(key, String(value));
-            }
-        });
+    // ⭐️ Determinar o endpoint
+    let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
+    if (filters?.origem === 'vigilancia') {
+        endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância
     }
 
-    return fetchWithAuth(`/api/casos?${params.toString()}`);
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            // Garante que o filtro 'origem' não vá para o backend
+            if (key !== 'origem' && value !== null && value !== undefined && value !== '') {
+                params.append(key, String(value));
+            }
+        });
+    }
+
+    return fetchWithAuth(`${endpoint}?${params.toString()}`);
 };
+
 export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
     const params = new URLSearchParams({ q: searchTerm });
+    // ✅ CORRIGIDO: Uso de crases
     return fetchWithAuth(`/api/casos?${params.toString()}`);
 };
 
 // ACOMPANHAMENTOS
 // ✅ CORRIGIDO: Uso de crases
 export const getAcompanhamentos = (casoId: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`);
+// ✅ CORRIGIDO: Uso de crases
 export const createAcompanhamento = (casoId: string, texto: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`, { method: 'POST', body: JSON.stringify({ texto }) });
 
 // ENCAMINHAMENTOS
 // ✅ CORRIGIDO: Uso de crases
 export const getEncaminhamentos = (casoId: string) => fetchWithAuth(`/api/casos/${casoId}/encaminhamentos`);
 export const createEncaminhamento = (data: object) => fetchWithAuth(`/api/encaminhamentos`, { method: 'POST', body: JSON.stringify(data) });
+// ✅ CORRIGIDO: Uso de crases
 export const updateEncaminhamento = (id: number, data: object) => fetchWithAuth(`/api/encaminhamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // ANEXOS
@@ -190,7 +208,7 @@ export const uploadAnexoParaCaso = (casoId: string | number, formData: FormData)
 export const uploadAnexoParaDemanda = (demandaId: string | number, formData: FormData) => fetchWithAuth(`/api/anexos/upload/demanda/${demandaId}`, { method: 'POST', body: formData });
 
 export async function downloadAnexo(anexoId: number): Promise<{ blob: Blob, filename: string }> {
-    // ✅ CORRIGIDO: Uso de crases
+    // ✅ CORRIGIDO: Uso de crases
     const response = await fetchWithAuth(`/api/anexos/download/${anexoId}`) as Response;
     const disposition = response.headers.get('content-disposition');
     let filename = 'arquivo_anexo';

@@ -2,9 +2,10 @@ import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './GraficoPizza.css';
 
+// ⭐️ CORREÇÃO: Padronizando para a estrutura universal {name, value}
 interface PizzaData {
-  tipo: string;
-  quantidade: number;
+  name: string;
+  value: number;
 }
 
 // ATUALIZADO: Adicionamos a nova propriedade 'onSliceClick'
@@ -17,19 +18,16 @@ interface GraficoPizzaProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF4560'];
 
 const GraficoPizza: React.FC<GraficoPizzaProps> = ({ data, onSliceClick }) => {
+  // O Recharts já aceita name e value, mas garantimos que value é número.
   const processedData = data.map(item => ({
-    name: item.tipo, // Recharts usa a chave 'name' para a legenda
-    value: Number(item.quantidade), // E 'value' para o valor
+    name: item.name, 
+    value: Number(item.value), 
   }));
 
   return (
     <div className="grafico-container">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          {/* ATUALIZADO: 
-            - Adicionamos a propriedade 'onClick' ao gráfico.
-            - Adicionamos um cursor de ponteiro para indicar que é clicável.
-          */}
           <Pie
             data={processedData}
             cx="50%"

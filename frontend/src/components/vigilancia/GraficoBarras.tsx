@@ -2,9 +2,10 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './GraficoBarras.css';
 
+// ⭐️ CORREÇÃO: Padronizando para a estrutura universal {name, value}
 interface GraficoData {
-  fonte: string;
-  quantidade: number;
+  name: string;
+  value: number;
 }
 
 // ATUALIZADO: Adicionamos a nova propriedade 'onBarClick'
@@ -14,9 +15,10 @@ interface GraficoBarrasProps {
 }
 
 const GraficoBarras: React.FC<GraficoBarrasProps> = ({ data, onBarClick }) => {
+  // Apenas garante que o value é numérico
   const processedData = data.map(item => ({
     ...item,
-    quantidade: Number(item.quantidade),
+    value: Number(item.value), // Usa 'value' em vez de 'quantidade'
   }));
 
   return (
@@ -29,15 +31,13 @@ const GraficoBarras: React.FC<GraficoBarrasProps> = ({ data, onBarClick }) => {
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" />
-          <YAxis dataKey="fonte" type="category" width={120} tick={{ fontSize: 12 }} />
+          {/* ⭐️ CORREÇÃO: Usar 'name' como dataKey para o eixo Y */}
+          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} /> 
           <Tooltip />
           <Legend />
-          {/* ATUALIZADO: 
-            - Adicionamos a propriedade 'onClick' à barra.
-            - Adicionamos um cursor de ponteiro para indicar que é clicável.
-          */}
+          {/* ⭐️ CORREÇÃO: Usar 'value' como dataKey para a barra */}
           <Bar 
-            dataKey="quantidade" 
+            dataKey="value" 
             fill="#8884d8" 
             name="Nº de Casos" 
             onClick={onBarClick}

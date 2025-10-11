@@ -8,60 +8,57 @@ import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 const router = express.Router();
 
 /**
- * Função de Limpeza SQL Extrema: Remove quebras de linha e múltiplos espaços.
- * @param sql String SQL suja.
- */
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
-
-/**
- * Função utilitária para gerar o filtro WHERE e sincronizar os parâmetros.
- * Retorna APENAS O CONTEÚDO do WHERE, limpo.
- */
-const buildFilterClause = (
-    accessFilter: { whereClause: string, params: any[] },
-    existingParamsCount: number = 0 // Parâmetros que já existem na query base
-): [string, any[]] => {
-    
-    let params: any[] = [];
-    let paramIndex = existingParamsCount + 1;
-
-    let unitWhere = accessFilter.whereClause;
-    
-    // 1. Substituir placeholders ($X, $Y) por números reais ($N+1, $N+2...)
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
-    }
-    
-    params.push(...accessFilter.params); 
-
-    // Retorna APENAS O CONTEÚDO do WHERE, limpo.
-    return [unitWhere.trim(), params];
-};
-
-
-// =======================================================================
-// ROTAS DO PAINEL DE VIGILÂNCIA (COM LIMPEZA EXTREMA APLICADA)
-// =======================================================================
-
-// Aplicamos o middleware em cada rota para garantir a execução.
-
-/**
- * @route   GET /fluxo-demanda
- * @desc    Casos novos nos últimos 30 dias (FILTRADO POR UNIDADE)
+ * Função de Limpeza SQL Extrema: Remove quebras de linha e múltiplos espaços.
  */
+const cleanSqlString = (sql: string): string => {
+    return sql.replace(/\s+/g, ' ').trim();
+};
+
+/**
+ * Função utilitária para gerar o filtro WHERE de acesso (unidade e visibilidade).
+ */
+const buildFilterClause = (
+    accessFilter: { whereClause: string, params: any[] },
+    existingParamsCount: number = 0 // Parâmetros que já existem na query base
+): [string, any[]] => {
+    
+    let params: any[] = [];
+    let paramIndex = existingParamsCount + 1;
+
+    let unitWhere = accessFilter.whereClause;
+    
+    // 1. Substituir placeholders ($X, $Y) por números reais ($N+1, $N+2...)
+    if (accessFilter.params.length === 1) {
+        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
+    } else if (accessFilter.params.length === 2) {
+        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
+    }
+    
+    params.push(...accessFilter.params); 
+
+    // Inclui casos do Gestor Principal
+    if (unitWhere !== 'TRUE') {
+        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
+    }
+
+    // Retorna APENAS O CONTEÚDO do WHERE, limpo.
+    return [unitWhere.trim(), params];
+};
+
+
+// =======================================================================
+// ROTAS DO PAINEL DE VIGILÂNCIA (KPIs e GRÁFICOS)
+// =======================================================================
+
 router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
     
     try {
+        const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0); 
+        const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
+
         const queryBase = `SELECT COUNT(id) AS "total" FROM casos WHERE "dataCad" >= CURRENT_DATE - INTERVAL '30 days'`;
-
-        const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0); 
-        const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
-
+        
         const finalQuery = cleanSqlString(queryBase + andClause);
         const result = await pool.query(finalQuery, unitParams);
 
@@ -72,23 +69,16 @@ router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit
     }
 });
 
-/**
- * @route   GET /sobrecarga-equipe
- * @desc    Média de casos por técnico (FILTRADO POR UNIDADE)
- */
 router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
-    
-    // Gerar filtro. existingParamsCount = 0. unitParams contém os IDs de filtro ($1, $2...)
-    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
-    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
+    
+    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
     
     try {
-        // FIX: Query base limpa
         const totalCasosBase = `SELECT COUNT(*) AS total FROM casos`;
         const totalTecnicosBase = `SELECT COUNT(DISTINCT "tecRef") AS total FROM casos`;
         
-        // 📌 FIX CRÍTICO: Não precisamos de variáveis intermediárias. Injetamos a query e os unitParams.
         const [casosResult, tecnicosResult] = await Promise.all([
             pool.query(cleanSqlString(totalCasosBase + whereClause), unitParams),
             pool.query(cleanSqlString(totalTecnicosBase + whereClause), unitParams),
@@ -112,18 +102,13 @@ router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', '
 });
 
 
-/**
- * @route   GET /incidencia-bairros
- * @desc    Casos por bairro (FILTRADO POR UNIDADE)
- */
 router.get("/incidencia-bairros", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
-    
-    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
-    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
+    
+    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
     
     try {
-        // FIX: Query base limpa
         const queryBase = `SELECT dados_completos->>'bairro' AS bairro, COUNT(id)::int AS casos FROM casos`;
         
         const finalQuery = cleanSqlString(`
@@ -143,18 +128,13 @@ router.get("/incidencia-bairros", authMiddleware, unitAccessMiddleware('casos', 
     }
 });
 
-/**
- * @route   GET /fontes-acionamento
- * @desc    Canais de denúncia (FILTRADO POR UNIDADE)
- */
 router.get("/fontes-acionamento", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
-    
-    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
-    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
+    
+    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
     
     try {
-        // FIX: Query base limpa
         const queryBase = `SELECT dados_completos->>'canalDenuncia' AS fonte, COUNT(id)::int AS quantidade FROM casos`;
         
         const finalQuery = cleanSqlString(`
@@ -174,18 +154,13 @@ router.get("/fontes-acionamento", authMiddleware, unitAccessMiddleware('casos', 
     }
 });
 
-/**
- * @route   GET /taxa-reincidencia
- * @desc    Taxa de reincidência nos últimos 12 meses (FILTRADO POR UNIDADE)
- */
 router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
-    
-    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
-    const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
+    
+    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+    const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
     
     try {
-        // FIX: Query base limpa
         const queryBase = `SELECT COUNT(id) AS "totalCasos", COUNT(id) FILTER (WHERE dados_completos->>'reincidente' = 'Sim') AS "casosReincidentes" FROM casos WHERE "dataCad" >= NOW() - INTERVAL '1 year'`;
 
         const finalQuery = cleanSqlString(queryBase + andClause); 
@@ -202,20 +177,15 @@ router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', '
     }
 });
 
-/**
- * @route   GET /perfil-violacoes
- * @desc    Perfil dos tipos de violência (FILTRADO POR UNIDADE)
- */
 router.get("/perfil-violacoes", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
-    const accessFilter = req.accessFilter!;
-    
-    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
-    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
+    const accessFilter = req.accessFilter!;
+    
+    const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+    const whereClause = unitFilterContent.length > 0 ? ` WHERE ${unitFilterContent}` : '';
     
     try {
-        // FIX: Query base limpa
         const queryBase = `SELECT dados_completos->>'tipoViolencia' AS tipo, COUNT(id)::int AS quantidade FROM casos`;
-        
+        
         const finalQuery = cleanSqlString(`
             ${queryBase} ${whereClause}
             AND dados_completos->>'tipoViolencia' IS NOT NULL 
@@ -231,6 +201,97 @@ router.get("/perfil-violacoes", authMiddleware, unitAccessMiddleware('casos', 'u
         console.error("Erro ao buscar perfil de violações (filtrado):", err.message);
         res.status(500).json({ message: "Erro interno no servidor." });
     }
+});
+
+/**
+ * ⭐️ NOVA ROTA: GET /casos-filtrados (Endpoint para Drill-Down do Painel)
+ * @desc Recebe filtro e valor da query string para listar casos detalhadamente.
+ */
+router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+    const accessFilter = req.accessFilter!;
+    
+    // ⭐️ CORREÇÃO: Trata a query string como potencial array de filtros
+    const { filtro, valor } = req.query;
+    const filtros = Array.isArray(filtro) ? filtro : (filtro ? [filtro] : []);
+    const valores = Array.isArray(valor) ? valor : (valor ? [valor] : []);
+
+    try {
+        // 1. Constrói a cláusula WHERE de segurança e visibilidade
+        const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
+        const whereClauses: string[] = unitFilterContent.length > 0 ? [`${unitFilterContent}`] : [];
+        const params: any[] = [...unitParams];
+        
+        const addParam = (val: any) => {
+            params.push(val);
+            return `$${params.length}`;
+        };
+
+        // 2. Aplicar TODOS os filtros fornecidos (COM PRIORIDADE DE DATA)
+        for (let i = 0; i < filtros.length; i++) {
+            const jsonKey = filtros[i];
+            const val = valores[i];
+
+            if (!jsonKey || !val) continue;
+
+            // ⭐️ LÓGICA CORRIGIDA: Usa SWITCH/CASE para forçar a avaliação da data
+            switch (jsonKey) {
+                case 'dataCad':
+                case 'ultimos_30_dias': // Adiciona a checagem 'ultimos_30_dias' como chave aqui
+                    // CRÍTICO: Se a chave é 'dataCad' e o valor é 'ultimos_30_dias', aplica a lógica SQL de data
+                    if (val === 'ultimos_30_dias') {
+                        // ✅ CORREÇÃO: Usa a lógica de data correta.
+                        whereClauses.push(`"dataCad" >= CURRENT_DATE - INTERVAL '30 days'`);
+                    } else {
+                         // Fallback para caso não seja o filtro de 30 dias (incomum, mas seguro)
+                         const ph = addParam(val);
+                         whereClauses.push(`dados_completos->>'${jsonKey}' = ${ph}::TEXT`);
+                    }
+                    break;
+                case 'status':
+                    // Filtro de Status (Colunas SQL)
+                    const phStatus = addParam(val);
+                    whereClauses.push(`status = ${phStatus}::VARCHAR`);
+                    break;
+                case 'reincidentes':
+                    // Filtros JSONB Sim/Não
+                    if (val === 'Sim') whereClauses.push(`dados_completos->>'reincidente' = 'Sim'`);
+                    break;
+                case 'por_bairro':
+                case 'por_canal':
+                case 'por_violencia':
+                    // Filtros de Gráfico (valor exato)
+                    const ph = addParam(val);
+                    const targetKey = jsonKey.replace('por_', '');
+                    whereClauses.push(`dados_completos->>'${targetKey}' = ${ph}::TEXT`);
+                    break;
+                default:
+                    // Filtro genérico (fallback)
+                    const phGeneric = addParam(val);
+                    whereClauses.push(`dados_completos->>'${jsonKey}' = ${phGeneric}::TEXT`);
+                    break;
+            }
+        }
+        
+        // Montagem final da query
+        let finalQuery = `
+            SELECT id, "dataCad", "tecRef", nome, status, unit_id, dados_completos->>'bairro' AS bairro
+            FROM casos
+        `;
+        
+        if (whereClauses.length > 0) {
+            finalQuery += ` WHERE ${whereClauses.join(' AND ')} `;
+        }
+
+        finalQuery += ` ORDER BY "dataCad" DESC`;
+
+        const result = await pool.query(cleanSqlString(finalQuery), params);
+        
+        res.json(result.rows); 
+
+    } catch (err: any) {
+        console.error("Erro ao listar casos filtrados para o Painel de Vigilância:", err.message);
+        res.status(500).json({ message: "Erro ao buscar lista detalhada." });
+    }
 });
 
 
