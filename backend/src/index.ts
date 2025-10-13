@@ -18,6 +18,7 @@ import relatoriosRoutes from "./routes/relatorios";
 import vigilanciaRoutes from './routes/vigilancia';
 import encaminhamentosRoutes from "./routes/encaminhamentos";
 import anexosRoutes from "./routes/anexos";
+import crasRouter from './routes/cras';
 // 1. IMPORTAÇÃO da nova rota de demandas
 import demandasRoutes from "./routes/demandas"; 
 
@@ -49,6 +50,7 @@ const PORT = process.env.PORT || 4000;
     app.use("/api/relatorios", relatoriosRoutes);
     app.use("/api/encaminhamentos", encaminhamentosRoutes);
     app.use("/api/anexos", anexosRoutes);
+    app.use('/api/cras', crasRouter);
     // 2. REGISTRO da nova rota de demandas
     app.use("/api/demandas", demandasRoutes);
 

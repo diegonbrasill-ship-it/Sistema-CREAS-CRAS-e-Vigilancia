@@ -18,30 +18,33 @@ import UserEditModal from '@/components/users/UserEditModal';
 import ReassignCasesModal from '@/components/users/ReassignCasesModal';
 
 // ========================================================
-// 📌 Módulos de Mapeamento de Nomenclatura
+// 📌 Módulos de Mapeamento de Nomenclatura (INCLUINDO ROLES CRAS)
 // ========================================================
 
 const UNIDADES_DISPONIVEIS = [
-    { id: 1, nome: 'CREAS' },
-    { id: 2, nome: 'Vigilancia SocioAssistencial' }, 
-    { id: 3, nome: 'CRAS Geralda Medeiros' },
-    { id: 4, nome: 'CRAS Mariana Alves' },
-    { id: 5, nome: 'CRAS Matheus leitao' },
-    { id: 6, nome: 'CRAS Severina Celestino' },
-    { id: 7, nome: 'Centro POP' },
-    { id: 8, nome: 'Conselho Tutelar Norte' },
+    { id: 1, nome: 'CREAS' },
+    { id: 2, nome: 'CRAS Geralda Medeiros' }, // IDs corrigidos e alinhados com a Sidebar
+    { id: 3, nome: 'CRAS Mariana Alves' },
+    { id: 4, nome: 'CRAS Matheus Leitão' },
+    { id: 5, nome: 'CRAS Severina Celestino' },
+    { id: 6, nome: 'Vigilancia SocioAssistencial' }, 
+    { id: 7, nome: 'Centro POP' },
+    { id: 8, nome: 'Conselho Tutelar Norte' },
 ];
 
 const PROFILE_OPTIONS = [
-    { value: "tecnico_superior", label: "Técnico de Nível Superior" },
-    { value: "tecnico_medio", label: "Técnico de Nível Médio" },
-    { value: "coordenador", label: "Coordenador(a) da Unidade" },
-    { value: "gestor", label: "Secretário(a) / Gestor Geral" },
-    { value: "vigilancia", label: "Vigilância Socioassistencial" },
+    { value: "tecnico_superior", label: "Técnico de Nível Superior" },
+    { value: "tecnico_medio", label: "Técnico de Nível Médio" },
+    { value: "coordenador", label: "Coordenador(a) CREAS" }, 
+    { value: "gestor", label: "Secretário(a) / Gestor Geral" },
+    { value: "vigilancia", label: "Vigilância Socioassistencial" },
+    // ⭐️ NOVO: Perfils CRAS
+    { value: "coordenador_cras", label: "Coordenador(a) CRAS" },
+    { value: "tecnico_cras", label: "Técnico(a) CRAS" },
 ];
 
 const getProfileLabel = (roleValue: string) => {
-    return PROFILE_OPTIONS.find(p => p.value === roleValue)?.label || roleValue;
+    return PROFILE_OPTIONS.find(p => p.value === roleValue)?.label || roleValue;
 };
 
 interface NewUserState {
@@ -71,8 +74,8 @@ export default function GerenciarUsuarios() {
   const fetchUsers = async () => {
     try {
       const response = await getUsers();
-      // 📌 FIX CRÍTICO: Tenta extrair o array de dados de forma segura (como sugerido)
-      const usersData = Array.isArray(response) ? response : response?.rows || response?.data || response?.results || [];
+      // 📌 FIX CRÍTICO: Tenta extrair o array de dados de forma segura (como sugerido)
+      const usersData = Array.isArray(response) ? response : response?.rows || response?.data || response?.results || [];
       setUsers(usersData);
     } catch (error: any) {
       toast.error(`Erro ao carregar servidores: ${error.message}`);
@@ -91,14 +94,15 @@ export default function GerenciarUsuarios() {
     setNewUser(prev => ({ ...prev, [name]: value } as NewUserState));
   };
 
+  // ⭐️ CORREÇÃO 1: Este handler deve receber o VALUE interno (a role string)
   const handleRoleChange = (value: string) => {
     setNewUser(prev => ({ ...prev, role: value }));
   };
-  
-  const handleUnitChange = (value: string) => {
-    const selectedUnitId = value && value !== 'null' ? parseInt(value, 10) : null;
-    setNewUser(prev => ({ ...prev, unit_id: selectedUnitId }));
-  };
+  
+  const handleUnitChange = (value: string) => {
+    const selectedUnitId = value && value !== 'null' ? parseInt(value, 10) : null;
+    setNewUser(prev => ({ ...prev, unit_id: selectedUnitId }));
+  };
 
   const handleCreateUser = async () => {
     // Validação
@@ -111,11 +115,11 @@ export default function GerenciarUsuarios() {
     try {
       await createUser(newUser); 
       toast.success(`Servidor "${newUser.nome_completo}" criado com sucesso!`);
-      
-      // 📌 FIX FINAL: Recarrega a lista DEPOIS do sucesso
+      
+      // 📌 FIX FINAL: Recarrega a lista DEPOIS do sucesso
       await fetchUsers(); 
-      
-      // Limpa e reseta o default APÓS a recarga
+      
+      // Limpa e reseta o default APÓS a recarga
       setNewUser({ username: '', password: '', role: PROFILE_OPTIONS[0].value, nome_completo: '', cargo: '', unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1 });
     } catch (error: any) {
       toast.error(`Erro ao criar servidor: ${error.message}`);
@@ -166,19 +170,19 @@ export default function GerenciarUsuarios() {
           <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="space-y-2 col-span-2"><Label htmlFor="nome_completo">Nome Completo</Label><Input name="nome_completo" placeholder="Ex: João Paulo da Silva" value={newUser.nome_completo} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="cargo">Cargo/Função</Label><Input name="cargo" placeholder="Ex: Psicólogo, Assistente Social" value={newUser.cargo} onChange={handleInputChange} /></div>
-              
+              
             <div className="space-y-2"><Label htmlFor="unit_id">Unidade</Label><Select value={String(newUser.unit_id ?? '')} onValueChange={handleUnitChange}>
-                <SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger>
-                <SelectContent>
-                    {UNIDADES_DISPONIVEIS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
-                </SelectContent>
-            </Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p></div>
+                <SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger>
+                <SelectContent>
+                    {UNIDADES_DISPONIVEIS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                </SelectContent>
+            </Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p></div>
 
             <div className="space-y-2"><Label htmlFor="username">Nome de Usuário</Label><Input name="username" placeholder="ex: joao.silva" value={newUser.username} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="password">Senha Provisória</Label><Input name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} /></div>
             <div className="space-y-2"><Label htmlFor="role">Perfil de Acesso</Label><Select value={newUser.role} onValueChange={handleRoleChange}><SelectTrigger id="role"><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>
-                {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.label}>{p.label}</SelectItem>))}
-            </SelectContent></Select></div>
+                {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))} 
+            </SelectContent></Select></div>
           </div>
           <Button onClick={handleCreateUser} disabled={isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}

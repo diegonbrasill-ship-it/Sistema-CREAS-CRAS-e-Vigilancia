@@ -21,10 +21,9 @@ router.use(authMiddleware, unitAccessMiddleware('users', 'unit_id'));
 
 // =======================================================================
 // MIDDLEWARE AUXILIAR: Checa se o usuário pode editar o alvo (Baseado no unit_id)
-// ... (omito a função para foco, ela é usada apenas nas rotas PUT/PATCH)
 // =======================================================================
 async function checkUserUnitAccess(req: Request, res: Response, next: NextFunction) {
-    const { id } = req.params;
+    const { id } = req.params;
     const accessFilter = req.accessFilter!;
 
     // 1. Resolve Placeholders e Parâmetros
@@ -44,6 +43,7 @@ async function checkUserUnitAccess(req: Request, res: Response, next: NextFuncti
     const query = cleanSqlString(`SELECT id FROM users WHERE id = $1 AND ${unitWhere}`);
     
     try {
+        // ✅ CORREÇÃO: Usando pool.query diretamente para evitar erro de 'release'
         const result = await pool.query(query, params);
         if (result.rowCount === 0) {
             return res.status(403).json({ message: "Acesso Proibido. Você não pode editar usuários de outras unidades." });
@@ -60,8 +60,7 @@ async function checkUserUnitAccess(req: Request, res: Response, next: NextFuncti
 // ROTA GET /users (Listagem: AGORA LISTA TODOS ATIVOS DA UNIDADE)
 // =======================================================================
 router.get("/", 
-    // ⭐️ CORREÇÃO: checkRole mantido para a rota de listagem (agora sem o segundo argumento)
-    checkRole(['coordenador', 'gestor', 'tecnico_superior', 'tecnico_medio', 'vigilancia']),
+    // ✅ CORREÇÃO: Removido checkRole para permitir a listagem de técnicos.
     async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!; 
     
@@ -89,8 +88,7 @@ router.get("/",
             additionalWhereClauses.push(unitWhere);
         } 
         
-        // ⭐️ FIX: Remover o filtro de ROLE aqui para garantir que TODOS os usuários da unidade apareçam
-        // Deixamos apenas o filtro de unidade e de status ativo
+        // ⭐️ FIX: Lista APENAS usuários ativos.
         additionalWhereClauses.push('is_active = true');
 
         // Juntar as cláusulas e montar a query
@@ -116,7 +114,6 @@ router.get("/",
 // ROTA POST /users (Criação)
 // =======================================================================
 router.post("/", checkRole(['coordenador', 'gestor']), async (req: Request, res: Response) => {
-// ... (Código POST inalterado)
     const { username, password, role, nome_completo, cargo, unit_id } = req.body;
     const adminUser = req.user!; 
     const adminRole = adminUser.role;
@@ -130,9 +127,10 @@ router.post("/", checkRole(['coordenador', 'gestor']), async (req: Request, res:
         return res.status(400).json({ message: "Todos os campos (usuário, senha, perfil, nome completo, cargo, unidade) são obrigatórios." });
     }
     
-    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia'];
+    // ⭐️ CORREÇÃO CRÍTICA AQUI: Adicionamos as novas roles do CRAS
+    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia', 'coordenador_cras', 'tecnico_cras'];
     if (!validRoles.includes(role)) {
-        return res.status(400).json({ message: "Perfil (role) inválido." });
+        return res.status(400).json({ message: `Perfil (role) inválido. Role recebida: ${role}. Roles aceitas: ${validRoles.join(', ')}` });
     }
 
     try {
@@ -173,7 +171,6 @@ router.post("/", checkRole(['coordenador', 'gestor']), async (req: Request, res:
 // ROTA PUT /users/:id (Edição)
 // =======================================================================
 router.put("/:id", checkRole(['coordenador', 'gestor']), checkUserUnitAccess, async (req: Request, res: Response) => {
-// ... (Código PUT inalterado)
     const { id } = req.params;
     const { username, role, nome_completo, cargo } = req.body;
     const adminUser = req.user!;
@@ -272,14 +269,12 @@ router.post("/reatribuir", checkRole(['coordenador', 'gestor']), async (req: Req
         const accessCheck = await client.query(accessQuery, [fromUserId, toUserId, adminUnitId]);
         
         if (accessCheck.rowCount !== 2) {
-            await client.query('ROLLBACK');
             return res.status(403).json({ message: 'Acesso Proibido. Um ou ambos os usuários não existem ou não pertencem à sua unidade de trabalho.' });
         }
         
         const toUserResultQuery = cleanSqlString('SELECT nome_completo, cargo FROM users WHERE id = $1');
         const toUserResult = await client.query(toUserResultQuery, [toUserId]);
         if (toUserResult.rowCount === 0) {
-            await client.query('ROLLBACK');
             throw new Error('Usuário de destino não encontrado.');
         }
         const { nome_completo, cargo } = toUserResult.rows[0];
@@ -314,3 +309,4 @@ router.post("/reatribuir", checkRole(['coordenador', 'gestor']), async (req: Req
 });
 
 export default router;
+
