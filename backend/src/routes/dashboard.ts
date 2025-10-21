@@ -1,6 +1,6 @@
 // backend/src/routes/dashboard.ts (VERSÃO FINAL COM FILTRO DE SEGREGACÃO CRÍTICA)
 
-import { Router, Request, Response, NextFunction } from "express"; 
+import { Router, Request, Response } from "express"; 
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
@@ -10,7 +10,8 @@ const router = Router();
 
 // ⭐️ CONSTANTES CRÍTICAS PARA SEGREGACÃO ⭐️
 const CREAS_UNIT_ID = 1;
-const CRAS_UNIT_IDS = [2, 3, 4, 5]; // IDs a serem EXCLUÍDOS do Dashboard/Análise
+// A lista CRAS_UNIT_IDS não é mais usada para filtragem, mas mantida por contexto.
+// const CRAS_UNIT_IDS = [2, 3, 4, 5]; 
 
 // 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Remove quebras de linha e múltiplos espaços.
 const cleanSqlString = (sql: string): string => {
@@ -21,7 +22,7 @@ const cleanSqlString = (sql: string): string => {
 /**
  * Função utilitária para gerar o filtro WHERE e sincronizar os parâmetros.
  * Retorna APENAS O CONTEÚDO do WHERE, limpo.
- * Esta função será modificada para INJETAR O FILTRO CREAS.
+ * Esta função foi modificada para INJETAR O FILTRO CREAS (unit_id=1 OR unit_id IS NULL).
  */
 const buildFullWhereClauseContent = ( 
     filters: { mes?: string, tecRef?: string, bairro?: string },
@@ -33,21 +34,16 @@ const buildFullWhereClauseContent = (
     let params: any[] = [];
     let paramIndex = startParamIndex;
 
-    // 🛑 1. FILTRO CRÍTICO DE SEGREGACÃO (CREAS/PAEFI) 🛑
-    // Garante que o Dashboard só conte casos do CREAS (ID 1) ou Casos NÃO lotados (NULL).
-    // Adicionamos os IDs CRAS (2-5) aos parâmetros para a exclusão na listagem
-    
-    // NOTE: A lista de IDs CRAS precisa ser injetada nos parâmetros
-    const crasIdsToExclude = CRAS_UNIT_IDS;
-    crasIdsToExclude.forEach(id => params.push(id));
-    
-    // Cria os placeholders dinamicamente (ex: $1, $2, $3, $4, $5, $6)
-    const placeholdersToExclude = crasIdsToExclude.map((_, i) => `$${paramIndex++}`).join(', ');
-    
-    // Cláusula para excluir explicitamente os IDs do CRAS (2-5)
-    whereClauses.push(`casos.unit_id NOT IN (${placeholdersToExclude})`);
+    // 🛑 1. CORREÇÃO CRÍTICA DE SEGREGACÃO (CREAS/PAEFI) 🛑
+    // Garante que o Dashboard só conte casos do CREAS (ID 1) ou Casos NÃO lotados (NULL).
+    
+    const creasIdParam = `$${paramIndex++}`;
+    params.push(CREAS_UNIT_ID); // Valor 1
+    
+    // NOVO FILTRO: Apenas unidade 1 (CREAS) OU NULL (Casos sem lotação)
+    whereClauses.push(`(casos.unit_id = ${creasIdParam} OR casos.unit_id IS NULL)`);
 
-
+    
     // 2. Adicionar filtros existentes (mes, tecRef, bairro)
     if (filters.mes) {
         params.push(filters.mes);
@@ -67,6 +63,7 @@ const buildFullWhereClauseContent = (
     let unitWhere = accessFilter.whereClause;
     
     // Substituir placeholders do unitAccessMiddleware ($X, $Y) por números reais ($N, $N+1...)
+    // O índice de parâmetro aqui deve continuar do último índice usado (paramIndex)
     if (accessFilter.params.length === 1) {
         unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
     } else if (accessFilter.params.length === 2) {
@@ -76,7 +73,9 @@ const buildFullWhereClauseContent = (
     // Adicionar os parâmetros da unidade à lista principal de parâmetros (agora indexados corretamente)
     params = params.concat(accessFilter.params); 
     
-    // ⭐️ CORREÇÃO ESSENCIAL: Mantemos o filtro de segurança, mas a exclusão já foi feita no passo 1.
+    // ⭐️ NOTA: O unitAccessMiddleware agora atuará DENTRO da segregação CREAS/PAEFI.
+    // Para um usuário CREAS (unit_id=1), o accessFilter.whereClause será 'unit_id = 1', o que é redundante, mas seguro.
+    // Para um usuário Vigilância (que deve ver TUDO do CREAS), o unitAccessMiddleware deve retornar 'TRUE' ou uma cláusula que inclua o CREAS e NULLs, que é garantido pelo filtro INJETADO no passo 1 e, implicitamente, pela lógica de autorização.
     if (unitWhere !== 'TRUE') {
         whereClauses.push(unitWhere);
     }
@@ -89,6 +88,8 @@ const buildFullWhereClauseContent = (
 // =======================================================================
 // 📌 APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
 // =======================================================================
+// A Vigilância (role) deve ter permissão total aqui para que o unitAccessMiddleware 
+// retorne um whereClause='TRUE', permitindo que o filtro CREAS (injetado) seja o único limitador.
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
 
@@ -129,6 +130,8 @@ router.get("/", async (req: Request, res: Response) => {
             return `COALESCE(NULLIF(NULLIF(${trimmedField}, ''), 'N/I'), 'Não Informado')`;
         }
 
+        // Restante das queries não precisa ser alterado, pois dependem corretamente
+        // das variáveis 'whereClause' e 'andClause', que agora contêm o filtro CREAS/PAEFI.
         const queries = [
             // 0 - Indicadores: Total de Atendimentos 
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos ${whereClause}`), params),

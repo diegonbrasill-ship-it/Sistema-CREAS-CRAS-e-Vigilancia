@@ -68,29 +68,29 @@ router.post("/", async (req: Request, res: Response) => {
         unit_id,
     } = req.body;
 
-    // 🛑 CORREÇÃO 1: Mapeamento EXPLICITO e Conversão de "" para NULL
-    const dados_completos_cleaned: any = {};
-    const jsonbKeys = [
-        'nis', 'idade', 'sexo', 'corEtnia', 'primeiraInfSuas', 
-        'bairro', 'rua', 'pontoReferencia', 'contato',
-        'recebePropPai', 'recebePAA', 'recebeBPC', 'recebeHabitacaoSocial',
-        'escolaridade', 'rendaFamiliar'
-    ];
+    // 🛑 CORREÇÃO 1: Mapeamento EXPLICITO e Conversão de "" para NULL
+    const dados_completos_cleaned: any = {};
+    const jsonbKeys = [
+        'nis', 'idade', 'sexo', 'corEtnia', 'primeiraInfSuas', 
+        'bairro', 'rua', 'pontoReferencia', 'contato',
+        'recebePropPai', 'recebePAA', 'recebeBPC', 'recebeHabitacaoSocial',
+        'escolaridade', 'rendaFamiliar'
+    ];
 
-    jsonbKeys.forEach(key => {
-        const rawValue = req.body[key];
-        // O valor é NULL se for string vazia ("") ou undefined, senão usa o valor
-        dados_completos_cleaned[key] = (rawValue === "" || rawValue === undefined) ? null : rawValue;
-    });
-    
-    const dadosCompletosJSON = JSON.stringify(dados_completos_cleaned);
-    // 🛑 FIM DA CORREÇÃO DE PERSISTÊNCIA 🛑
+    jsonbKeys.forEach(key => {
+        const rawValue = req.body[key];
+        // O valor é NULL se for string vazia ("") ou undefined, senão usa o valor
+        dados_completos_cleaned[key] = (rawValue === "" || rawValue === undefined) ? null : rawValue;
+    });
+    
+    const dadosCompletosJSON = JSON.stringify(dados_completos_cleaned);
+    // 🛑 FIM DA CORREÇÃO DE PERSISTÊNCIA 🛑
 
     const nomeToUse = nome || null;
     const tecRefToUse = tecRef || null;
     const unitIdToUse = unit_id || req.user!.unit_id || null;
     const statusToUse = status || 'Ativo';
-    const dataCadToUse = dataCad || new Date().toISOString().split('T')[0];
+    const dataCadToUse = dataCad || new Date().toISOString().split('T')[0];
 
     const userId = req.user!.id;
     const username = req.user!.username;
@@ -114,23 +114,23 @@ router.post("/", async (req: Request, res: Response) => {
 
         const casoBase = result.rows[0];
         
-        // Mescla os dados JSONB para que o Frontend veja todos os campos no objeto raiz
-        const casoMesclado = {
-            ...casoBase.dados_completos,
-            id: casoBase.id,
-            dataCad: casoBase.dataCad,
-            tecRef: casoBase.tecRef,
-            nome: casoBase.nome,
-            status: casoBase.status,
-            unit_id: casoBase.unit_id,
-        };
+        // Mescla os dados JSONB para que o Frontend veja todos os campos no objeto raiz
+        const casoMesclado = {
+            ...casoBase.dados_completos,
+            id: casoBase.id,
+            dataCad: casoBase.dataCad,
+            tecRef: casoBase.tecRef,
+            nome: casoBase.nome,
+            status: casoBase.status,
+            unit_id: casoBase.unit_id,
+        };
 
 
         await logAction({ userId, username, action: 'CREATE_CASE', details: { casoId: casoBase.id } });
         
-        // Retorna o objeto mesclado!
+        // Retorna o objeto mesclado!
         res.status(201).json(casoMesclado);
-        
+        
     } catch (err: any) {
         console.error("Erro ao criar caso:", err.message);
         res.status(500).json({ message: "Erro ao criar caso." });
@@ -150,18 +150,18 @@ router.get("/", async (req: Request, res: Response) => {
     confirmedViolence, socioeducacao, mes 
 } = req.query as any;
 
-    // 🛑 RESTAURAÇÃO DE ESCOPO 🛑
-    let params: any[] = [];
-    const whereClauses: string[] = [];
+    // 🛑 FLUXO DE PARÂMETROS: Começa em $1. 🛑
+    let params: any[] = [];
+    const whereClauses: string[] = [];
 
-    const addParam = (val: any) => {
-        params.push(val);
-        return `$${params.length}`;
-    };
-    // 🛑 FIM DA RESTAURAÇÃO DE ESCOPO 🛑
+    const addParam = (val: any) => {
+        params.push(val);
+        return `$${params.length}`; 
+    };
+    // 🛑 FIM DO FLUXO DE PARÂMETROS 🛑
 
   // ⭐️ INÍCIO DA CORREÇÃO DE VISIBILIDADE E FILTROS ⭐️
-  const isVigilancia = user.role.toLowerCase() === 'vigilancia'; // Definindo localmente
+  const isVigilancia = user.role.toLowerCase() === 'vigilancia'; 
   const isGestorGeral = user.role.toLowerCase() === 'gestor'; 
 
   try {
@@ -191,22 +191,56 @@ router.get("/", async (req: Request, res: Response) => {
            dados_completos->>'cpf' ILIKE ${p4})
         `));
       } 
-      // 2. FILTROS DE DRILL-DOWN (Filtro/Valor) - CORREÇÃO CRÍTICA
+      // 2. FILTROS DE DRILL-DOWN (Filtro/Valor) - CORREÇÃO CRÍTICA DO NOME
       else if (filtro && valor) {
-          const jsonKey = filtro;
-          const phValor = addParam(valor);
-
-          if (jsonKey === 'recebeBPC') {
-              whereClauses.push(`(dados_completos->>'${jsonKey}' = 'Idoso' OR dados_completos->>'${jsonKey}' = 'PCD')`);
-              params.pop(); 
-          } else if (jsonKey === 'por_bairro' || jsonKey === 'por_violencia' || jsonKey === 'por_canal') {
-              const targetKey = jsonKey.replace('por_', '');
-              whereClauses.push(`LOWER(dados_completos->>'${targetKey}') = LOWER(${phValor}::TEXT)`);
-          } else {
-              whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
+          const jsonKey = filtro;
+          
+          // 🛑 TRATAMENTO FAIXA ETÁRIA (CONFIRMADO: 'por_faixa_etaria') 🛑
+          if (jsonKey === 'por_faixa_etaria') { 
+            const phValor = addParam(valor);
+            // Replicamos a lógica do Dashboard
+            const rangeClause = cleanSqlString(`
+                (CASE 
+                    WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
+                    WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
+                    WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
+                    WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
+                    WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
+                    ELSE 'Não informado' 
+                END = ${phValor})
+            `);
+            whereClauses.push(rangeClause);
+          } else if (jsonKey === 'recebeBPC') {
+              whereClauses.push(`(dados_completos->>'${jsonKey}' = 'Idoso' OR dados_completos->>'${jsonKey}' = 'PCD')`);
+          } 
+          // 🛑 TRATAMENTO TIPO DE VIOLAÇÃO (AQUI ESTÁ O AJUSTE FINAL DE NOMENCLATURA E ILIKE) 🛑
+          else if (jsonKey === 'por_violencia') {
+              // ⭐️ FORÇAMOS A CHAVE DO BANCO DE DADOS EXATA: 'tipoViolencia' ⭐️
+              const targetKey = 'tipoViolencia'; 
+              const phValor = addParam(valor);
+              
+              // Buscamos a string dentro do valor JSONB (ILIKE)
+              // Usamos o TRIM() para limpar espaços em branco caso seja valor único.
+              whereClauses.push(cleanSqlString(`LOWER(TRIM(dados_completos->>'${targetKey}')) ILIKE '%' || LOWER(${phValor}::TEXT) || '%'`));
           }
+          // 🛑 TRATAMENTO GERAL (por_bairro, por_canal, etc.) 🛑
+          else if (jsonKey === 'por_bairro' || jsonKey === 'por_canal') {
+              const targetKey = jsonKey.replace('por_', '');
+              
+              // TRATAMENTO PARA VALORES AUSENTES (NULL/Vazio/NÃO INFORMADO)
+              if (valor.toLowerCase().includes('não informado') || valor.toLowerCase() === 'n/i') {
+                whereClauses.push(`(dados_completos->>'${targetKey}' IS NULL OR TRIM(dados_completos->>'${targetKey}') = '')`);
+              } else {
+                const phValor = addParam(valor);
+                // Usar TRIM() e LOWER() para igualdade em campos de valor único
+                whereClauses.push(`LOWER(TRIM(dados_completos->>'${targetKey}')) = LOWER(${phValor}::TEXT)`);
+              }
+          } else {
+              // Outros filtros de campo direto que funcionavam antes.
+              const phValor = addParam(valor);
+            whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
+          }
       }
-
       // 3. FILTROS BÁSICOS (status, confirmedViolence, socioeducacao)
       if (status && status !== 'todos') {
         const ph = addParam(status);
@@ -215,34 +249,29 @@ router.get("/", async (req: Request, res: Response) => {
       if (confirmedViolence === 'true') whereClauses.push(`(dados_completos->>'confirmacaoViolencia')::TEXT = 'Confirmada'`);
       if (socioeducacao === 'true') whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
 
-      // 4. FILTRO DE ACESSO POR UNIDADE (SEGURANÇA E SEGREGACÃO)
-      // 🛑 CORREÇÃO DA SEGREGACÃO CRÍTICA (Gestor vê CREAS, mas não o CRAS)
-      // O filtro do Middleware já foi aplicado; vamos ajustá-lo para a consulta CREAS
-      if (!isGestorGeral) {
-          // Se não for Gestor Geral, aplicamos o filtro de unidade do middleware
+      // 🛑 4. FILTRO DE FIDELIDADE (SEGREGACÃO CRÍTICA) 🛑
+      if (isVigilancia || isGestorGeral) {
+          const creasIdParam = addParam(CREAS_UNIT_ID); 
+          whereClauses.push(`(casos.unit_id = ${creasIdParam} OR casos.unit_id IS NULL)`);
+      }
+
+      // 5. FILTRO DE ACESSO POR UNIDADE (SEGURANÇA PADRÃO)
+      if (!isGestorGeral && !isVigilancia) {
           let unitWhere = accessFilter.whereClause;
           
-          // cria placeholders sequenciais e adiciona os valores aos params com addParam
-          const unitPlaceholders: string[] = accessFilter.params.map((p: any) => `${addParam(p)}::INTEGER`);
+          let nextParamIndex = params.length + 1;
+          
+          const unitPlaceholders: string[] = accessFilter.params.map((p: any) => {
+              params.push(p); 
+              return `$${nextParamIndex++}::INTEGER`;
+          });
 
-          // substitui tokens $X e $Y pelos placeholders gerados
           if (unitPlaceholders[0]) unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
           if (unitPlaceholders[1]) unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
 
-          // Filtro para a unidade do usuário + casos sem lotação (que são do Gestor)
           unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
           whereClauses.push(unitWhere);
-      } else {
-          // 🛑 GESTOR GERAL: Vê CREAS (1) e casos sem lotação (NULL), MAS NÃO O CRAS (2-5)
-          const crasIds = CRAS_UNIT_IDS.map(id => addParam(id)).join(', ');
-          const creasIdParam = addParam(UNIT_ID_CREAS);
-
-          // Filtro: Tudo MENOS os IDs do CRAS
-          whereClauses.push(`(casos.unit_id = ${creasIdParam} OR casos.unit_id IS NULL OR casos.unit_id NOT IN (${crasIds}))`);
-
-          // Re-adiciona os IDs do CRAS para garantir que o array params esteja correto (se já não estiver lá)
-          // Isso é complexo no POST, mas no GET, a lógica acima deve bastar
-      }
+      }
 
       // Montagem final da query
       if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
@@ -274,15 +303,15 @@ router.put("/:id", checkCaseAccess('params', 'id'), async (req: Request, res: Re
     const dadosExistentes = resultAtual.rows[0];
     
     const dadosMesclados = { 
-        ...dadosExistentes.dados_completos, 
-        ...novosDados 
-    };
+        ...dadosExistentes.dados_completos, 
+        ...novosDados 
+    };
 
-    // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
+    // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
     const dataCad = novosDados.dataCad || dadosExistentes.dataCad; 
     const tecRef = novosDados.tecRef || dadosExistentes.tecRef;
     const nome = novosDados.nome || dadosExistentes.nome || null;
-    
+    
     await pool.query(
       cleanSqlString(`UPDATE casos SET "dataCad" = $1, "tecRef" = $2, nome = $3, dados_completos = $4 WHERE id = $5`),
       [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), id]
@@ -409,11 +438,11 @@ router.get("/:casoId/encaminhamentos", async (req: Request, res: Response) => {
   const { casoId } = req.params;
   const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
 
-    // 1. Resolve Placeholders para a checagem de acesso
-    const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1
-    let unitWhere = accessFilter.whereClause;
-    
-    if (accessFilter.params.length === 1) {
+    // 1. Resolve Placeholders para a checagem de acesso
+    const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1
+    let unitWhere = accessFilter.whereClause;
+    
+    if (accessFilter.params.length === 1) {
         unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
         unitParams.push(accessFilter.params[0]);
     } else if (accessFilter.params.length === 2) {
@@ -421,18 +450,18 @@ router.get("/:casoId/encaminhamentos", async (req: Request, res: Response) => {
         unitParams.push(accessFilter.params[0], accessFilter.params[1]);
     }
 
-    // 2. Query: Busca encaminhamentos APENAS se o caso pertencer à unidade
-    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
+    // 2. Query: Busca encaminhamentos APENAS se o caso pertencer à unidade
+    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
 
-    const checkQuery = cleanSqlString(`
-        SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
-               enc.observacoes, usr.username AS "tecRef"
-        FROM encaminhamentos enc
-        LEFT JOIN users usr ON enc."userId" = usr.id
-        LEFT JOIN casos c ON enc."casoId" = c.id
-        WHERE enc."casoId" = $1 AND ${finalUnitWhere}
-        ORDER BY enc."dataEncaminhamento" DESC
-    `);
+    const checkQuery = cleanSqlString(`
+        SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
+               enc.observacoes, usr.username AS "tecRef"
+        FROM encaminhamentos enc
+        LEFT JOIN users usr ON enc."userId" = usr.id
+        LEFT JOIN casos c ON enc."casoId" = c.id
+        WHERE enc."casoId" = $1 AND ${finalUnitWhere}
+        ORDER BY enc."dataEncaminhamento" DESC
+    `);
 
 
   try {
@@ -444,83 +473,81 @@ router.get("/:casoId/encaminhamentos", async (req: Request, res: Response) => {
   }
 });
 
-// backend/src/routes/casos.ts (Adicionar ao final)
-
 // =======================================================================
 // ROTA GET /casos/busca-rapida - BUSCA RÁPIDA PARA ASSOCIAÇÃO DE DEMANDAS
 // =======================================================================
 router.get("/busca-rapida", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
-    const accessFilter = req.accessFilter!;
-    const { q } = req.query as { q?: string };
-    const searchTerm = q?.trim();
+    const accessFilter = req.accessFilter!;
+    const { q } = req.query as { q?: string };
+    const searchTerm = q?.trim();
 
-    if (!searchTerm || searchTerm.length < 3) {
-        return res.json([]); // Retorna vazio se a busca for muito curta
-    }
+    if (!searchTerm || searchTerm.length < 3) {
+        return res.json([]); // Retorna vazio se a busca for muito curta
+    }
 
-    try {
-        const params: any[] = [];
-        const addParam = (val: any) => {
-            params.push(val);
-            return `$${params.length}`;
-        };
+    try {
+        const params: any[] = [];
+        const addParam = (val: any) => {
+            params.push(val);
+            return `$${params.length}`;
+        };
 
-        // 1. Constrói a cláusula WHERE de busca (Nome, NIS, CPF, ID)
-        const wild = `%${searchTerm}%`;
-        const p1 = addParam(wild);
-        const p2 = addParam(wild);
-        const p3 = addParam(wild);
-        
-        // Tentativa de buscar por ID exato se o termo for numérico
-        const idSearch = parseInt(searchTerm, 10);
-        let idClause = '';
-        if (!isNaN(idSearch)) {
-            const pId = addParam(idSearch);
-            idClause = ` OR id = ${pId}::INTEGER`;
-        }
-        
-        const searchClause = cleanSqlString(`
-            (nome ILIKE ${p1} OR
-             dados_completos->>'nis' ILIKE ${p2} OR
-             dados_completos->>'cpf' ILIKE ${p3}
-             ${idClause}
-            )
-        `);
-        
-        // 2. Constrói o filtro de acesso por unidade
-        const [unitFilterContent, unitParams] = [accessFilter.whereClause, accessFilter.params];
-        let accessParams = [...unitParams];
-        
-        // Substitui placeholders do accessFilter
-        let accessWhere = unitFilterContent;
-        let pIndex = params.length;
+        // 1. Constrói a cláusula WHERE de busca (Nome, NIS, CPF, ID)
+        const wild = `%${searchTerm}%`;
+        const p1 = addParam(wild);
+        const p2 = addParam(wild);
+        const p3 = addParam(wild);
+        
+        // Tentativa de buscar por ID exato se o termo for numérico
+        const idSearch = parseInt(searchTerm, 10);
+        let idClause = '';
+        if (!isNaN(idSearch)) {
+            const pId = addParam(idSearch);
+            idClause = ` OR id = ${pId}::INTEGER`;
+        }
+        
+        const searchClause = cleanSqlString(`
+            (nome ILIKE ${p1} OR
+             dados_completos->>'nis' ILIKE ${p2} OR
+             dados_completos->>'cpf' ILIKE ${p3}
+             ${idClause}
+            )
+        `);
+        
+        // 2. Constrói o filtro de acesso por unidade
+        const [unitFilterContent, unitParams] = [accessFilter.whereClause, accessFilter.params];
+        let accessParams = [...unitParams];
+        
+        // Substitui placeholders do accessFilter
+        let accessWhere = unitFilterContent;
+        let pIndex = params.length;
 
-        if (unitParams.length === 1) {
-            accessWhere = accessWhere.replace('$X', `$${++pIndex}`);
-        } else if (unitParams.length === 2) {
-            accessWhere = accessWhere.replace('$X', `$${++pIndex}`).replace('$Y', `$${++pIndex}`);
-        }
-        
-        params.push(...accessParams);
-        
-        // 3. Montagem final da query (combinando busca, status Ativo e segurança)
-        const query = cleanSqlString(`
-            SELECT id, nome, "tecRef", dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
-            FROM casos
-            WHERE status = 'Ativo' 
-              AND (${searchClause})
-              AND (${accessWhere})
-            ORDER BY nome ASC
-            LIMIT 10
-        `);
+        if (unitParams.length === 1) {
+            accessWhere = accessWhere.replace('$X', `$${++pIndex}`);
+        } else if (unitParams.length === 2) {
+            accessWhere = accessWhere.replace('$X', `$${++pIndex}`).replace('$Y', `$${++pIndex}`);
+        }
+        
+        params.push(...accessParams);
+        
+        // 3. Montagem final da query (combinando busca, status Ativo e segurança)
+        const query = cleanSqlString(`
+            SELECT id, nome, "tecRef", dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
+            FROM casos
+            WHERE status = 'Ativo' 
+              AND (${searchClause})
+              AND (${accessWhere})
+            ORDER BY nome ASC
+            LIMIT 10
+        `);
 
-        const result = await pool.query(query, params);
-        
-        res.json(result.rows);
-    } catch (err: any) {
-        console.error("Erro na busca rápida de casos:", err.message);
-        res.status(500).json({ message: "Erro na busca rápida de casos." });
-    }
+        const result = await pool.query(query, params);
+        
+        res.json(result.rows);
+    } catch (err: any) {
+        console.error("Erro na busca rápida de casos:", err.message);
+        res.status(500).json({ message: "Erro na busca rápida de casos." });
+    }
 });
 
 export default router;
