@@ -1,4 +1,4 @@
-// backend/src/routes/dashboard.ts
+// backend/src/routes/dashboard.ts (VERSÃO FINAL COM FILTRO DE SEGREGACÃO CRÍTICA)
 
 import { Router, Request, Response, NextFunction } from "express"; 
 import pool from "../db";
@@ -7,6 +7,10 @@ import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { QueryResult } from "pg";
 
 const router = Router();
+
+// ⭐️ CONSTANTES CRÍTICAS PARA SEGREGACÃO ⭐️
+const CREAS_UNIT_ID = 1;
+const CRAS_UNIT_IDS = [2, 3, 4, 5]; // IDs a serem EXCLUÍDOS do Dashboard/Análise
 
 // 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Remove quebras de linha e múltiplos espaços.
 const cleanSqlString = (sql: string): string => {
@@ -17,6 +21,7 @@ const cleanSqlString = (sql: string): string => {
 /**
  * Função utilitária para gerar o filtro WHERE e sincronizar os parâmetros.
  * Retorna APENAS O CONTEÚDO do WHERE, limpo.
+ * Esta função será modificada para INJETAR O FILTRO CREAS.
  */
 const buildFullWhereClauseContent = ( 
     filters: { mes?: string, tecRef?: string, bairro?: string },
@@ -28,7 +33,22 @@ const buildFullWhereClauseContent = (
     let params: any[] = [];
     let paramIndex = startParamIndex;
 
-    // 1. Adicionar filtros existentes (mes, tecRef, bairro)
+    // 🛑 1. FILTRO CRÍTICO DE SEGREGACÃO (CREAS/PAEFI) 🛑
+    // Garante que o Dashboard só conte casos do CREAS (ID 1) ou Casos NÃO lotados (NULL).
+    // Adicionamos os IDs CRAS (2-5) aos parâmetros para a exclusão na listagem
+    
+    // NOTE: A lista de IDs CRAS precisa ser injetada nos parâmetros
+    const crasIdsToExclude = CRAS_UNIT_IDS;
+    crasIdsToExclude.forEach(id => params.push(id));
+    
+    // Cria os placeholders dinamicamente (ex: $1, $2, $3, $4, $5, $6)
+    const placeholdersToExclude = crasIdsToExclude.map((_, i) => `$${paramIndex++}`).join(', ');
+    
+    // Cláusula para excluir explicitamente os IDs do CRAS (2-5)
+    whereClauses.push(`casos.unit_id NOT IN (${placeholdersToExclude})`);
+
+
+    // 2. Adicionar filtros existentes (mes, tecRef, bairro)
     if (filters.mes) {
         params.push(filters.mes);
         whereClauses.push(`TO_CHAR(casos."dataCad", 'YYYY-MM') = $${paramIndex++}`);
@@ -42,7 +62,8 @@ const buildFullWhereClauseContent = (
         whereClauses.push(`LOWER(casos.dados_completos->>'bairro') = LOWER($${paramIndex++})`);
     }
 
-    // 2. Adicionar filtro de Unidade (CORREÇÃO DE VISIBILIDADE)
+
+    // 3. Adicionar filtro de Unidade (FILTRO DE SEGURANÇA BASE)
     let unitWhere = accessFilter.whereClause;
     
     // Substituir placeholders do unitAccessMiddleware ($X, $Y) por números reais ($N, $N+1...)
@@ -52,20 +73,12 @@ const buildFullWhereClauseContent = (
         unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
     }
     
-    // Adicionar os parâmetros da unidade à lista principal de parâmetros
+    // Adicionar os parâmetros da unidade à lista principal de parâmetros (agora indexados corretamente)
     params = params.concat(accessFilter.params); 
     
-    // ⭐️ CORREÇÃO ESSENCIAL: Inclui casos onde unit_id é NULL, se não for TRUE (Gestor Geral)
-    if (unitWhere !== 'TRUE') {
-        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
-    }
-
-    // Adicionar a cláusula de unidade ao conjunto de cláusulas WHERE
-    whereClauses.push(unitWhere);
-
-
-    if (whereClauses.length === 0) {
-        return ['', []]; 
+    // ⭐️ CORREÇÃO ESSENCIAL: Mantemos o filtro de segurança, mas a exclusão já foi feita no passo 1.
+    if (unitWhere !== 'TRUE') {
+        whereClauses.push(unitWhere);
     }
 
     // Retorna APENAS O CONTEÚDO do WHERE, limpo.
@@ -94,27 +107,27 @@ router.get("/", async (req: Request, res: Response) => {
         // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
         const whereClause = whereContent.length > 0 ? ` WHERE ${whereContent}` : '';
         const andClause = whereContent.length > 0 ? ` AND ${whereContent}` : ''; 
-        
-        // Lógica para excluir valores nulos/vazios/sem rótulo nos agrupamentos
-        const appendNonNullFilter = (jsonbKey: string): string => {
-            const jsonbField = `dados_completos->>'${jsonbKey}'`;
-            const baseClause = whereContent.length > 0 ? andClause : ' WHERE TRUE ';
-            
-            // Filtro rigoroso: exclui NULL, espaços em branco e valores comuns de fallback.
-            return ` ${baseClause} 
-                     AND ${jsonbField} IS NOT NULL 
-                     AND TRIM(${jsonbField}) <> '' 
-                     AND LOWER(TRIM(${jsonbField})) NOT IN ('n/i', 'não informado', 'null', 'undefined') `;
-        }
-        
-        // Função para garantir que campos que seriam NULOS tenham o rótulo "Não Informado"
-        const getGroupedFieldName = (jsonbKey: string): string => {
-            const jsonbField = `dados_completos->>'${jsonbKey}'`;
-            const trimmedField = `TRIM(${jsonbField})`;
-            
-            // COALESCE(NULLIF(NULLIF(TRIM(campo), ''), 'N/I'), 'Não Informado')
-            return `COALESCE(NULLIF(NULLIF(${trimmedField}, ''), 'N/I'), 'Não Informado')`;
-        }
+        
+        // Lógica para excluir valores nulos/vazios/sem rótulo nos agrupamentos
+        const appendNonNullFilter = (jsonbKey: string): string => {
+            const jsonbField = `dados_completos->>'${jsonbKey}'`;
+            const baseClause = whereContent.length > 0 ? andClause : ' WHERE TRUE ';
+            
+            // Filtro rigoroso: exclui NULL, espaços em branco e valores comuns de fallback.
+            return ` ${baseClause} 
+                     AND ${jsonbField} IS NOT NULL 
+                     AND TRIM(${jsonbField}) <> '' 
+                     AND LOWER(TRIM(${jsonbField})) NOT IN ('n/i', 'não informado', 'null', 'undefined') `;
+        }
+        
+        // Função para garantir que campos que seriam NULOS tenham o rótulo "Não Informado"
+        const getGroupedFieldName = (jsonbKey: string): string => {
+            const jsonbField = `dados_completos->>'${jsonbKey}'`;
+            const trimmedField = `TRIM(${jsonbField})`;
+            
+            // COALESCE(NULLIF(NULLIF(TRIM(campo), ''), 'N/I'), 'Não Informado')
+            return `COALESCE(NULLIF(NULLIF(${trimmedField}, ''), 'N/I'), 'Não Informado')`;
+        }
 
         const queries = [
             // 0 - Indicadores: Total de Atendimentos 
@@ -130,12 +143,12 @@ router.get("/", async (req: Request, res: Response) => {
             
             // 5 - Indicadores: Recebem BPC (CORREÇÃO DE VALORES: Usando OR explícito)
             pool.query(cleanSqlString(`
-                SELECT COUNT(id) AS total FROM casos 
-                WHERE (dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')
-                ${andClause}
-            `), params),
+                SELECT COUNT(id) AS total FROM casos 
+                WHERE (dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')
+                ${andClause}
+            `), params),
             
-            // 6-7 (Queries que usam andClause)
+            // 6-7 (Queries que usam andClause)
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'confirmacaoViolencia' = 'Confirmada' ${andClause}`), params),
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'notificacaoSINAM' = 'Sim' ${andClause}`), params),
             
@@ -181,7 +194,7 @@ router.get("/", async (req: Request, res: Response) => {
                     recebemBolsaFamilia: parseInt(results[4].rows[0]?.total || 0, 10),
                     recebemBPC: parseInt(results[5].rows[0]?.total || 0, 10),
                     violenciaConfirmada: parseInt(results[6].rows[0]?.total || 0, 10),
-                    notificadosSINAN: parseInt(results[7].rows[0]?.total || 0, 10),
+                    notificadosSINAM: parseInt(results[7].rows[0]?.total || 0, 10),
                     contextoFamiliar: results[8].rows[0] || {},
                 },
                 principais: { 

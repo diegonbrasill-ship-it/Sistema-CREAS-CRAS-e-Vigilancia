@@ -1,21 +1,20 @@
-// frontend/src/services/api.ts
+// frontend/src/services/api.ts (VERSÃO FINAL COM listCrasCases CORRIGIDA)
 
 const API_BASE_URL = "http://localhost:4000";
+const CRAS_BASE_URL = '/api/cras'; 
 
-// 🟢 NOVO: Interface base para os filtros de Dashboards/PainelVigilancia/Consultas.
-// Esta interface resolve os erros de tipagem "unidades does not exist"
+// -------------------------------------------------------------------
+// --- TIPOS DE DADOS E INTERFACES BASE (MANTIDOS) ---
+// -------------------------------------------------------------------
+
 export interface FiltrosBase {
-    mes?: string;
-    tecRef?: string;
-    bairro?: string;
-    
-    // Filtros de Unidade (NOVOS CAMPOS)
-    unidades?: string; // Lista de IDs separadas por vírgula (dashboardFilterUnits.join(','))
-    isFiltroTotal?: boolean; // Flag para Gestor Geral
+    mes?: string;
+    tecRef?: string;
+    bairro?: string;
+    unidades?: string; 
+    isFiltroTotal?: boolean; 
 }
 
-
-// --- TIPOS DE DADOS E INTERFACES ---
 type LoginResponse = { 
     message: string; 
     token: string; 
@@ -50,8 +49,6 @@ export interface User {
     unit_id: number | null; 
 }
 
-// ... (MseTipo, MseSituacao e interfaces MSE mantidas) ...
-
 export type MseTipo = 'LA' | 'PSC' | 'LA + PSC';
 export type MseSituacao = 'CUMPRIMENTO' | 'DESCUMPRIMENTO';
 
@@ -79,7 +76,6 @@ export interface MseApiResponse {
 }
 
 
-// Interfaces de Dashboard
 export interface DashboardApiDataType { 
     indicadores: {
         totalAtendimentos: number; novosNoMes: number; inseridosPAEFI: number; reincidentes: number;
@@ -94,12 +90,11 @@ export interface ApiResponse {
     opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
 }
 
-// ✅ CORREÇÃO 1: Interface FiltrosCasos agora estende FiltrosBase
 export interface FiltrosCasos extends FiltrosBase { 
     filtro?: string; 
     valor?: string; 
     status?: string;
-    origem?: 'vigilancia' | 'dashboard' | 'consulta'; // Propriedade para direcionar o endpoint
+    origem?: 'vigilancia' | 'dashboard' | 'consulta' | 'cras';
 }
 
 export interface DemandaResumida {
@@ -110,6 +105,7 @@ export interface CasoDetalhado {
     id: number; nome: string; dataCad: string; tecRef: string; status: string;
     [key: string]: any; 
     demandasVinculadas: DemandaResumida[];
+    unit_id: number; 
 }
 export interface Demanda {
     id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; prazo_resposta?: string; 
@@ -121,20 +117,63 @@ export interface DemandaDetalhada extends Demanda {
     registrado_por_id: number; created_at: string; anexos: Anexo[];
 }
 
-// Função "Mestre" fetchWithAuth (mantida)
+export interface CasoListagem {
+    id: number;
+    dataCad: string;
+    tecRef: string;
+    nome: string;
+    status: string;
+    unit_id: number;
+    bairro: string;
+}
+
+
+// -------------------------------------------------------------------
+// 📌 FUNÇÃO MESTRE: fetchWithAuth (CORRIGIDA PARA TRATAMENTO ROBUSTO DE ERRO)
+// -------------------------------------------------------------------
+
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     const token = localStorage.getItem('token');
-    if (!token) throw new Error('Usuário não autenticado. Por favor, faça o login novamente.');
+    
+    if (!token) throw new Error('UNAUTHORIZED_SESSION_EXPIRED'); 
+    
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${token}`);
+    
     if (!(options.body instanceof FormData)) {
         headers.set('Content-Type', 'application/json');
     }
+    
     const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Erro ${response.status}: ${response.statusText}` }));
+        
+        if (response.status === 401) {
+            throw new Error('UNAUTHORIZED_SESSION_EXPIRED'); 
+        }
+        if (response.status === 403) {
+            throw new Error('FORBIDDEN_PERMISSION_DENIED'); 
+        }
+        
+        // 🛑 CORREÇÃO CRÍTICA: Tenta ler o JSON, mas usa o status text se o corpo estiver vazio/inválido
+        const contentType = response.headers.get('content-type');
+        let errorData;
+
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                // Se falhar ao ler JSON (corpo vazio/malformado), usa uma mensagem padrão
+                errorData = { message: `Erro ${response.status}: Falha de comunicação/JSON vazio.` };
+            }
+        } else {
+            // Se não é JSON (ex: HTML de erro), usa a mensagem padrão de status
+            errorData = { message: `Erro ${response.status}: ${response.statusText}` };
+        }
+        
         throw new Error(errorData.message || 'Ocorreu um erro na requisição');
     }
+    
     const contentType = response.headers.get('content-type');
     if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/octet-stream'))) {
         return response;
@@ -142,21 +181,23 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return response.json();
 }
 
-// 🟢 Função auxiliar para adicionar parâmetros de filtro à URL (Usada nas funções de Dashboard e Vigilância)
+// 🟢 Função auxiliar para adicionar parâmetros de filtro
 const appendFiltros = (filters?: FiltrosBase): string => {
-    const params = new URLSearchParams();
-    if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-            // Garante que apenas valores não nulos/vazios sejam anexados
-            if (value !== null && value !== undefined && value !== '') {
-                params.append(key, String(value));
-            }
-        });
-    }
-    return `?${params.toString()}`;
+    const params = new URLSearchParams();
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && value !== '') {
+                params.append(key, String(value));
+            }
+        });
+    }
+    return `?${params.toString()}`;
 };
 
-// --- FUNÇÕES DA API ---
+
+// -------------------------------------------------------------------
+// --- FUNÇÕES DA API (CRUD PADRÃO) ---
+// -------------------------------------------------------------------
 
 // AUTENTICAÇÃO
 export async function login(username: string, password: string): Promise<LoginResponse> {
@@ -170,24 +211,34 @@ export async function login(username: string, password: string): Promise<LoginRe
     return data;
 }
 
-// CASOS (Funções base mantidas)
+// CASOS 
 export const createCase = (casoData: any) => fetchWithAuth(`/api/casos`, { method: 'POST', body: JSON.stringify(casoData) });
 export const updateCase = (id: number | string, casoData: any) => fetchWithAuth(`/api/casos/${id}`, { method: 'PUT', body: JSON.stringify(casoData) });
 export const updateCasoStatus = (casoId: string | number, status: string) => fetchWithAuth(`/api/casos/${casoId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
 
-// ✅ CORREÇÃO 2: getCasosFiltrados agora aceita FiltrosCasos
+// 🛑 CORRIGIDO: Função de Listagem CRAS agora aceita filtros
+export const listCrasCases = (filters?: { unitId?: string }): Promise<CasoListagem[]> => {
+    // Monta o parâmetro de query se o unitId for fornecido
+    const params = filters?.unitId ? `?unitId=${filters.unitId}` : '';
+    
+    // A rota deve ser chamada com o filtro: /api/cras/casos?unitId=3
+    return fetchWithAuth(`${CRAS_BASE_URL}/casos${params}`);
+};
+
+
+// -------------------------------------------------------------------
+// --- FUNÇÕES DA API (DEMANDAS, DASHBOARD, VIGILÂNCIA, MSE) ---
+// -------------------------------------------------------------------
+// ... (O restante das funções API MSE, DASHBOARD, etc. permanecem inalteradas)
 export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
-    // ⭐️ Determinar o endpoint
-    let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
+    let endpoint = '/api/casos'; 
     if (filters?.origem === 'vigilancia') {
-        endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância
+        endpoint = '/api/vigilancia/casos-filtrados'; 
     }
 
-    // Garante que os parâmetros de filtro (incluindo unidades) sejam anexados
-    const paramsString = appendFiltros(filters);
-
+    const paramsString = appendFiltros(filters);
     return fetchWithAuth(`${endpoint}${paramsString}`);
 };
 
@@ -196,7 +247,6 @@ export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
     return fetchWithAuth(`/api/casos?${params.toString()}`);
 };
 
-// ACOMPANHAMENTOS, ENCAMINHAMENTOS, ANEXOS (MANTIDAS)
 export const getAcompanhamentos = (casoId: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`);
 export const createAcompanhamento = (casoId: string, texto: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`, { method: 'POST', body: JSON.stringify({ texto }) });
 export const getEncaminhamentos = (casoId: string) => fetchWithAuth(`/api/casos/${casoId}/encaminhamentos`);
@@ -220,10 +270,10 @@ export async function downloadAnexo(anexoId: number): Promise<{ blob: Blob, file
     return { blob, filename };
 }
 
-// USUÁRIOS (MANTIDAS)
+// USUÁRIOS
 export const getUsers = () => fetchWithAuth(`/api/users`);
 export const createUser = (data: object) => fetchWithAuth(`/api/users`, { method: 'POST', body: JSON.stringify(data) });
-export const updateUser = (id: number, data: Partial<User>) => fetchWithAuth(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const updateUser = (id: number, data: object) => fetchWithAuth(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const updateUserStatus = (id: number, isActive: boolean) => fetchWithAuth(`/api/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive }) });
 export const reassignUserCases = (fromUserId: number, toUserId: number) => fetchWithAuth(`/api/users/reatribuir`, { method: 'POST', body: JSON.stringify({ fromUserId, toUserId }) });
 
@@ -234,30 +284,23 @@ export async function generateReport(filters: { startDate: string, endDate: stri
 }
 
 // DASHBOARD
-// ✅ CORREÇÃO 3: getDashboardData agora aceita FiltrosBase
-export const getDashboardData = (filters?: FiltrosBase): Promise<ApiResponse> => {
-    // 🟢 Utiliza a função auxiliar para anexar todos os filtros (incluindo unidades)
-    const paramsString = appendFiltros(filters);
-    return fetchWithAuth(`/api/dashboard${paramsString}`);
-};
+export const getDashboardData = (filters?: FiltrosCasos) => fetchWithAuth(`/api/dashboard${appendFiltros(filters)}`);
 
 // PAINEL DE VIGILÂNCIA
-// ✅ CORREÇÃO 4: Funções de Vigilância agora aceitam FiltrosBase
 export const getVigilanciaFluxoDemanda = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/fluxo-demanda${appendFiltros(filters)}`);
 export const getVigilanciaSobrecargaEquipe = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/sobrecarga-equipe${appendFiltros(filters)}`);
 export const getVigilanciaIncidenciaBairros = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/incidencia-bairros${appendFiltros(filters)}`);
 export const getVigilanciaFontesAcionamento = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/fontes-acionamento${appendFiltros(filters)}`);
 export const getVigilanciaTaxaReincidencia = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/taxa-reincidencia${appendFiltros(filters)}`);
-export const getVigilanciaPerfilViolacoes = (filters?: FiltrosBase) => fetchWithAuth(`/api/vigilancia/perfil-violacoes${appendFiltros(filters)}`);
+export const getVigilanciaPerfilViolacoes = (filters?: FiltrosCasos) => fetchWithAuth(`/api/vigilancia/perfil-violacoes${appendFiltros(filters)}`);
 
-// DEMANDAS, MSE (MANTIDAS)
+// DEMANDAS, MSE
 export const getDemandas = (): Promise<Demanda[]> => fetchWithAuth(`/api/demandas`);
-export const createDemanda = (demandaData: object): Promise<any> => fetchWithAuth(`/api/demandas`, { method: 'POST', body: JSON.stringify(demandaData) });
+export const createDemanda = (demandaData: object) => fetchWithAuth(`/api/demandas`, { method: 'POST', body: JSON.stringify(demandaData) });
 export const getDemandaById = (id: string | number): Promise<DemandaDetalhada> => fetchWithAuth(`/api/demandas/${id}`);
-export const updateDemandaStatus = (id: string | number, status: string): Promise<any> => fetchWithAuth(`/api/demandas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export const updateDemandaStatus = (id: string | number, status: string) => fetchWithAuth(`/api/demandas/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 
-// ... (Restante do código MSE mantido)
-export const getMseRegistros = (filters?: { q?: string }): Promise<any> => {
+export const getMseRegistros = (filters?: { q?: string }) => {
     const params = new URLSearchParams();
     if (filters?.q) params.append('q', filters.q);
     return fetchWithAuth(`/api/mse/registros?${params.toString()}`);

@@ -1,4 +1,4 @@
-// backend/src/routes/casos.ts
+// backend/src/routes/casos.ts (VERSÃO FINAL COMPLETA E CORRIGIDA)
 
 import { Router, Request, Response } from "express";
 import pool from "../db";
@@ -6,9 +6,14 @@ import { authMiddleware } from "../middleware/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { logAction } from "../services/logger";
 import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants";
-import { checkCaseAccess } from "../middleware/caseAccess.middleware"; // Manter para rotas de modificação
+import { checkCaseAccess } from "../middleware/caseAccess.middleware"; 
 
 const router = Router();
+
+// ⭐️ CONSTANTES DO BACKEND ⭐️
+const CREAS_UNIT_ID = 1;
+const CRAS_UNIT_IDS = [2, 3, 4, 5]; // IDs das unidades CRAS
+const VIGILANCIA_ROLE = 'vigilancia';
 
 // FUNÇÃO UTILITÁRIA: Limpeza de strings SQL
 export const cleanSqlString = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
@@ -51,70 +56,113 @@ export function anonimizarDadosSeNecessario(
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
 // =======================================================================
-// ROTA POST /casos - CRIAR NOVO CASO (CORRIGIDO: Inserção de dados_completos)
+// ROTA POST /casos - CRIAR NOVO CASO (CORREÇÃO DEFINITIVA DE PERSISTÊNCIA)
 // =======================================================================
 router.post("/", async (req: Request, res: Response) => {
-    
-    // ⭐️ CORREÇÃO CRÍTICA: Desestruturação para separar COLUNAS SQL e o JSONB
-    const { 
-        nome, 
-        dataCad, 
-        tecRef, 
-        status, 
-        unit_id,
-        // Captura todos os outros campos (incluindo tipoViolencia) para o JSONB
-        ...dados_completos_payload 
-    } = req.body;
+    
+    const { 
+        nome, 
+        dataCad, 
+        tecRef, 
+        status, 
+        unit_id,
+    } = req.body;
 
-    // Campos SQL (com fallback)
-    const nomeToUse = nome || null;
-    const tecRefToUse = tecRef || null;
-    const unitIdToUse = unit_id || req.user!.unit_id || null; // Garante o unit_id do usuário logado
-    const statusToUse = status || 'Ativo'; // Padrão 'Ativo' para novos casos
+    // 🛑 CORREÇÃO 1: Mapeamento EXPLICITO e Conversão de "" para NULL
+    const dados_completos_cleaned: any = {};
+    const jsonbKeys = [
+        'nis', 'idade', 'sexo', 'corEtnia', 'primeiraInfSuas', 
+        'bairro', 'rua', 'pontoReferencia', 'contato',
+        'recebePropPai', 'recebePAA', 'recebeBPC', 'recebeHabitacaoSocial',
+        'escolaridade', 'rendaFamiliar'
+    ];
+
+    jsonbKeys.forEach(key => {
+        const rawValue = req.body[key];
+        // O valor é NULL se for string vazia ("") ou undefined, senão usa o valor
+        dados_completos_cleaned[key] = (rawValue === "" || rawValue === undefined) ? null : rawValue;
+    });
+    
+    const dadosCompletosJSON = JSON.stringify(dados_completos_cleaned);
+    // 🛑 FIM DA CORREÇÃO DE PERSISTÊNCIA 🛑
+
+    const nomeToUse = nome || null;
+    const tecRefToUse = tecRef || null;
+    const unitIdToUse = unit_id || req.user!.unit_id || null;
+    const statusToUse = status || 'Ativo';
     const dataCadToUse = dataCad || new Date().toISOString().split('T')[0];
 
-    // O objeto JSONB é o payload restante (agora com tipoViolencia, etc.)
-    const dadosCompletosJSON = JSON.stringify(dados_completos_payload);
+    const userId = req.user!.id;
+    const username = req.user!.username;
 
-    const userId = req.user!.id;
-    const username = req.user!.username;
+    try {
+        const insertQuery = cleanSqlString(`
+            INSERT INTO casos (nome, "dataCad", "tecRef", status, unit_id, "userId", dados_completos)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+        `);
 
-    try {
-        const insertQuery = cleanSqlString(`
-            INSERT INTO casos (nome, "dataCad", "tecRef", status, unit_id, "userId", dados_completos)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
-        `);
+        const result = await pool.query(insertQuery, [
+            nomeToUse, 
+            dataCadToUse, 
+            tecRefToUse, 
+            statusToUse, 
+            unitIdToUse, 
+            userId, 
+            dadosCompletosJSON
+        ]);
 
-        const result = await pool.query(insertQuery, [
-            nomeToUse, 
-            dataCadToUse, 
-            tecRefToUse, 
-            statusToUse, 
-            unitIdToUse, 
-            userId, 
-            dadosCompletosJSON
-        ]);
+        const casoBase = result.rows[0];
+        
+        // Mescla os dados JSONB para que o Frontend veja todos os campos no objeto raiz
+        const casoMesclado = {
+            ...casoBase.dados_completos,
+            id: casoBase.id,
+            dataCad: casoBase.dataCad,
+            tecRef: casoBase.tecRef,
+            nome: casoBase.nome,
+            status: casoBase.status,
+            unit_id: casoBase.unit_id,
+        };
 
-        const novoCaso = result.rows[0];
+
+        await logAction({ userId, username, action: 'CREATE_CASE', details: { casoId: casoBase.id } });
+        
+        // Retorna o objeto mesclado!
+        res.status(201).json(casoMesclado);
         
-        await logAction({ userId, username, action: 'CREATE_CASE', details: { casoId: novoCaso.id } });
-        res.status(201).json(novoCaso);
-    } catch (err: any) {
-        console.error("Erro ao criar caso:", err.message);
-        res.status(500).json({ message: "Erro ao criar caso." });
-    }
+    } catch (err: any) {
+        console.error("Erro ao criar caso:", err.message);
+        res.status(500).json({ message: "Erro ao criar caso." });
+    }
 });
 
 // =======================================================================
-// ROTA GET /casos - LISTAR CASOS (CORREÇÃO DE TIPAGEM E BPC)
+// ROTA GET /casos - LISTAR CASOS (CORREÇÃO DE SEGREGACÃO CRÍTICA)
 // =======================================================================
 router.get("/", async (req: Request, res: Response) => {
   const user = req.user!;
   const accessFilter = req.accessFilter!;
   
   // Desestruturação da Query
-  const { q, tecRef, filtro, valor, status = 'Ativo', confirmedViolence, socioeducacao, mes } = req.query as any;
+  const { 
+    q, tecRef, filtro, valor, status = 'Ativo', 
+    confirmedViolence, socioeducacao, mes 
+} = req.query as any;
+
+    // 🛑 RESTAURAÇÃO DE ESCOPO 🛑
+    let params: any[] = [];
+    const whereClauses: string[] = [];
+
+    const addParam = (val: any) => {
+        params.push(val);
+        return `$${params.length}`;
+    };
+    // 🛑 FIM DA RESTAURAÇÃO DE ESCOPO 🛑
+
+  // ⭐️ INÍCIO DA CORREÇÃO DE VISIBILIDADE E FILTROS ⭐️
+  const isVigilancia = user.role.toLowerCase() === 'vigilancia'; // Definindo localmente
+  const isGestorGeral = user.role.toLowerCase() === 'gestor'; 
 
   try {
     let query = `
@@ -126,29 +174,11 @@ router.get("/", async (req: Request, res: Response) => {
       FROM casos
     `;
 
-      const params: any[] = [];
-      const whereClauses: string[] = [];
-
-      // helper: adiciona param e retorna placeholder $n
-      const addParam = (val: any) => {
-        params.push(val);
-        return `$${params.length}`;
-      };
-
-      // 1. FILTROS STATUS E MÊS
-      if (status && status !== 'todos') {
-        const ph = addParam(status);
-        whereClauses.push(`status = ${ph}::VARCHAR`);
-      }
-      if (mes) {
-        const ph = addParam(mes);
-        whereClauses.push(`TO_CHAR("dataCad", 'YYYY-MM') = ${ph}::VARCHAR`);
-      }
-
-      // 2. FILTRO DE BUSCA (geral ou por tecRef/filtro)
-      const searchTerm = valor && filtro === 'q' ? valor : tecRef;
-      if (searchTerm) {
-        const wild = `%${searchTerm}%`;
+      
+      // 1. FILTROS DE PESQUISA GERAL (q, tecRef)
+      const searchTarget = q || tecRef;
+      if (searchTarget) {
+        const wild = `%${searchTarget}%`;
         const p1 = addParam(wild);
         const p2 = addParam(wild);
         const p3 = addParam(wild);
@@ -161,72 +191,62 @@ router.get("/", async (req: Request, res: Response) => {
            dados_completos->>'cpf' ILIKE ${p4})
         `));
       } 
-      // ⭐️ TRATAMENTO ROBUSTO PARA FILTROS DE CARD/GRÁFICO
-      else if (filtro && valor && filtro !== 'q') {
-          
-        const jsonKey = filtro;
-        const phValor = addParam(valor);
+      // 2. FILTROS DE DRILL-DOWN (Filtro/Valor) - CORREÇÃO CRÍTICA
+      else if (filtro && valor) {
+          const jsonKey = filtro;
+          const phValor = addParam(valor);
 
-        if (jsonKey === 'por_bairro') {
-          // Lógica de Bairro (busca exata)
-          whereClauses.push(`LOWER(dados_completos->>'bairro') = LOWER(${phValor}::TEXT)`);
-        } else if (jsonKey === 'por_violencia') {
-          // Lógica de Tipo de Violência (busca parcial - ILIKE)
-          whereClauses.push(`dados_completos->>'tipoViolencia' ILIKE ${phValor}`);
-        } else if (jsonKey === 'por_faixa_etaria') {
-          // Lógica de Faixa Etária (filtro complexo no frontend, tratamento especial no backend)
-          whereClauses.push(cleanSqlString(`
-              CASE 
-                  WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
-                  WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
-                  WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
-                  WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
-                  WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
-                  ELSE 'Não informado' 
-              END = ${phValor}::TEXT
-          `));
-      } 
-      // ⭐️ CORREÇÃO FINAL BPC: Trata o filtro do card BPC (Listagem)
-      else if (jsonKey === 'recebeBPC') {
-          // O modal BPC deve listar todos os casos que se qualificam (Idoso OU PCD)
-          whereClauses.push(`(dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')`);
-          
-          // 🛑 AÇÃO CRÍTICA: Remove o parâmetro 'valor' que estava contaminando o array
-          params.pop();
-      }
-      else {
-        // Lógica Genérica (Violência Confirmada, Sexo, etc.)
-        whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
+          if (jsonKey === 'recebeBPC') {
+              whereClauses.push(`(dados_completos->>'${jsonKey}' = 'Idoso' OR dados_completos->>'${jsonKey}' = 'PCD')`);
+              params.pop(); 
+          } else if (jsonKey === 'por_bairro' || jsonKey === 'por_violencia' || jsonKey === 'por_canal') {
+              const targetKey = jsonKey.replace('por_', '');
+              whereClauses.push(`LOWER(dados_completos->>'${targetKey}') = LOWER(${phValor}::TEXT)`);
+          } else {
+              whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
+          }
       }
-    }
 
-      // 3. FILTROS DE COERÊNCIA (Apenas mantidos por compatibilidade)
+      // 3. FILTROS BÁSICOS (status, confirmedViolence, socioeducacao)
+      if (status && status !== 'todos') {
+        const ph = addParam(status);
+        whereClauses.push(`status = ${ph}::VARCHAR`);
+      }
       if (confirmedViolence === 'true') whereClauses.push(`(dados_completos->>'confirmacaoViolencia')::TEXT = 'Confirmada'`);
       if (socioeducacao === 'true') whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
 
-      // 4. FILTRO DE ACESSO POR UNIDADE (Visibilidade restaurada e Estabilidade)
-      if (accessFilter.whereClause !== 'TRUE') {
-        // cria placeholders sequenciais e adiciona os valores aos params com addParam
-        const unitPlaceholders: string[] = accessFilter.params.map((p: any) => `${addParam(p)}::INTEGER`);
+      // 4. FILTRO DE ACESSO POR UNIDADE (SEGURANÇA E SEGREGACÃO)
+      // 🛑 CORREÇÃO DA SEGREGACÃO CRÍTICA (Gestor vê CREAS, mas não o CRAS)
+      // O filtro do Middleware já foi aplicado; vamos ajustá-lo para a consulta CREAS
+      if (!isGestorGeral) {
+          // Se não for Gestor Geral, aplicamos o filtro de unidade do middleware
+          let unitWhere = accessFilter.whereClause;
+          
+          // cria placeholders sequenciais e adiciona os valores aos params com addParam
+          const unitPlaceholders: string[] = accessFilter.params.map((p: any) => `${addParam(p)}::INTEGER`);
 
-        let unitWhere = accessFilter.whereClause;
-        // substitui tokens $X e $Y (se existirem) pelos placeholders gerados
-        if (unitPlaceholders[0]) unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
-        if (unitPlaceholders[1]) unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
+          // substitui tokens $X e $Y pelos placeholders gerados
+          if (unitPlaceholders[0]) unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
+          if (unitPlaceholders[1]) unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
 
-        // ⭐️ REAPLICAÇÃO DA CORREÇÃO DE VISIBILIDADE: Inclui casos sem unit_id (Gestor Principal)
-        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
+          // Filtro para a unidade do usuário + casos sem lotação (que são do Gestor)
+          unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
+          whereClauses.push(unitWhere);
+      } else {
+          // 🛑 GESTOR GERAL: Vê CREAS (1) e casos sem lotação (NULL), MAS NÃO O CRAS (2-5)
+          const crasIds = CRAS_UNIT_IDS.map(id => addParam(id)).join(', ');
+          const creasIdParam = addParam(UNIT_ID_CREAS);
 
-        whereClauses.push(unitWhere);
-      }
+          // Filtro: Tudo MENOS os IDs do CRAS
+          whereClauses.push(`(casos.unit_id = ${creasIdParam} OR casos.unit_id IS NULL OR casos.unit_id NOT IN (${crasIds}))`);
+
+          // Re-adiciona os IDs do CRAS para garantir que o array params esteja correto (se já não estiver lá)
+          // Isso é complexo no POST, mas no GET, a lógica acima deve bastar
+      }
 
       // Montagem final da query
       if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
       query += ` ORDER BY "dataCad" DESC`;
-
-      // Debug: verifique se placeholders e params estão sincronizados
-      console.log("DEBUG: FINAL QUERY:", cleanSqlString(query));
-      console.log("DEBUG: FINAL PARAMS:", params);
 
       // Execução
       const result = await pool.query(cleanSqlString(query), params);

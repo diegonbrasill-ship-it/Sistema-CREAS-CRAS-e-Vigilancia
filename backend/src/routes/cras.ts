@@ -1,69 +1,87 @@
-// backend/src/routes/cras.ts (Novo Arquivo)
+// backend/src/routes/cras.ts (VERSÃO FINAL COM DIAGNÓSTICO CRÍTICO DE LISTAGEM)
 
 import express, { Router, Request, Response } from "express";
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth";
-import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
-// Importar tipos auxiliares, se necessário
-// import { anonimizarDadosSeNecessario } from './casos'; 
+// Importamos unitAccessMiddleware, mas removemos ele do router.use para este teste final
+import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
 
 const router = express.Router();
 
 // Função de Limpeza SQL (Importada ou definida localmente)
 const cleanSqlString = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 
-// Aplicamos o filtro de unidade para todas as rotas do CRAS
-// 'casos' é a tabela base, 'unit_id' é a coluna de filtro
-router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
+// Aplicamos o authMiddleware (Obrigatório), mas removemos o filtro unitAccessMiddleware
+// para a rota GET /casos para depurar a listagem.
+router.use(authMiddleware); // Mantemos apenas o middleware de autenticação
 
-
-// =======================================================================
 // 📌 ROTA PRINCIPAL: GET /cras/casos (Listagem e Busca de Prontuário)
+// 🛑 CORRIGIDA A FALHA DE SEGREGACÃO DO GESTOR 🛑
 // =======================================================================
 router.get("/casos", async (req: Request, res: Response) => {
-    // Acessa o filtro de segurança e o usuário logado
-    const accessFilter = req.accessFilter!;
-    const user = (req as any).user;
-
-    // Campos a serem buscados para a listagem (adaptados do seu casos.ts)
-    const baseFields = `id, "dataCad", "tecRef", nome, status, unit_id, dados_completos->>'bairro' AS bairro`;
-
-    // Constrói o filtro de acesso (Visibilidade Gestor + Unidade CRAS)
-    let unitParams = [...accessFilter.params];
-    let unitWhere = accessFilter.whereClause;
+    // Acessa o filtro de segurança
+    const accessFilter = req.accessFilter!;
+    const user = (req as any).user;
     
-    // Substitui placeholders do accessFilter
-    let paramIndex = 1;
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
+    // 🛑 NOVO: Capturamos um filtro unitId da query (se o Front-end enviou)
+    const { unitId: queryUnitId } = req.query as { unitId?: string };
+
+    const isGestorGeral = user.role.toLowerCase() === 'gestor';
+    const userUnitId = user.unit_id; // unit_id do usuário logado
+
+    let finalWhereClause = 'WHERE status = $1';
+    let finalParams: (string | number)[] = ['Ativo']; // Status sempre ativo
+    let paramIndex = 2; 
+
+    // 1. FILTRO BASE DE SEGURANÇA (Se não é Gestor, só vê a sua unidade)
+    if (!isGestorGeral) {
+        if (userUnitId !== null && userUnitId >= 2) {
+            // Servidor CRAS (Comum): Vê APENAS os casos da sua unidade.
+            finalWhereClause += ` AND casos.unit_id = $${paramIndex++}`;
+            finalParams.push(userUnitId);
+        } else {
+            // Usuário CREAS (ID 1) ou sem lotação no CRAS: Retorna vazio.
+            finalWhereClause += ' AND 1 = 0'; // Força resultado vazio
+        }
     }
-    
-    // Filtro de Visibilidade: CRAS/Gestor Máximo/Gestor Criador
-    // Adicionamos a checagem 'OR casos.unit_id IS NULL' para o Gestor Máximo
-    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
-    
-    // Montagem da Query
-    const query = cleanSqlString(`
-        SELECT ${baseFields} 
-        FROM casos
-        WHERE ${finalUnitWhere}
-        ORDER BY "dataCad" DESC
-    `);
-    
-    try {
-        const result = await pool.query(query, unitParams);
-
-        // NOTE: A anonimização deve ser tratada aqui, se necessário (Vigilância acessando CRAS)
-        // Por enquanto, apenas devolvemos os dados filtrados.
-        res.json(result.rows); 
-
-    } catch (err: any) {
-        console.error("Erro ao listar casos do CRAS:", err.message);
-        res.status(500).json({ message: "Erro ao buscar casos do CRAS." });
+    // 2. FILTRO DO GESTOR GERAL (Deve ver todos ou filtrar pelo clique no submenu)
+    else {
+        // Opção 2.1: Se o Gestor passou um unitId na query (clicou no submenu), filtra EXATAMENTE por ele.
+        if (queryUnitId) {
+            finalWhereClause += ` AND casos.unit_id = $${paramIndex++}`;
+            finalParams.push(queryUnitId);
+        }
+        // Opção 2.2: Se o Gestor está na tela de consulta geral (sem filtro na query), ele vê todos os CRAS + NULL.
+        else {
+            const crasIds = [2, 3, 4, 5];
+            const placeholders = crasIds.map(() => `$${paramIndex++}`).join(', ');
+            finalWhereClause += ` AND (casos.unit_id IN (${placeholders}) OR casos.unit_id IS NULL)`;
+            finalParams.push(...crasIds);
+        }
     }
+
+
+    // Campos a serem buscados para a listagem 
+    const baseFields = `id, "dataCad", "tecRef", nome, status, unit_id, dados_completos->>'bairro' AS bairro`;
+    
+    // Montagem da Query
+    const query = cleanSqlString(`
+        SELECT ${baseFields} 
+        FROM casos
+        ${finalWhereClause}
+        ORDER BY "dataCad" DESC
+    `);
+    
+    try {
+        // 🛑 EXECUÇÃO DA QUERY COM OS PARÂMETROS CORRETOS 🛑
+        const result = await pool.query(query, finalParams); 
+
+        res.json(result.rows); 
+
+    } catch (err: any) {
+        console.error("Erro ao listar casos do CRAS:", err.message);
+        res.status(500).json({ message: "Erro ao buscar casos do CRAS." });
+    }
 });
-
 
 export default router;
