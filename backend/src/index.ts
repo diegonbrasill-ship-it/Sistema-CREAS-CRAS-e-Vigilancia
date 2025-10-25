@@ -20,9 +20,7 @@ import encaminhamentosRoutes from "./routes/encaminhamentos";
 import anexosRoutes from "./routes/anexos";
 import crasRouter from './routes/cras';
 // 1. IMPORTAÇÃO da nova rota de demandas
-import demandasRoutes from "./routes/demandas"; 
-
-
+import demandasRoutes from "./routes/demandas";
 
 const app = express();
 
@@ -60,6 +58,3 @@ const PORT = process.env.PORT || 4000;
     process.exit(1);
   }
 })();
-
-
-

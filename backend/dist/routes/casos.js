@@ -1,5 +1,5 @@
 "use strict";
-// backend/src/routes/casos.ts (VERSÃO FINAL COM MIDDLEWARES DE ACESSO REMOVIDOS)
+// backend/src/routes/casos.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,7 +12,7 @@ const auth_1 = require("../middleware/auth");
 const unitAccess_middleware_1 = require("../middleware/unitAccess.middleware");
 const logger_1 = require("../services/logger");
 const constants_1 = require("../utils/constants");
-const caseAccess_middleware_1 = require("../middleware/caseAccess.middleware");
+const caseAccess_middleware_1 = require("../middleware/caseAccess.middleware"); // Manter para rotas de modificação
 const router = (0, express_1.Router)();
 // FUNÇÃO UTILITÁRIA: Limpeza de strings SQL
 const cleanSqlString = (sql) => sql.replace(/\s+/g, ' ').trim();
@@ -47,29 +47,41 @@ function anonimizarDadosSeNecessario(user, data) {
 // =======================================================================
 router.use(auth_1.authMiddleware, (0, unitAccess_middleware_1.unitAccessMiddleware)('casos', 'unit_id'));
 // =======================================================================
-// ROTA POST /casos - Criar novo caso
+// ROTA POST /casos - CRIAR NOVO CASO (CORRIGIDO: Inserção de dados_completos)
 // =======================================================================
-// Rotas POST, PUT, DELETE, PATCH SEMPRE USAM checagem de acesso para modificação.
-router.post("/", (0, caseAccess_middleware_1.checkCaseAccess)('body', 'unit_id'), async (req, res) => {
-    const { dataCad, tecRef, nome, dados_completos, unit_id } = req.body;
+router.post("/", async (req, res) => {
+    // ⭐️ CORREÇÃO CRÍTICA: Desestruturação para separar COLUNAS SQL e o JSONB
+    const { nome, dataCad, tecRef, status, unit_id, 
+    // Captura todos os outros campos (incluindo tipoViolencia) para o JSONB
+    ...dados_completos_payload } = req.body;
+    // Campos SQL (com fallback)
+    const nomeToUse = nome || null;
+    const tecRefToUse = tecRef || null;
+    const unitIdToUse = unit_id || req.user.unit_id || null; // Garante o unit_id do usuário logado
+    const statusToUse = status || 'Ativo'; // Padrão 'Ativo' para novos casos
+    const dataCadToUse = dataCad || new Date().toISOString().split('T')[0];
+    // O objeto JSONB é o payload restante (agora com tipoViolencia, etc.)
+    const dadosCompletosJSON = JSON.stringify(dados_completos_payload);
     const userId = req.user.id;
     const username = req.user.username;
     try {
         const insertQuery = (0, exports.cleanSqlString)(`
-      INSERT INTO casos ("dataCad", "tecRef", nome, dados_completos, unit_id, "userId", status)
-      VALUES ($1, $2, $3, $4, $5, $6, 'Ativo')
-      RETURNING *
-    `);
+            INSERT INTO casos (nome, "dataCad", "tecRef", status, unit_id, "userId", dados_completos)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+        `);
         const result = await db_1.default.query(insertQuery, [
-            dataCad,
-            tecRef,
-            nome,
-            JSON.stringify(dados_completos),
-            unit_id,
-            userId
+            nomeToUse,
+            dataCadToUse,
+            tecRefToUse,
+            statusToUse,
+            unitIdToUse,
+            userId,
+            dadosCompletosJSON
         ]);
-        await (0, logger_1.logAction)({ userId, username, action: 'CREATE_CASE', details: { casoId: result.rows[0].id } });
-        res.status(201).json(result.rows[0]);
+        const novoCaso = result.rows[0];
+        await (0, logger_1.logAction)({ userId, username, action: 'CREATE_CASE', details: { casoId: novoCaso.id } });
+        res.status(201).json(novoCaso);
     }
     catch (err) {
         console.error("Erro ao criar caso:", err.message);
@@ -77,8 +89,7 @@ router.post("/", (0, caseAccess_middleware_1.checkCaseAccess)('body', 'unit_id')
     }
 });
 // =======================================================================
-// ROTA GET /casos - LISTAR CASOS 
-// ... (Rota de Listagem inalterada)
+// ROTA GET /casos - LISTAR CASOS (CORREÇÃO DE TIPAGEM E BPC)
 // =======================================================================
 router.get("/", async (req, res) => {
     const user = req.user;
@@ -119,11 +130,11 @@ router.get("/", async (req, res) => {
             const p3 = addParam(wild);
             const p4 = addParam(wild);
             whereClauses.push((0, exports.cleanSqlString)(`
-        (nome ILIKE ${p1} OR
-         "tecRef" ILIKE ${p2} OR
-         dados_completos->>'nis' ILIKE ${p3} OR
-         dados_completos->>'cpf' ILIKE ${p4})
-      `));
+          (nome ILIKE ${p1} OR
+           "tecRef" ILIKE ${p2} OR
+           dados_completos->>'nis' ILIKE ${p3} OR
+           dados_completos->>'cpf' ILIKE ${p4})
+        `));
         }
         // ⭐️ TRATAMENTO ROBUSTO PARA FILTROS DE CARD/GRÁFICO
         else if (filtro && valor && filtro !== 'q') {
@@ -140,18 +151,25 @@ router.get("/", async (req, res) => {
             else if (jsonKey === 'por_faixa_etaria') {
                 // Lógica de Faixa Etária (filtro complexo no frontend, tratamento especial no backend)
                 whereClauses.push((0, exports.cleanSqlString)(`
-            CASE 
-                WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
-                WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
-                WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
-                WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
-                WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
-                ELSE 'Não informado' 
-            END = ${phValor}::TEXT
-        `));
+              CASE 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
+                  WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
+                  WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
+                  ELSE 'Não informado' 
+              END = ${phValor}::TEXT
+          `));
+            }
+            // ⭐️ CORREÇÃO FINAL BPC: Trata o filtro do card BPC (Listagem)
+            else if (jsonKey === 'recebeBPC') {
+                // O modal BPC deve listar todos os casos que se qualificam (Idoso OU PCD)
+                whereClauses.push(`(dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')`);
+                // 🛑 AÇÃO CRÍTICA: Remove o parâmetro 'valor' que estava contaminando o array
+                params.pop();
             }
             else {
-                // Lógica Genérica: Cobre todos os cards e a maioria dos gráficos
+                // Lógica Genérica (Violência Confirmada, Sexo, etc.)
                 whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
             }
         }
@@ -160,7 +178,7 @@ router.get("/", async (req, res) => {
             whereClauses.push(`(dados_completos->>'confirmacaoViolencia')::TEXT = 'Confirmada'`);
         if (socioeducacao === 'true')
             whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
-        // 4. FILTRO DE ACESSO POR UNIDADE (mapeamento sequencial seguro)
+        // 4. FILTRO DE ACESSO POR UNIDADE (Visibilidade restaurada e Estabilidade)
         if (accessFilter.whereClause !== 'TRUE') {
             // cria placeholders sequenciais e adiciona os valores aos params com addParam
             const unitPlaceholders = accessFilter.params.map((p) => `${addParam(p)}::INTEGER`);
@@ -170,6 +188,8 @@ router.get("/", async (req, res) => {
                 unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
             if (unitPlaceholders[1])
                 unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
+            // ⭐️ REAPLICAÇÃO DA CORREÇÃO DE VISIBILIDADE: Inclui casos sem unit_id (Gestor Principal)
+            unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
             whereClauses.push(unitWhere);
         }
         // Montagem final da query
@@ -190,20 +210,25 @@ router.get("/", async (req, res) => {
     }
 });
 // =======================================================================
-// ROTA PUT /casos/:id - ATUALIZAR CASO ⭐️ MIDDLEWARE MANTIDO (MODIFICAÇÃO)
+// ROTA PUT /casos/:id - ATUALIZAR CASO (Mantém segurança de modificação)
 // =======================================================================
 router.put("/:id", (0, caseAccess_middleware_1.checkCaseAccess)('params', 'id'), async (req, res) => {
     const { id } = req.params;
     const novosDados = req.body;
     const { id: userId, username } = req.user;
     try {
-        const resultAtual = await db_1.default.query((0, exports.cleanSqlString)('SELECT dados_completos FROM casos WHERE id = $1'), [id]);
+        const resultAtual = await db_1.default.query((0, exports.cleanSqlString)('SELECT dados_completos, "dataCad", "tecRef", nome FROM casos WHERE id = $1'), [id]);
         if (resultAtual.rowCount === 0)
             return res.status(404).json({ message: "Caso não encontrado." });
-        const dadosMesclados = { ...resultAtual.rows[0].dados_completos, ...novosDados };
-        const dataCad = dadosMesclados.dataCad;
-        const tecRef = dadosMesclados.tecRef;
-        const nome = dadosMesclados.nome || null;
+        const dadosExistentes = resultAtual.rows[0];
+        const dadosMesclados = {
+            ...dadosExistentes.dados_completos,
+            ...novosDados
+        };
+        // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
+        const dataCad = novosDados.dataCad || dadosExistentes.dataCad;
+        const tecRef = novosDados.tecRef || dadosExistentes.tecRef;
+        const nome = novosDados.nome || dadosExistentes.nome || null;
         await db_1.default.query((0, exports.cleanSqlString)(`UPDATE casos SET "dataCad" = $1, "tecRef" = $2, nome = $3, dados_completos = $4 WHERE id = $5`), [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), id]);
         await (0, logger_1.logAction)({ userId, username, action: 'UPDATE_CASE', details: { casoId: id } });
         res.status(200).json({ message: "Prontuário atualizado com sucesso!", caso: dadosMesclados });
@@ -214,7 +239,7 @@ router.put("/:id", (0, caseAccess_middleware_1.checkCaseAccess)('params', 'id'),
     }
 });
 // =======================================================================
-// PATCH /casos/:id/status ⭐️ MIDDLEWARE MANTIDO (MODIFICAÇÃO)
+// PATCH /casos/:id/status (Mantém segurança de modificação)
 // =======================================================================
 router.patch("/:id/status", (0, caseAccess_middleware_1.checkCaseAccess)('params', 'id'), async (req, res) => {
     const { id } = req.params;
@@ -236,7 +261,7 @@ router.patch("/:id/status", (0, caseAccess_middleware_1.checkCaseAccess)('params
     }
 });
 // =======================================================================
-// DELETE /casos/:id ⭐️ MIDDLEWARE MANTIDO (MODIFICAÇÃO)
+// DELETE /casos/:id (Mantém segurança de modificação)
 // =======================================================================
 router.delete("/:id", (0, caseAccess_middleware_1.checkCaseAccess)('params', 'id'), async (req, res) => {
     const { id } = req.params;
@@ -254,15 +279,34 @@ router.delete("/:id", (0, caseAccess_middleware_1.checkCaseAccess)('params', 'id
     }
 });
 // =======================================================================
-// GET /casos/:id - DETALHES DO CASO 🛑 MIDDLEWARE REMOVIDO
+// GET /casos/:id - DETALHES DO CASO (Segurança Reintroduzida)
 // =======================================================================
 router.get("/:id", async (req, res) => {
     const { id } = req.params;
     const user = req.user;
+    const accessFilter = req.accessFilter; // Cláusula de filtro de unidade
+    // 1. Resolvendo a Cláusula WHERE de Acesso
+    const unitParams = [id]; // ID do Caso é o $1
+    let unitWhere = accessFilter.whereClause;
+    if (accessFilter.params.length === 1) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
+        unitParams.push(accessFilter.params[0]);
+    }
+    else if (accessFilter.params.length === 2) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
+        unitParams.push(accessFilter.params[0], accessFilter.params[1]);
+    }
+    // 2. Montando a Query Segura
+    // ⭐️ Adiciona OR casos.unit_id IS NULL para Gestor Principal
+    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
+    const checkQuery = (0, exports.cleanSqlString)(`SELECT * FROM casos WHERE id = $1 AND ${finalUnitWhere}`);
     try {
-        const casoResult = await db_1.default.query((0, exports.cleanSqlString)('SELECT * FROM casos WHERE id = $1'), [id]);
-        if (casoResult.rowCount === 0)
-            return res.status(404).json({ message: "Caso não encontrado." });
+        // EXECUTA A CHECAGEM E BUSCA AO MESMO TEMPO
+        const casoResult = await db_1.default.query(checkQuery, unitParams);
+        if (casoResult.rowCount === 0) {
+            // Se não encontrou ou não tem permissão
+            return res.status(404).json({ message: "Caso não encontrado ou acesso restrito." });
+        }
         const casoBase = casoResult.rows[0];
         const demandasQuery = (0, exports.cleanSqlString)(`
             SELECT id, tipo_documento, instituicao_origem, data_recebimento, status
@@ -291,25 +335,107 @@ router.get("/:id", async (req, res) => {
     }
 });
 // =======================================================================
-// GET /casos/:casoId/encaminhamentos 🛑 MIDDLEWARE REMOVIDO
+// GET /casos/:casoId/encaminhamentos (Segurança Reintroduzida)
 // =======================================================================
 router.get("/:casoId/encaminhamentos", async (req, res) => {
     const { casoId } = req.params;
+    const accessFilter = req.accessFilter; // Cláusula de filtro de unidade
+    // 1. Resolve Placeholders para a checagem de acesso
+    const unitParams = [casoId]; // ID do Caso é o $1
+    let unitWhere = accessFilter.whereClause;
+    if (accessFilter.params.length === 1) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
+        unitParams.push(accessFilter.params[0]);
+    }
+    else if (accessFilter.params.length === 2) {
+        unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
+        unitParams.push(accessFilter.params[0], accessFilter.params[1]);
+    }
+    // 2. Query: Busca encaminhamentos APENAS se o caso pertencer à unidade
+    const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
+    const checkQuery = (0, exports.cleanSqlString)(`
+        SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
+               enc.observacoes, usr.username AS "tecRef"
+        FROM encaminhamentos enc
+        LEFT JOIN users usr ON enc."userId" = usr.id
+        LEFT JOIN casos c ON enc."casoId" = c.id
+        WHERE enc."casoId" = $1 AND ${finalUnitWhere}
+        ORDER BY enc."dataEncaminhamento" DESC
+    `);
     try {
-        const query = (0, exports.cleanSqlString)(`
-      SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
-             enc.observacoes, usr.username AS "tecRef"
-      FROM encaminhamentos enc
-      LEFT JOIN users usr ON enc."userId" = usr.id
-      WHERE enc."casoId" = $1
-      ORDER BY enc."dataEncaminhamento" DESC
-    `);
-        const result = await db_1.default.query(query, [casoId]);
+        const result = await db_1.default.query(checkQuery, unitParams);
         res.json(result.rows);
     }
     catch (err) {
         console.error(`Erro ao listar encaminhamentos para o caso ${casoId}:`, err.message);
         res.status(500).json({ message: "Erro ao buscar encaminhamentos." });
+    }
+});
+// backend/src/routes/casos.ts (Adicionar ao final)
+// =======================================================================
+// ROTA GET /casos/busca-rapida - BUSCA RÁPIDA PARA ASSOCIAÇÃO DE DEMANDAS
+// =======================================================================
+router.get("/busca-rapida", auth_1.authMiddleware, (0, unitAccess_middleware_1.unitAccessMiddleware)('casos', 'unit_id'), async (req, res) => {
+    const accessFilter = req.accessFilter;
+    const { q } = req.query;
+    const searchTerm = q?.trim();
+    if (!searchTerm || searchTerm.length < 3) {
+        return res.json([]); // Retorna vazio se a busca for muito curta
+    }
+    try {
+        const params = [];
+        const addParam = (val) => {
+            params.push(val);
+            return `$${params.length}`;
+        };
+        // 1. Constrói a cláusula WHERE de busca (Nome, NIS, CPF, ID)
+        const wild = `%${searchTerm}%`;
+        const p1 = addParam(wild);
+        const p2 = addParam(wild);
+        const p3 = addParam(wild);
+        // Tentativa de buscar por ID exato se o termo for numérico
+        const idSearch = parseInt(searchTerm, 10);
+        let idClause = '';
+        if (!isNaN(idSearch)) {
+            const pId = addParam(idSearch);
+            idClause = ` OR id = ${pId}::INTEGER`;
+        }
+        const searchClause = (0, exports.cleanSqlString)(`
+            (nome ILIKE ${p1} OR
+             dados_completos->>'nis' ILIKE ${p2} OR
+             dados_completos->>'cpf' ILIKE ${p3}
+             ${idClause}
+            )
+        `);
+        // 2. Constrói o filtro de acesso por unidade
+        const [unitFilterContent, unitParams] = [accessFilter.whereClause, accessFilter.params];
+        let accessParams = [...unitParams];
+        // Substitui placeholders do accessFilter
+        let accessWhere = unitFilterContent;
+        let pIndex = params.length;
+        if (unitParams.length === 1) {
+            accessWhere = accessWhere.replace('$X', `$${++pIndex}`);
+        }
+        else if (unitParams.length === 2) {
+            accessWhere = accessWhere.replace('$X', `$${++pIndex}`).replace('$Y', `$${++pIndex}`);
+        }
+        params.push(...accessParams);
+        // 3. Montagem final da query (combinando busca, status Ativo e segurança)
+        const query = (0, exports.cleanSqlString)(`
+            SELECT id, nome, "tecRef", dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
+            FROM casos
+            WHERE status = 'Ativo' 
+              AND (${searchClause})
+              AND (${accessWhere})
+            ORDER BY nome ASC
+            LIMIT 10
+        `);
+        const result = await db_1.default.query(query, params);
+        res.json(result.rows);
+    }
+    catch (err) {
+        console.error("Erro na busca rápida de casos:", err.message);
+        res.status(500).json({ message: "Erro na busca rápida de casos." });
     }
 });
 exports.default = router;

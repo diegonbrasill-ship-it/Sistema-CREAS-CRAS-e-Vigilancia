@@ -29,8 +29,8 @@ export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoadi
         Adicionamos a propriedade 'style' para forçar o z-index.
         Isso garante que o modal sempre apareça na frente de outros elementos, como o mapa.
       */}
-      <DialogContent 
-        className="max-w-4xl h-[80vh] flex flex-col" 
+      <DialogContent
+        className="max-w-4xl h-[80vh] flex flex-col"
         style={{ zIndex: 2000 }}
       >
         <DialogHeader>
@@ -40,7 +40,7 @@ export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoadi
             {cases.length > 0 && ` Total: ${cases.length} caso(s).`}
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">

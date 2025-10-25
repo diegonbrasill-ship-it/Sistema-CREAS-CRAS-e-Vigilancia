@@ -1,7 +1,7 @@
 // frontend/src/components/mse/MseRegistroModal.tsx
 
-import React, { useState, useEffect } from 'react'; 
-import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form'; 
+import React, { useState, useEffect } from 'react';
+import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-toastify';
@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 // Importação dos utilitários
-import { calculateAge, addMonthsToDate } from '../../utils/dateUtils'; 
-import { createMseRegistro, getMseRegistroById, MseRegistroBody, MseTipo, MseSituacao } from '@/services/api'; 
+import { calculateAge, addMonthsToDate } from '../../utils/dateUtils';
+import { createMseRegistro, getMseRegistroById, MseRegistroBody, MseTipo, MseSituacao } from '@/services/api';
 
 // ========================================================
 // ESQUEMA DE VALIDAÇÃO ZOD (MANTIDO)
@@ -35,10 +35,10 @@ const formSchema = z.object({
     situacao: z.enum(['CUMPRIMENTO', 'DESCUMPRIMENTO'], { message: "Situação é obrigatória." }),
     local_descumprimento: z.string().optional().nullable(),
     pia_data_elaboracao: z.string().optional().nullable(),
-    pia_status: z.string().optional().nullable(), 
+    pia_status: z.string().optional().nullable(),
 });
 
-type MseFormData = z.infer<typeof formSchema>; 
+type MseFormData = z.infer<typeof formSchema>;
 
 // ========================================================
 // Componente Modal
@@ -56,16 +56,16 @@ const SITUACAO_OPCOES: MseSituacao[] = ['CUMPRIMENTO', 'DESCUMPRIMENTO'];
 
 export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroId }: MseRegistroModalProps) {
     const isEditMode = !!registroId;
-    const [isLoadEditing, setIsLoadEditing] = useState(false); 
+    const [isLoadEditing, setIsLoadEditing] = useState(false);
 
     const { register, handleSubmit, control, watch, formState: { errors, isSubmitting }, reset } = useForm<MseFormData>({
-        resolver: zodResolver(formSchema) as Resolver<MseFormData>, 
+        resolver: zodResolver(formSchema) as Resolver<MseFormData>,
         defaultValues: {
             mse_duracao_meses: 6,
             situacao: 'CUMPRIMENTO',
             data_nascimento: '', mse_data_inicio: '', nome_adolescente: '',
             responsavel: null, endereco: null, contato: null, nis: null, local_descumprimento: null,
-            pia_data_elaboracao: null, pia_status: 'Em Análise', 
+            pia_data_elaboracao: null, pia_status: 'Em Análise',
         },
     });
 
@@ -75,12 +75,12 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
     const dataNascimento = watch('data_nascimento');
     const dataInicio = watch('mse_data_inicio');
     const duracaoMesesValue = watch('mse_duracao_meses');
-    const duracaoMeses = Number(duracaoMesesValue) || 0; 
+    const duracaoMeses = Number(duracaoMesesValue) || 0;
 
     useEffect(() => { if (dataNascimento) setIdade(calculateAge(dataNascimento)); else setIdade('-'); }, [dataNascimento]);
     useEffect(() => { if (dataInicio && duracaoMeses > 0) setDataFim(addMonthsToDate(dataInicio, duracaoMeses)); else setDataFim('-'); }, [dataInicio, duracaoMeses]);
-    
-    
+
+
     // 📌 FIX CRÍTICO: Lógica de Carregamento de Dados
     useEffect(() => {
         // 1. Condição: Só carrega se estiver em modo edição E o modal estiver aberto
@@ -90,7 +90,7 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                 try {
                     // Chama a API para buscar os dados do registro
                     const data = await getMseRegistroById(registroId);
-                    
+
                     // Converte strings de data do DB para formato de input HTML
                     const formattedData = {
                         ...data,
@@ -98,9 +98,9 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                         mse_data_inicio: data.mse_data_inicio ? new Date(data.mse_data_inicio).toISOString().split('T')[0] : '',
                         pia_data_elaboracao: data.pia_data_elaboracao ? new Date(data.pia_data_elaboracao).toISOString().split('T')[0] : null,
                     };
-                    
+
                     // Preenche o formulário com os dados existentes
-                    reset(formattedData); 
+                    reset(formattedData);
                 } catch (err: any) {
                     // 📌 FIX DA PISCADELA: Não chamar onClose no catch
                     toast.error(`Falha ao carregar registro MSE: ${err.message}. Verifique o ID ${registroId}.`);
@@ -111,16 +111,16 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
             loadData();
         } else if (!isEditMode && !isOpen) {
             // 2. Limpa o formulário ao fechar (se for modo CRIAÇÃO e o modal fechar)
-            reset(); 
+            reset();
         }
     }, [registroId, isEditMode, isOpen, reset]); // Adicionado reset como dependência
 
     // 📌 IMPLEMENTAÇÃO DO SUBMIT ROBUSTO
     const onSubmit: SubmitHandler<MseFormData> = async (data) => {
-        
+
         const cleanedPayload = Object.entries(data).reduce((acc, [key, value]) => {
             if (value !== null && value !== undefined && value !== '') {
-                 (acc as any)[key] = value;
+                (acc as any)[key] = value;
             }
             return acc;
         }, {} as Partial<MseRegistroBody>);
@@ -130,7 +130,7 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
             ...cleanedPayload,
             nis: cleanedPayload.nis ? cleanedPayload.nis.replace(/[^\d]/g, '') : null,
             contato: cleanedPayload.contato ? cleanedPayload.contato.replace(/[^\d]/g, '') : null,
-            mse_duracao_meses: Number(cleanedPayload.mse_duracao_meses), 
+            mse_duracao_meses: Number(cleanedPayload.mse_duracao_meses),
         } as unknown as MseRegistroBody;
 
         try {
@@ -178,7 +178,7 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                     <div className="grid md:grid-cols-3 gap-4">
                         <div className="space-y-2 col-span-2"><Label htmlFor="nome_adolescente">Nome Completo do Adolescente</Label><Input {...register("nome_adolescente")} />{errors.nome_adolescente && <p className="text-sm text-red-500">{errors.nome_adolescente.message}</p>}</div>
                         <div className="space-y-2"><Label htmlFor="data_nascimento">Data de Nascimento</Label><Input type="date" {...register("data_nascimento")} />{errors.data_nascimento && <p className="text-sm text-red-500">{errors.data_nascimento.message}</p>}<p className="text-xs text-slate-500">Idade Atual: <span className="font-semibold">{idade}</span></p></div>
-                        
+
                         {/* INPUT COM MÁSCARA: NIS */}
                         <div className="space-y-2">
                             <Label htmlFor="nis">NIS</Label>
@@ -186,9 +186,9 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                                 name="nis"
                                 control={control}
                                 render={({ field }) => (
-                                    <Input 
+                                    <Input
                                         id="nis"
-                                        type="text" 
+                                        type="text"
                                         placeholder="000.00000.00-0"
                                         {...field}
                                         value={field.value ?? ''}
@@ -197,9 +197,9 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                             />
                             {errors.nis && <p className="text-sm text-red-500">{errors.nis.message}</p>}
                         </div>
-                        
+
                         <div className="space-y-2"><Label htmlFor="responsavel">Responsável Legal</Label><Input {...register("responsavel")} /></div>
-                        
+
                         {/* INPUT COM MÁSCARA: CONTATO */}
                         <div className="space-y-2">
                             <Label htmlFor="contato">Contato</Label>
@@ -207,9 +207,9 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
                                 name="contato"
                                 control={control}
                                 render={({ field }) => (
-                                    <Input 
-                                        id="contato" 
-                                        type="text" 
+                                    <Input
+                                        id="contato"
+                                        type="text"
                                         placeholder="(00) 00000-0000"
                                         {...field}
                                         value={field.value ?? ''}
@@ -220,24 +220,24 @@ export default function MseRegistroModal({ isOpen, onClose, onSuccess, registroI
 
                         <div className="space-y-2 col-span-3"><Label htmlFor="endereco">Endereço Completo</Label><Input {...register("endereco")} /></div>
                     </div>
-                    
+
                     <h3 className="text-lg font-semibold border-b pb-2 pt-4">2. Detalhes da Medida</h3>
                     <div className="grid md:grid-cols-4 gap-4">
-                        <div className="space-y-2"><Label>Tipo de MSE</Label><Controller control={control} name="mse_tipo" render={({ field }) => ( <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>{MSE_TIPOS.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select> )}/>{errors.mse_tipo && <p className="text-sm text-red-500">{errors.mse_tipo.message}</p>}</div>
+                        <div className="space-y-2"><Label>Tipo de MSE</Label><Controller control={control} name="mse_tipo" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>{MSE_TIPOS.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent></Select>)} />{errors.mse_tipo && <p className="text-sm text-red-500">{errors.mse_tipo.message}</p>}</div>
                         <div className="space-y-2"><Label htmlFor="mse_data_inicio">Data de Início</Label><Input type="date" {...register("mse_data_inicio")} />{errors.mse_data_inicio && <p className="text-sm text-red-500">{errors.mse_data_inicio.message}</p>}</div>
-                        
+
                         {/* INPUT DE DURAÇÃO */}
                         <div className="space-y-2"><Label htmlFor="mse_duracao_meses">Duração (meses)</Label><Input type="number" {...register("mse_duracao_meses")} />{errors.mse_duracao_meses && <p className="text-sm text-red-500">{errors.mse_duracao_meses.message as string}</p>}<p className="text-xs text-slate-500">Data Fim Estimada: <span className="font-semibold">{dataFim}</span></p></div>
-                        
-                        <div className="space-y-2"><Label>Situação Atual</Label><Controller control={control} name="situacao" render={({ field }) => ( <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>{SITUACAO_OPCOES.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent></Select> )}/>{errors.situacao && <p className="text-sm text-red-500">{errors.situacao.message}</p>}</div>
+
+                        <div className="space-y-2"><Label>Situação Atual</Label><Controller control={control} name="situacao" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>{SITUACAO_OPCOES.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent></Select>)} />{errors.situacao && <p className="text-sm text-red-500">{errors.situacao.message}</p>}</div>
                     </div>
 
                     <div className="space-y-2"><Label htmlFor="local_descumprimento">Local de Descumprimento (Se aplicável)</Label><Input {...register("local_descumprimento")} /></div>
-                    
+
                     <h3 className="text-lg font-semibold border-b pb-2 pt-4">3. Plano Individual de Atendimento (PIA)</h3>
                     <div className="grid md:grid-cols-3 gap-4">
                         <div className="space-y-2"><Label htmlFor="pia_data_elaboracao">Data da Elaboração do PIA</Label><Input type="date" {...register("pia_data_elaboracao")} /></div>
-                        <div className="space-y-2"><Label>Status do PIA</Label><Controller control={control} name="pia_status" render={({ field }) => ( <Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Em Análise">Em Análise</SelectItem><SelectItem value="Aprovado">Aprovado</SelectItem><SelectItem value="Revisão">Em Revisão</SelectItem><SelectItem value="Não Elaborado">Não Elaborado</SelectItem></SelectContent></Select> )}/></div>
+                        <div className="space-y-2"><Label>Status do PIA</Label><Controller control={control} name="pia_status" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Em Análise">Em Análise</SelectItem><SelectItem value="Aprovado">Aprovado</SelectItem><SelectItem value="Revisão">Em Revisão</SelectItem><SelectItem value="Não Elaborado">Não Elaborado</SelectItem></SelectContent></Select>)} /></div>
                     </div>
 
                     <DialogFooter className="pt-6">

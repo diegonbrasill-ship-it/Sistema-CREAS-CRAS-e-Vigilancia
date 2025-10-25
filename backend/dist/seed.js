@@ -46,9 +46,11 @@ async function seed() {
         const role = "gestor"; // Usamos 'gestor' como role
         // 📌 MUDANÇA CRÍTICA 2: CRIAÇÃO DO ÚNICO USUÁRIO
         const hash = await bcryptjs_1.default.hash(password, 10);
-        const insertUser = await client.query(`INSERT INTO users (username, passwordHash, nome_completo, cargo, is_active, role, unit_id)
-       VALUES ($1, $2, $3, $4, true, $5, $6)
-       RETURNING id`, [username, hash, nomeCompleto, cargo, role, COORDENADOR_UNIT_ID]);
+        const insertUser = await client.query(`
+    INSERT INTO users (username, passwordHash, nome_completo, cargo, is_active, role, unit_id)
+    VALUES ($1, $2, $3, $4, true, $5, $6)
+    RETURNING id;
+`, [username, hash, nomeCompleto, cargo, role, COORDENADOR_UNIT_ID]);
         const userId = insertUser.rows[0].id;
         console.log(`✅ Usuário único '${username}' criado com sucesso (Unit ID ${COORDENADOR_UNIT_ID}).`);
         // Garante que a role exista (embora 'gestor' não precise de user_roles se usarmos a coluna 'role')

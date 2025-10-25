@@ -8,7 +8,7 @@ export interface FiltrosBase {
     mes?: string;
     tecRef?: string;
     bairro?: string;
-    
+
     // Filtros de Unidade (NOVOS CAMPOS)
     unidades?: string; // Lista de IDs separadas por vírgula (dashboardFilterUnits.join(','))
     isFiltroTotal?: boolean; // Flag para Gestor Geral
@@ -16,38 +16,38 @@ export interface FiltrosBase {
 
 
 // --- TIPOS DE DADOS E INTERFACES ---
-type LoginResponse = { 
-    message: string; 
-    token: string; 
-    user: { 
-        id: number; 
-        username: string; 
-        role: string; 
-        nome_completo: string; 
-        cargo: string; 
-        is_active: boolean; 
-        unit_id: number; 
-    }; 
+type LoginResponse = {
+    message: string;
+    token: string;
+    user: {
+        id: number;
+        username: string;
+        role: string;
+        nome_completo: string;
+        cargo: string;
+        is_active: boolean;
+        unit_id: number;
+    };
 };
 type ChartData = { name: string; value: number; };
 
 export interface Anexo {
-    id: number;
-    nomeOriginal: string;
-    tamanhoArquivo?: number; 
-    dataUpload: string;
-    descricao?: string; 
-    uploadedBy?: string;
+    id: number;
+    nomeOriginal: string;
+    tamanhoArquivo?: number;
+    dataUpload: string;
+    descricao?: string;
+    uploadedBy?: string;
 }
 
 export interface User {
-    id: number;
-    username: string;
-    role: string;
-    nome_completo: string;
-    cargo: string;
-    is_active: boolean;
-    unit_id: number | null; 
+    id: number;
+    username: string;
+    role: string;
+    nome_completo: string;
+    cargo: string;
+    is_active: boolean;
+    unit_id: number | null;
 }
 
 // ... (MseTipo, MseSituacao e interfaces MSE mantidas) ...
@@ -56,90 +56,90 @@ export type MseTipo = 'LA' | 'PSC' | 'LA + PSC';
 export type MseSituacao = 'CUMPRIMENTO' | 'DESCUMPRIMENTO';
 
 export interface MseRegistroBody {
-    nome_adolescente: string; data_nascimento: string; responsavel?: string; endereco?: string; contato?: string; nis?: string;
-    mse_tipo: MseTipo; mse_data_inicio: string; mse_duracao_meses: number; situacao: MseSituacao;
-    local_descumprimento?: string; pia_data_elaboracao?: string; pia_status?: string;
+    nome_adolescente: string; data_nascimento: string; responsavel?: string; endereco?: string; contato?: string; nis?: string;
+    mse_tipo: MseTipo; mse_data_inicio: string; mse_duracao_meses: number; situacao: MseSituacao;
+    local_descumprimento?: string; pia_data_elaboracao?: string; pia_status?: string;
 }
 
 export interface MseRegistroResumido {
-    id: number; nome_adolescente: string; data_nascimento: string; idade_atual: number; mse_tipo: MseTipo; 
-    mse_data_inicio: string; situacao: MseSituacao; registrado_por: string; mse_data_final?: string;
+    id: number; nome_adolescente: string; data_nascimento: string; idade_atual: number; mse_tipo: MseTipo;
+    mse_data_inicio: string; situacao: MseSituacao; registrado_por: string; mse_data_final?: string;
 }
 
 export interface MseKpis {
-    total_medidas: string;
-    total_cumprimento: string;
-    total_descumprimento: string;
-    expirando_em_60_dias: string;
+    total_medidas: string;
+    total_cumprimento: string;
+    total_descumprimento: string;
+    expirando_em_60_dias: string;
 }
 
-export interface MseApiResponse { 
-    registros: MseRegistroResumido[];
-    kpis: MseKpis;
+export interface MseApiResponse {
+    registros: MseRegistroResumido[];
+    kpis: MseKpis;
 }
 
 
 // Interfaces de Dashboard
-export interface DashboardApiDataType { 
-    indicadores: {
-        totalAtendimentos: number; novosNoMes: number; inseridosPAEFI: number; reincidentes: number;
-        recebemBolsaFamilia: number; recebemBPC: number; violenciaConfirmada: number; notificadosSINAN: number;
-        contextoFamiliar: { dependenciaFinanceira: number; vitimaPCD: number; membroCarcerario: number; membroSocioeducacao: number; };
-    };
-    principais: { moradiaPrincipal: string; escolaridadePrincipal: string; violenciaPrincipal: string; localPrincipal: string; };
-    graficos: { tiposViolacao: ChartData[]; casosPorBairro: ChartData[]; casosPorSexo: ChartData[]; encaminhamentosTop5: ChartData[]; canalDenuncia: ChartData[]; casosPorCor: ChartData[]; casosPorFaixaEtaria: ChartData[]; };
+export interface DashboardApiDataType {
+    indicadores: {
+        totalAtendimentos: number; novosNoMes: number; inseridosPAEFI: number; reincidentes: number;
+        recebemBolsaFamilia: number; recebemBPC: number; violenciaConfirmada: number; notificadosSINAN: number;
+        contextoFamiliar: { dependenciaFinanceira: number; vitimaPCD: number; membroCarcerario: number; membroSocioeducacao: number; };
+    };
+    principais: { moradiaPrincipal: string; escolaridadePrincipal: string; violenciaPrincipal: string; localPrincipal: string; };
+    graficos: { tiposViolacao: ChartData[]; casosPorBairro: ChartData[]; casosPorSexo: ChartData[]; encaminhamentosTop5: ChartData[]; canalDenuncia: ChartData[]; casosPorCor: ChartData[]; casosPorFaixaEtaria: ChartData[]; };
 }
-export interface ApiResponse { 
-    dados: DashboardApiDataType;
-    opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
+export interface ApiResponse {
+    dados: DashboardApiDataType;
+    opcoesFiltro: { meses: string[]; tecnicos: string[]; bairros: string[]; };
 }
 
 // ✅ CORREÇÃO 1: Interface FiltrosCasos agora estende FiltrosBase
-export interface FiltrosCasos extends FiltrosBase { 
-    filtro?: string; 
-    valor?: string; 
-    status?: string;
-    origem?: 'vigilancia' | 'dashboard' | 'consulta'; // Propriedade para direcionar o endpoint
+export interface FiltrosCasos extends FiltrosBase {
+    filtro?: string;
+    valor?: string;
+    status?: string;
+    origem?: 'vigilancia' | 'dashboard' | 'consulta'; // Propriedade para direcionar o endpoint
 }
 
 export interface DemandaResumida {
-    id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; status: string;
+    id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; status: string;
 }
 
 export interface CasoDetalhado {
-    id: number; nome: string; dataCad: string; tecRef: string; status: string;
-    [key: string]: any; 
-    demandasVinculadas: DemandaResumida[];
+    id: number; nome: string; dataCad: string; tecRef: string; status: string;
+    [key: string]: any;
+    demandasVinculadas: DemandaResumida[];
 }
 export interface Demanda {
-    id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; prazo_resposta?: string; 
-    status: string; nome_caso?: string; caso_id?: number; tecnico_designado: string; registrado_por: string;
+    id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; prazo_resposta?: string;
+    status: string; nome_caso?: string; caso_id?: number; tecnico_designado: string; registrado_por: string;
 }
 
 export interface DemandaDetalhada extends Demanda {
-    numero_documento?: string; assunto?: string; caso_associado_id?: number; tecnico_designado_id: number; 
-    registrado_por_id: number; created_at: string; anexos: Anexo[];
+    numero_documento?: string; assunto?: string; caso_associado_id?: number; tecnico_designado_id: number;
+    registrado_por_id: number; created_at: string; anexos: Anexo[];
 }
 
 // Função "Mestre" fetchWithAuth (mantida)
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('Usuário não autenticado. Por favor, faça o login novamente.');
-    const headers = new Headers(options.headers || {});
-    headers.set('Authorization', `Bearer ${token}`);
-    if (!(options.body instanceof FormData)) {
-        headers.set('Content-Type', 'application/json');
-    }
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Erro ${response.status}: ${response.statusText}` }));
-        throw new Error(errorData.message || 'Ocorreu um erro na requisição');
-    }
-    const contentType = response.headers.get('content-type');
-    if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/octet-stream'))) {
-        return response;
-    }
-    return response.json();
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Usuário não autenticado. Por favor, faça o login novamente.');
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${token}`);
+    if (!(options.body instanceof FormData)) {
+        headers.set('Content-Type', 'application/json');
+    }
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Erro ${response.status}: ${response.statusText}` }));
+        throw new Error(errorData.message || 'Ocorreu um erro na requisição');
+    }
+    const contentType = response.headers.get('content-type');
+    if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/octet-stream'))) {
+        return response;
+    }
+    return response.json();
 }
 
 // 🟢 Função auxiliar para adicionar parâmetros de filtro à URL (Usada nas funções de Dashboard e Vigilância)
@@ -160,14 +160,14 @@ const appendFiltros = (filters?: FiltrosBase): string => {
 
 // AUTENTICAÇÃO
 export async function login(username: string, password: string): Promise<LoginResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Erro de autenticação');
-    return data;
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Erro de autenticação');
+    return data;
 }
 
 // CASOS (Funções base mantidas)
@@ -179,21 +179,21 @@ export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth
 
 // ✅ CORREÇÃO 2: getCasosFiltrados agora aceita FiltrosCasos
 export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
-    // ⭐️ Determinar o endpoint
-    let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
-    if (filters?.origem === 'vigilancia') {
-        endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância
-    }
+    // ⭐️ Determinar o endpoint
+    let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
+    if (filters?.origem === 'vigilancia') {
+        endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância
+    }
 
     // Garante que os parâmetros de filtro (incluindo unidades) sejam anexados
     const paramsString = appendFiltros(filters);
 
-    return fetchWithAuth(`${endpoint}${paramsString}`);
+    return fetchWithAuth(`${endpoint}${paramsString}`);
 };
 
 export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
-    const params = new URLSearchParams({ q: searchTerm });
-    return fetchWithAuth(`/api/casos?${params.toString()}`);
+    const params = new URLSearchParams({ q: searchTerm });
+    return fetchWithAuth(`/api/casos?${params.toString()}`);
 };
 
 // ACOMPANHAMENTOS, ENCAMINHAMENTOS, ANEXOS (MANTIDAS)
@@ -207,17 +207,17 @@ export const uploadAnexoParaCaso = (casoId: string | number, formData: FormData)
 export const uploadAnexoParaDemanda = (demandaId: string | number, formData: FormData) => fetchWithAuth(`/api/anexos/upload/demanda/${demandaId}`, { method: 'POST', body: formData });
 
 export async function downloadAnexo(anexoId: number): Promise<{ blob: Blob, filename: string }> {
-    const response = await fetchWithAuth(`/api/anexos/download/${anexoId}`) as Response;
-    const disposition = response.headers.get('content-disposition');
-    let filename = 'arquivo_anexo';
-    if (disposition?.includes('attachment')) {
-        const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-        if (filenameMatch?.[1]) {
-            filename = filenameMatch[1].replace(/['"]/g, '');
-        }
-    }
-    const blob = await response.blob();
-    return { blob, filename };
+    const response = await fetchWithAuth(`/api/anexos/download/${anexoId}`) as Response;
+    const disposition = response.headers.get('content-disposition');
+    let filename = 'arquivo_anexo';
+    if (disposition?.includes('attachment')) {
+        const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        if (filenameMatch?.[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+    }
+    const blob = await response.blob();
+    return { blob, filename };
 }
 
 // USUÁRIOS (MANTIDAS)
@@ -229,16 +229,16 @@ export const reassignUserCases = (fromUserId: number, toUserId: number) => fetch
 
 // RELATÓRIOS
 export async function generateReport(filters: { startDate: string, endDate: string }): Promise<Blob> {
-    const response = await fetchWithAuth(`/api/relatorios/geral`, { method: 'POST', body: JSON.stringify(filters) }) as Response;
-    return response.blob();
+    const response = await fetchWithAuth(`/api/relatorios/geral`, { method: 'POST', body: JSON.stringify(filters) }) as Response;
+    return response.blob();
 }
 
 // DASHBOARD
 // ✅ CORREÇÃO 3: getDashboardData agora aceita FiltrosBase
 export const getDashboardData = (filters?: FiltrosBase): Promise<ApiResponse> => {
-    // 🟢 Utiliza a função auxiliar para anexar todos os filtros (incluindo unidades)
+    // 🟢 Utiliza a função auxiliar para anexar todos os filtros (incluindo unidades)
     const paramsString = appendFiltros(filters);
-    return fetchWithAuth(`/api/dashboard${paramsString}`);
+    return fetchWithAuth(`/api/dashboard${paramsString}`);
 };
 
 // PAINEL DE VIGILÂNCIA
@@ -258,31 +258,31 @@ export const updateDemandaStatus = (id: string | number, status: string): Promis
 
 // ... (Restante do código MSE mantido)
 export const getMseRegistros = (filters?: { q?: string }): Promise<any> => {
-    const params = new URLSearchParams();
-    if (filters?.q) params.append('q', filters.q);
-    return fetchWithAuth(`/api/mse/registros?${params.toString()}`);
+    const params = new URLSearchParams();
+    if (filters?.q) params.append('q', filters.q);
+    return fetchWithAuth(`/api/mse/registros?${params.toString()}`);
 }
 
 export const createMseRegistro = (data: MseRegistroBody): Promise<{ message: string; registroId: number }> => {
-    try {
-        const userData = localStorage.getItem('user');
-        let unit_id: number | null = null;
-        if (userData) {
-            const parsed = JSON.parse(userData);
-            if (parsed?.unit_id) unit_id = Number(parsed.unit_id);
-        }
+    try {
+        const userData = localStorage.getItem('user');
+        let unit_id: number | null = null;
+        if (userData) {
+            const parsed = JSON.parse(userData);
+            if (parsed?.unit_id) unit_id = Number(parsed.unit_id);
+        }
 
-        const payload = { ...data, unit_id }; 
+        const payload = { ...data, unit_id };
 
-        return fetchWithAuth(`/api/mse/registros`, { 
-            method: 'POST', 
-            body: JSON.stringify(payload),
-        });
-    } catch (err) {
-        console.error("Erro ao recuperar unit_id do usuário para MSE:", err);
-        throw new Error("Falha ao incluir unidade do usuário na requisição MSE.");
-    }
+        return fetchWithAuth(`/api/mse/registros`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error("Erro ao recuperar unit_id do usuário para MSE:", err);
+        throw new Error("Falha ao incluir unidade do usuário na requisição MSE.");
+    }
 };
 
-export const getMseRegistroById = (id: number): Promise<MseRegistroBody> => 
-    fetchWithAuth(`/api/mse/registros/${id}`);
+export const getMseRegistroById = (id: number): Promise<MseRegistroBody> =>
+    fetchWithAuth(`/api/mse/registros/${id}`);

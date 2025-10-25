@@ -22,6 +22,7 @@ const relatorios_1 = __importDefault(require("./routes/relatorios"));
 const vigilancia_1 = __importDefault(require("./routes/vigilancia"));
 const encaminhamentos_1 = __importDefault(require("./routes/encaminhamentos"));
 const anexos_1 = __importDefault(require("./routes/anexos"));
+const cras_1 = __importDefault(require("./routes/cras"));
 // 1. IMPORTAÇÃO da nova rota de demandas
 const demandas_1 = __importDefault(require("./routes/demandas"));
 const app = (0, express_1.default)();
@@ -46,6 +47,7 @@ const PORT = process.env.PORT || 4000;
         app.use("/api/relatorios", relatorios_1.default);
         app.use("/api/encaminhamentos", encaminhamentos_1.default);
         app.use("/api/anexos", anexos_1.default);
+        app.use('/api/cras', cras_1.default);
         // 2. REGISTRO da nova rota de demandas
         app.use("/api/demandas", demandas_1.default);
         app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`));

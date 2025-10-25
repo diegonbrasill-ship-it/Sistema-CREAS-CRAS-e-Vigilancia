@@ -10,11 +10,10 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 // Configuração de conexão com PostgreSQL usando variáveis de ambiente
 const pool = new pg_1.Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_DATABASE,
-    password: process.env.DB_PASSWORD,
-    port: Number(process.env.DB_PORT),
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false, // necessário para conexão segura sem exigir CA
+    },
 });
 // Flag de controle para inicialização única
 let isDbInitialized = false;

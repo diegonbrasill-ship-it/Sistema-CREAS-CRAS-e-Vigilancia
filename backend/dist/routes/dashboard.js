@@ -35,7 +35,7 @@ const buildFullWhereClauseContent = (filters, accessFilter, startParamIndex) => 
         params.push(filters.bairro);
         whereClauses.push(`LOWER(casos.dados_completos->>'bairro') = LOWER($${paramIndex++})`);
     }
-    // 2. Adicionar filtro de Unidade (CRÍTICO!)
+    // 2. Adicionar filtro de Unidade (CORREÇÃO DE VISIBILIDADE)
     let unitWhere = accessFilter.whereClause;
     // Substituir placeholders do unitAccessMiddleware ($X, $Y) por números reais ($N, $N+1...)
     if (accessFilter.params.length === 1) {
@@ -46,6 +46,10 @@ const buildFullWhereClauseContent = (filters, accessFilter, startParamIndex) => 
     }
     // Adicionar os parâmetros da unidade à lista principal de parâmetros
     params = params.concat(accessFilter.params);
+    // ⭐️ CORREÇÃO ESSENCIAL: Inclui casos onde unit_id é NULL, se não for TRUE (Gestor Geral)
+    if (unitWhere !== 'TRUE') {
+        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
+    }
     // Adicionar a cláusula de unidade ao conjunto de cláusulas WHERE
     whereClauses.push(unitWhere);
     if (whereClauses.length === 0) {
@@ -70,7 +74,7 @@ router.get("/", async (req, res) => {
         // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
         const whereClause = whereContent.length > 0 ? ` WHERE ${whereContent}` : '';
         const andClause = whereContent.length > 0 ? ` AND ${whereContent}` : '';
-        // ⭐️ Lógica de Filtro para Gráficos: Remove entradas que são NULAS, vazias ou fallbacks conhecidos. ⭐️
+        // Lógica para excluir valores nulos/vazios/sem rótulo nos agrupamentos
         const appendNonNullFilter = (jsonbKey) => {
             const jsonbField = `dados_completos->>'${jsonbKey}'`;
             const baseClause = whereContent.length > 0 ? andClause : ' WHERE TRUE ';
@@ -92,11 +96,17 @@ router.get("/", async (req, res) => {
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos ${whereClause}`), params),
             // 1. Novos no Mês (A query base tem WHERE, usa andClause)
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE "dataCad" >= date_trunc('month', CURRENT_DATE) ${andClause}`), params),
-            // 2 - 7 (Queries que usam andClause)
+            // 2 - 4 (Queries que usam andClause)
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'inseridoPAEFI' = 'Sim' ${andClause}`), params),
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'reincidente' = 'Sim' ${andClause}`), params),
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'recebePBF' = 'Sim' ${andClause}`), params),
-            db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'recebeBPC' IN ('Idoso', 'PCD') ${andClause}`), params),
+            // 5 - Indicadores: Recebem BPC (CORREÇÃO DE VALORES: Usando OR explícito)
+            db_1.default.query(cleanSqlString(`
+                SELECT COUNT(id) AS total FROM casos 
+                WHERE (dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')
+                ${andClause}
+            `), params),
+            // 6-7 (Queries que usam andClause)
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'confirmacaoViolencia' = 'Confirmada' ${andClause}`), params),
             db_1.default.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'notificacaoSINAM' = 'Sim' ${andClause}`), params),
             // 8 - Indicadores: Contexto Familiar (Não precisa de GROUP BY)
@@ -111,15 +121,15 @@ router.get("/", async (req, res) => {
             db_1.default.query(cleanSqlString(`SELECT dados_completos->>'escolaridade' AS name FROM casos ${whereClause} AND dados_completos->>'escolaridade' IS NOT NULL AND TRIM(dados_completos->>'escolaridade') <> '' GROUP BY dados_completos->>'escolaridade' ORDER BY COUNT(*) DESC LIMIT 1`), params),
             db_1.default.query(cleanSqlString(`SELECT dados_completos->>'tipoViolencia' AS name FROM casos ${whereClause} AND dados_completos->>'tipoViolencia' IS NOT NULL AND TRIM(dados_completos->>'tipoViolencia') <> '' GROUP BY dados_completos->>'tipoViolencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
             db_1.default.query(cleanSqlString(`SELECT dados_completos->>'localOcorrencia' AS name FROM casos ${whereClause} AND dados_completos->>'localOcorrencia' IS NOT NULL AND TRIM(dados_completos->>'localOcorrencia') <> '' GROUP BY dados_completos->>'localOcorrencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
-            // 13 a 19 - Gráficos (USANDO A FUNÇÃO getGroupedFieldName e whereClause base)
+            // 13 a 19 - Gráficos (USANDO A FUNÇÃO getGroupedFieldName)
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('bairro')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC LIMIT 5`), params),
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('tipoViolencia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('encaminhamentoDetalhe')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC LIMIT 5`), params),
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('sexo')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('canalDenuncia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             db_1.default.query(cleanSqlString(`SELECT ${getGroupedFieldName('corEtnia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
-            // Faixa Etária (Aqui, o 'Não Informado' é gerado pelo CASE WHEN)
-            db_1.default.query(cleanSqlString(`SELECT CASE WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' ELSE 'Não informado' END as name, COUNT(*) as value FROM casos ${whereClause} AND dados_completos->>'idade' IS NOT NULL GROUP BY name ORDER BY value DESC`), params),
+            // Faixa Etária (Tratamento especial no agrupamento)
+            db_1.default.query(cleanSqlString(`SELECT CASE WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' ELSE 'Não informado' END as name, COUNT(*) as value FROM casos ${whereClause} AND dados_completos->>'idade' IS NOT NULL AND TRIM(dados_completos->>'idade') <> '' GROUP BY name ORDER BY value DESC`), params),
             // 20, 21, 22 - Opções para os Filtros (Reforçando checagem TRIM() )
             db_1.default.query(cleanSqlString(`SELECT DISTINCT TO_CHAR("dataCad", 'YYYY-MM') AS mes FROM casos ${whereClause} AND "dataCad" IS NOT NULL GROUP BY mes ORDER BY mes DESC`), params),
             db_1.default.query(cleanSqlString(`SELECT DISTINCT "tecRef" FROM casos ${whereClause} AND "tecRef" IS NOT NULL GROUP BY "tecRef" ORDER BY "tecRef" ASC`), params),
