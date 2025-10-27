@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../contexts/AuthContext"; 
 
 // 🔹 Serviços e componentes
-import { getCasosFiltrados, FiltrosCasos } from "../services/api"; // Importando a interface FiltrosCasos
+import { getCasosFiltrados, FiltrosCasos, CaseListEntry } from "../services/api"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,18 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileSearch, Search, AlertTriangle, Filter } from "lucide-react"; 
 
 // ========================================================
-// 📌 Tipagem
+// 📌 Tipagem Local (Mantida para ActiveFilter)
 // ========================================================
-type CasoNaLista = {
-  id: string; // Garantimos que o ID é tratado como string no frontend
-  nome: string;
-  tecRef: string;
-  dataCad: string;
-  bairro: string;
-  unit_id: number; 
-};
-
-// Interface para o filtro ativo (Otimizada)
 interface ActiveFilter {
     key: 'q' | 'status' | 'por_violencia' | 'por_bairro';
     label: string;
@@ -49,13 +39,13 @@ const FILTRO_OPCOES: ActiveFilter[] = [
         { value: 'Arquivado', label: 'Arquivado' },
         { value: 'todos', label: 'Todos os Status' },
     ]},
-    // Mapeamos o label para o valor de 'filtro' que o Back-end espera
     { key: 'por_violencia', label: 'Por Tipo de Violência', placeholder: 'Ex: Negligência, Física...' },
     { key: 'por_bairro', label: 'Por Bairro', placeholder: 'Ex: Centro, Jardim...' },
 ];
 
 // Função auxiliar para mapear o Key do Front-end para o campo 'filtro' do Back-end
 const getFilterKeyForBackend = (key: string): string | undefined => {
+    // Para filtros específicos (que não são 'q' ou 'status'), usamos o prefixo 'por_'
     if (key === 'por_violencia') return 'por_violencia';
     if (key === 'por_bairro') return 'por_bairro';
     return undefined;
@@ -67,7 +57,8 @@ const getFilterKeyForBackend = (key: string): string | undefined => {
 // ========================================================
 export default function Consulta() {
   const { user } = useAuth();
-  const [casos, setCasos] = useState<CasoNaLista[]>([]);
+  // ⭐️ Usando a interface CaseListEntry ⭐️
+  const [casos, setCasos] = useState<CaseListEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilterKey, setSelectedFilterKey] = useState<string>('q'); // Guarda a chave de filtro ativa
@@ -88,30 +79,25 @@ export default function Consulta() {
 
     // 📌 LÓGICA DE MONTAGEM DO FILTRO PARA O BACK-END
     if (selectedFilterKey === 'q' && searchTerm) {
-        // Se for busca geral, Back-end entende 'q' no filtro e searchTerm no valor.
-        filters.filtro = 'q'; 
-        filters.valor = searchTerm; 
+        // ⭐️ CORRIGIDO: Usa a nova propriedade 'q' da interface FiltrosCasos ⭐️
+        filters.q = searchTerm; 
     } else if (selectedFilterKey === 'status' && searchTerm) {
         filters.status = searchTerm; 
     } else if ((selectedFilterKey === 'por_violencia' || selectedFilterKey === 'por_bairro') && searchTerm) {
-        // Envia a chave e o valor para os filtros específicos (que usam a estrutura filtro + valor)
+        // Filtros que usam a estrutura filtro + valor
         filters.filtro = getFilterKeyForBackend(selectedFilterKey);
         filters.valor = searchTerm;
     }
 
-    // Nota: O Back-end já garante que apenas dados da unidade do usuário logado são retornados.
-
     try {
-      const data = await getCasosFiltrados(filters);
+      // getCasosFiltrados retorna CaseListEntry[]
+      const data: CaseListEntry[] = await getCasosFiltrados(filters);
 
-      const casosFormatados = data.map((caso: any) => ({
+      // Mapeamento para garantir que a data seja um objeto Date para a Tabela
+      const casosFormatados = data.map((caso: CaseListEntry) => ({
         ...caso,
-        // Garante que o ID é tratado como string
-        id: String(caso.id),
-        dataCad: new Date(caso.dataCad).toLocaleDateString("pt-BR", {
-          timeZone: "UTC",
-        }),
-        nome: caso.nome || '', 
+        // Converte a data para um formato que a função formatTableDate possa usar
+        dataCad: new Date(caso.dataCad).toISOString(), 
       }));
 
       setCasos(casosFormatados);
@@ -126,12 +112,25 @@ export default function Consulta() {
     const newFilter = FILTRO_OPCOES.find(op => op.label === filterLabel) || FILTRO_OPCOES[0];
     setSelectedFilter(newFilter);
     setSelectedFilterKey(newFilter.key); // Atualiza a chave de filtro
-    setSearchTerm(newFilter.isSelect ? (newFilter.options?.[0].value || '') : ''); // Limpa a busca ou define o valor padrão do Select
+    // Limpa a busca ou define o valor padrão do Select
+    setSearchTerm(newFilter.isSelect ? (newFilter.options?.[0].value || '') : ''); 
+  };
+  
+  // Função auxiliar para formatação de data na tabela
+  const formatTableDate = (dataString: string): string => {
+    try {
+      return new Date(dataString).toLocaleDateString("pt-BR", {
+        timeZone: "UTC",
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   // 📌 Lógica para mostrar alerta de anonimização (Visível apenas para a Vigilância)
   const isVigilancia = user?.role === 'vigilancia';
-  const displayAnonimizationWarning = isVigilancia && casos.some(caso => caso.nome.includes('DADO SIGILOSO'));
+  // O Back-end coloca 'SIGILOSO' no nome quando a Vigilância acessa casos CREAS
+  const displayAnonimizationWarning = isVigilancia && casos.some(caso => caso.nome.includes('SIGILOSO'));
 
   return (
     <div className="space-y-6">
@@ -163,7 +162,6 @@ export default function Consulta() {
         <CardContent>
           <div className="flex gap-3 mb-4">
             {/* 1. SELETOR DE FILTRO AVANÇADO */}
-            {/* O valor do Select é o label do filtro, que aciona o handleFilterChange */}
             <Select onValueChange={handleFilterChange} value={selectedFilter.label}> 
                 <SelectTrigger className="w-[200px]">
                     <Filter className="h-4 w-4 mr-2" />
@@ -194,7 +192,7 @@ export default function Consulta() {
                     </SelectContent>
                 </Select>
             ) : (
-                // Se for um Input de texto livre (ex: Busca Geral, Bairro, Tipo de Violência)
+                // Se for um Input de texto livre (Busca Geral, Bairro, Tipo de Violência)
                 <div className="relative w-full">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -231,12 +229,12 @@ export default function Consulta() {
                     <TableRow key={caso.id}>
                       <TableCell className="font-medium">
                         {caso.nome}
-                        {/* Indicador visual de anonimização */}
-                        {caso.nome.includes('DADO SIGILOSO') && <Badge variant="secondary" className="ml-2 bg-yellow-300 text-yellow-900">SIGILO</Badge>}
+                        {/* Indicador visual de anonimização (SIGILO é o texto do backend) */}
+                        {caso.nome && caso.nome.includes('SIGILOSO') && <Badge variant="secondary" className="ml-2 bg-yellow-300 text-yellow-900">SIGILO</Badge>}
                       </TableCell>
                       <TableCell>{caso.tecRef}</TableCell>
-                      <TableCell>{caso.dataCad}</TableCell>
-                      <TableCell>{caso.bairro}</TableCell>
+                      <TableCell>{formatTableDate(caso.dataCad)}</TableCell>
+                      <TableCell>{caso.bairro || 'N/A'}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="outline" size="sm">
                           <Link to={`/caso/${caso.id}`}>

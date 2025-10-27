@@ -1,30 +1,20 @@
-// frontend/src/components/Layout.tsx (VERSÃO FINAL COM O REDIRECIONAMENTO REMOVIDO)
+// frontend/src/components/Layout.tsx 
+// ⭐️ Componente SHELL PRINCIPAL COM ESTRUTURA DE NAVEGAÇÃO INTEGRADA ⭐️
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-// ⭐️ IMPORTAÇÃO DO HOOK CENTRALIZADO ⭐️
+// ⭐️ IMPORTAÇÃO DO HOOK E CONSTANTES CENTRALIZADAS ⭐️
 import { usePermissoesSUAS, CRAS_UNITS } from '../hooks/usePermissoesSUAS'; 
 
 // Importação completa de ícones
-import { LayoutDashboard, PlusCircle, Search, User, LogOut, BarChart3, Settings, FileText, Users, Inbox, UserCheck, BookOpen, Home, ChevronDown, ChevronRight, MapPin } from "lucide-react"; 
+import { LogOut, PlusCircle, Search, User, BarChart3, Settings, FileText, Users, Inbox, UserCheck, BookOpen, LayoutDashboard, Home, ChevronDown, ChevronRight, MapPin } from "lucide-react"; 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge"; 
 
-// 🛑 AVISO: As CONSTANTES originais que definem as unidades foram mantidas, 
-// mas o CRAS_UNITS do hook DEVE ser o utilizado em um cenário real.
-// Se `../hooks/usePermissoesSUAS` já exporta CRAS_UNITS, a definição LOCAL pode ser redundante/removida.
-const CREAS_UNIT_ID = 1;
-const CRAS_UNIT_IDS = CRAS_UNITS.map(u => u.id); // Usando a constante importada do hook
 
-const UNIDADES_DISPONIVEIS = [
-    { id: 1, nome: 'CREAS' },
-    ...CRAS_UNITS.map(cras => ({ id: cras.id, nome: cras.name })), 
-    { id: 6, nome: 'Vigilancia SocioAssistencial' }, 
-    { id: 7, nome: 'Centro POP' },
-    { id: 8, nome: 'Conselho Tutelar Norte' },
-];
+// 🛑 REMOVIDO: Constantes locais duplicadas foram removidas.
 
 // ⭐️ TIPAGEM PARA ESTRUTURA DE MENU ⭐️
 interface SubMenuItem {
@@ -50,18 +40,16 @@ export default function Layout() {
   
   const username = user?.username || "Usuário";
   const userRole = (user?.role || '').toLowerCase().trim();
-  const userUnitId = user?.unit_id;
   
   // ⭐️ UTILIZAÇÃO DO HOOK CENTRALIZADO ⭐️
   const { 
       isGestorGeral, 
-      isVigilancia, 
-      isLotadoNoCreas, 
       isLotadoNoCRAS, 
+      userCrasUnit, 
       canAccessAnaliseGroup, 
       canViewCreasOperacional, 
-      userCrasUnit, 
-      canViewCRAS 
+      canViewCRAS,
+      canViewVigilancia, // Necessário para Painel Vigilância
   } = usePermissoesSUAS();
   
   const canViewAdmin = isGestorGeral || userRole.includes('coordenador'); 
@@ -72,8 +60,6 @@ export default function Layout() {
     logout();
     navigate('/login');
   };
-
-  // ❌ REMOVIDO: BLOCO useEffect de redirecionamento. O redirecionamento será tratado na rota '/' do App.tsx.
 
   // Função para alternar o submenu CRAS (mantida)
   const toggleCrasMenu = (id: number) => {
@@ -87,38 +73,35 @@ export default function Layout() {
       {
           title: userCrasUnit ? `Módulos CRAS - ${userCrasUnit.name}` : "Módulos CRAS",
           icon: Home,
-          isVisible: canViewCRAS, // 🛑 CORRIGIDO: Usa a permissão correta (Gestor ou Lotado no CRAS)
+          isVisible: canViewCRAS, 
           isCrasGroup: true,
-          subItems: [
-              // Note que as rotas precisam usar o userCrasUnit.urlName para funcionar
-              // Estes subItems são apenas um 'placeholder' visual, o renderCrasLinks fará a renderização dinâmica.
-          ]
+          subItems: [ /* Renderização dinâmica no renderCrasLinks */ ]
       },
       
       // ⭐️ MÓDULOS OPERACIONAIS CREAS (PROTEÇÃO CREAS_OP/ANÁLISE)
       {
           title: "Atendimento Operacional CREAS",
           icon: MapPin,
-          isVisible: canAccessAnaliseGroup, // Visível se puder acessar CREAS Data (Vigilância/CREAS/Gestor)
+          isVisible: canAccessAnaliseGroup, 
           subItems: [
-              // 🟢 CORREÇÃO APLICADA: canAccessAnaliseGroup permite que a Vigilância acesse Coleta de Dados
-              { name: "Coleta de Dados", path: "/cadastro", icon: PlusCircle, isVisible: canAccessAnaliseGroup }, 
-              // 🟢 Mantido: canViewCreasOperacional exclui a Vigilância (apenas CREAS/Gestor)
+              // Usa CREAS_OP para ações que a Vigilância NÃO deve fazer (como Controle MSE)
+              { name: "Coleta de Dados", path: "/cadastro", icon: PlusCircle, isVisible: canViewCreasOperacional }, 
               { name: "Controle MSE", path: "/controle-mse", icon: FileText, isVisible: canViewCreasOperacional },
-              // Rotas de Consulta/Visualização (Acesso a Dados CREAS)
+              // Consulta e Demandas são visíveis para quem acessa dados CREAS (CREAS/Vigilância/Gestor)
               { name: "Consulta de Casos", path: "/consulta", icon: Search, isVisible: canAccessAnaliseGroup },
               { name: "Gerenciamento de Demandas", path: "/demandas", icon: Inbox, isVisible: canAccessAnaliseGroup },
           ]
       },
       
-      // ⭐️ MÓDULOS CREAS/VIGILÂNCIA/ANÁLISE (PROTEÇÃO CANACCESSANALIZEGROUP)
+      // ⭐️ MÓDULOS DE ANÁLISE E GESTÃO (PROTEÇÃO CANACCESSANALIZEGROUP)
       {
           title: "Análise e Gestão",
           icon: BarChart3,
           isVisible: canAccessAnaliseGroup,
           subItems: [
               { name: "Dashboard PAEFI", path: "/dashboard", icon: LayoutDashboard, isVisible: canAccessAnaliseGroup },
-              { name: "Painel de Vigilância", path: "/painel-vigilancia", icon: BarChart3, isVisible: canAccessAnaliseGroup }, // AGORA APARECE PARA CREAS E VIGILÂNCIA
+              // ⭐️ Agora depende de canViewVigilancia (Gestor/Vigilância)
+              { name: "Painel de Vigilância", path: "/painel-vigilancia", icon: BarChart3, isVisible: canViewVigilancia }, 
               { name: "Relatórios", path: "/relatorios", icon: FileText, isVisible: canAccessAnaliseGroup },
               { name: "Integrações", path: "/integracoes", icon: Settings, isVisible: canAccessAnaliseGroup },
           ]
@@ -135,7 +118,7 @@ export default function Layout() {
       },
   ];
 
-  // FUNÇÃO: Renderizar links de CRAS (CORRIGIDA - APENAS LINKS ÚTEIS)
+  // FUNÇÃO: Renderizar links de CRAS (Refatorada para o novo padrão)
   // ============================================================
   const renderCrasLinks = (cras: typeof CRAS_UNITS[0], userCrasUnit: typeof CRAS_UNITS[0] | undefined, isGestorGeral: boolean) => {
       const isCurrentOpen = openCrasUnitId === cras.id;
@@ -161,17 +144,17 @@ export default function Layout() {
               {isCurrentOpen && ( // Renderiza os links CRAS apenas se a unidade estiver aberta
                   <div className="ml-2 pl-2 space-y-1 border-l border-green-300 transition-all duration-300 ease-in-out">
                       
-                        {/* NOVO REGISTRO */}
+                        {/* NOVO REGISTRO (CrasCaseForm) */}
                       <Link to={`/cras/${cras.urlName}/cadastro`} className={`${linkClasses} ${location.pathname.startsWith(`/cras/${cras.urlName}/cadastro`) ? activeLinkClass : inactiveLinkClass}`}>
                           <PlusCircle className="h-5 w-5" /> Novo Registro
                       </Link>
 
-                        {/* CONSULTAR USUÁRIO */}
+                        {/* CONSULTAR USUÁRIO (CrasCaseList) */}
                       <Link to={`/cras/${cras.urlName}/consulta`} className={`${linkClasses} ${location.pathname.startsWith(`/cras/${cras.urlName}/consulta`) ? activeLinkClass : inactiveLinkClass}`}>
-                          <Search className="h-5 w-5" /> Consultar Usuário
+                          <Search className="h-5 w-5" /> Consultar Casos
                       </Link>
-                        
-                        {/* ⚠️ MÓDULOS DE ACOMPANHAMENTO (Apenas links estáticos) */}
+                      
+                        {/* LINKS FUTUROS (Em Breve) */}
                       <Link to={`/cras/${cras.urlName}/gestantes`} className={`${linkClasses} ${location.pathname.endsWith('/gestantes') ? activeLinkClass : inactiveLinkClass}`}>
                           <UserCheck className="h-5 w-5" /> Controle Gestantes
                       </Link>
@@ -184,15 +167,14 @@ export default function Layout() {
       );
   };
 
-  // ⭐️ FUNÇÃO AUXILIAR PARA RENDERIZAR LINKS DE SUBMENU ⭐️
+  // FUNÇÃO AUXILIAR PARA RENDERIZAR LINKS DE SUBMENU (grupos CREAS/Análise/Admin)
   const renderSubMenuItem = (item: SubMenuItem, index: number, linkColorClass: string) => {
       if (!item.isVisible) return null;
 
       const Icon = item.icon; // Componente do ícone
       const isActive = location.pathname.startsWith(item.path) || location.pathname === item.path;
       
-      // Define a classe de cor para o link ativo
-      const activeLinkClass = `bg-${linkColorClass}-100 text-${linkColorClass}-700`;
+      const activeLinkClass = `bg-blue-100 text-blue-700`; // Usar classe base para links ativos
       const inactiveLinkClass = "text-slate-600 hover:bg-slate-100 hover:text-slate-900";
 
       return (
@@ -222,10 +204,10 @@ export default function Layout() {
         
         <nav className="flex-1 p-2 space-y-4">
             
-            {/* 🛑 BLOCO DE DIAGNÓSTICO (Para fins de teste) - AJUSTADO PARA O HOOK 🛑 */}
+            {/* 🛑 BLOCO DE DIAGNÓSTICO (Para fins de teste) 🛑 */}
             <div className="text-xs p-2 bg-yellow-100 border border-yellow-300 rounded">
                 <p>ROLE: <strong>{userRole || 'VAZIO'}</strong></p>
-                <p>UNIT ID: <strong>{String(userUnitId) || 'VAZIO'}</strong></p>
+                <p>UNIT ID: <strong>{user?.unit_id || 'VAZIO'}</strong></p>
                 <p>CAN ACCESS ANÁLISE?: <strong>{canAccessAnaliseGroup ? 'SIM' : 'NÃO'}</strong></p>
                 <p>VER CREAS OP?: <strong>{canViewCreasOperacional ? 'SIM' : 'NÃO'}</strong></p>
             </div>
@@ -274,7 +256,7 @@ export default function Layout() {
         <header className="bg-white border-b h-16 flex items-center justify-end px-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-auto justify-start gap-2">
+              <Button variant="ghost" className="w-auto justify-start gap-2">
                 <User className="h-5 w-5" />
                 <span className="font-medium text-slate-700">{username}</span>
               </Button>

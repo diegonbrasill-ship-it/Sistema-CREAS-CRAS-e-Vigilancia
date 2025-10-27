@@ -1,4 +1,5 @@
-// frontend/src/App.tsx (VERSÃO FINAL COM FLUXO DE ROTAS E ESTABILIZAÇÃO DE FLUXO)
+// frontend/src/App.tsx 
+// ⭐️ ATUALIZAÇÃO: Adicionada rota para a página de impressão de Benefício Eventual ⭐️
 
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import React from 'react'; 
@@ -17,22 +18,25 @@ import ControleMSE from "./pages/ControleMSE";
 import Demandas from "./pages/Demandas";
 import DemandaDetalhe from "./pages/DemandaDetalhe";
 
-// ⭐️ NOVOS COMPONENTES CRAS IMPORTADOS ⭐️
-import CrasProntuario from "./pages/Cras/CrasProntuario"; 
-import CrasConsulta from "./pages/Cras/CrasConsulta"; 
-// 🛑 CORRIGIDO: Adicionando a importação do componente de visualização
-import CrasProntuarioView from "./pages/Cras/CrasProntuarioView"; 
-// ⚠️ Importar ícone para o EmBreve
+// ⭐️ COMPONENTES CRAS PADRONIZADOS ⭐️
+import CrasCaseForm from "./pages/Cras/CrasCaseForm"; 
+import CrasCaseList from "./pages/Cras/CrasCaseList"; 
+import CrasCaseDetail from "./pages/Cras/CrasCaseDetail"; 
+// ⭐️ NOVO: Importação do módulo de Instrumentais/RMA ⭐️
+import CrasInstrumentais from "./pages/Cras/CrasInstrumentais"; 
+// ⭐️ NOVO (B.E. Impressão): Importação da página de impressão ⭐️
+import BeneficioPrintPage from "./pages/Cras/BeneficioPrintPage"; 
+
 import { Settings } from "lucide-react"; 
 
-// ⭐️ NOVO: Importar o Hook Centralizado para a Proteção de Rota ⭐️
+// Importar o Hook Centralizado para a Proteção de Rota
 import { usePermissoesSUAS } from "./hooks/usePermissoesSUAS";
 
 
 import 'leaflet/dist/leaflet.css';
 
 // ===============================================================
-// 🛑 Componente EmBreve (Placeholder)
+// Componente EmBreve (Placeholder) - (Mantido para outras rotas)
 // ===============================================================
 function EmBreve() {
     return (
@@ -45,146 +49,147 @@ function EmBreve() {
 }
 
 // ===============================================================
-// 🛑 Componente de Redirecionamento Inicial (Substitui o Route Index)
+// Componente de Redirecionamento Inicial (Inalterado)
 // ===============================================================
 function RedirectHome() {
-    const { isAuthenticated, isLoading } = useAuth();
-    const { isGestorGeral, isVigilancia, isLotadoNoCRAS, isLotadoNoCreas, userCrasUnit } = usePermissoesSUAS();
-    const location = useLocation();
+    const { isAuthenticated, isLoading } = useAuth();
+    const { isGestorGeral, isVigilancia, isLotadoNoCRAS, isLotadoNoCreas, userCrasUnit } = usePermissoesSUAS();
+    const location = useLocation();
 
-    if (isLoading) return <div>Carregando sistema...</div>;
-    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    if (isLoading) return <div>Carregando sistema...</div>;
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-    // 🛑 Lógica para decidir para onde ir APENAS na rota raiz (/) 🛑
-    if (location.pathname === '/') {
-        if (isGestorGeral) {
-            return <Navigate to="/dashboard" replace />;
-        }
-        if (isVigilancia) {
-            return <Navigate to="/painel-vigilancia" replace />;
-        }
-        if (isLotadoNoCRAS && userCrasUnit) {
-            return <Navigate to={`/cras/${userCrasUnit.urlName}/cadastro`} replace />;
-        }
-        if (isLotadoNoCreas) {
-            return <Navigate to="/cadastro" replace />;
-        }
-    }
-    
-    // Se o usuário está autenticado mas não tem rota padrão na raiz, ele deve ir para o Dashboard
-    return <Navigate to="/dashboard" replace />;
+    if (location.pathname === '/') {
+        if (isGestorGeral || isVigilancia) {
+            return <Navigate to="/dashboard" replace />;
+        }
+        if (isLotadoNoCRAS && userCrasUnit) {
+            return <Navigate to={`/cras/${userCrasUnit.urlName}/consulta`} replace />;
+        }
+        if (isLotadoNoCreas) {
+            return <Navigate to="/consulta" replace />;
+        }
+    }
+    
+    // Fallback default if none of the specific roles match or path is not '/'
+    return <Navigate to="/dashboard" replace />; 
 }
 // ===============================================================
 
 // ===============================================================
-// 🔒 PROTEÇÃO DE ROTAS DINÂMICA
+// 🔒 PROTEÇÃO DE ROTAS DINÂMICA (Inalterado)
 // ===============================================================
 function RouteProtegida({ element, requiredAccess, fallbackPath = "/dashboard" }: 
-    { element: JSX.Element, requiredAccess: 'ANALISE' | 'CREAS_OP' | 'CRAS' | 'ADMIN' | 'VIGILANCIA', fallbackPath?: string }) {
-    
-    const { isAuthenticated, isLoading } = useAuth();
-    const { 
-        canAccessAnaliseGroup, 
-        canViewCreasOperacional, 
-        isLotadoNoCRAS, 
-        canManageUsers,
-        isVigilancia,
-        canViewCRAS 
-    } = usePermissoesSUAS();
+    { element: JSX.Element, requiredAccess: 'ANALISE' | 'CREAS_OP' | 'CRAS' | 'ADMIN' | 'VIGILANCIA', fallbackPath?: string }) {
     
-    // ⚠️ Garante que a permissão mais abrangente é usada para o Gestor e CRAS
-    const canViewAnyCrasModule = isLotadoNoCRAS || canViewCRAS; 
-    
-    if (isLoading || !isAuthenticated) {
-        if (!isAuthenticated && !isLoading) return <Navigate to="/login" replace />;
-        return <div>Carregando sistema...</div>;
-    }
+    const { isAuthenticated, isLoading } = useAuth();
+    const { 
+        canAccessAnaliseGroup, 
+        canViewCreasOperacional, 
+        isLotadoNoCRAS, 
+        canManageUsers,
+        isVigilancia,
+        canViewCRAS 
+    } = usePermissoesSUAS();
+    
+    // Considera que Gestor/Vigilancia podem ver módulos CRAS via canViewCRAS
+    const canViewAnyCrasModule = isLotadoNoCRAS || canViewCRAS; 
+    
+    if (isLoading || !isAuthenticated) {
+        if (!isAuthenticated && !isLoading) return <Navigate to="/login" replace />;
+        return <div>Carregando sistema...</div>;
+    }
 
-    let hasPermission = false;
+    let hasPermission = false;
 
-    switch (requiredAccess) {
-        case 'ADMIN':
-            hasPermission = canManageUsers;
-            break;
-        case 'ANALISE':
-            hasPermission = canAccessAnaliseGroup; 
-            break;
-        case 'CREAS_OP':
-            hasPermission = canViewCreasOperacional;
-            break;
-        case 'CRAS':
-            // 🛑 CORREÇÃO: Usamos a variável mais abrangente para o CRAS
-            hasPermission = canViewAnyCrasModule; 
-            break;
-        case 'VIGILANCIA':
-            hasPermission = isVigilancia;
-            break;
-        default:
-            hasPermission = false;
-    }
+    switch (requiredAccess) {
+        case 'ADMIN':
+            hasPermission = canManageUsers;
+            break;
+        case 'ANALISE':
+            hasPermission = canAccessAnaliseGroup; 
+            break;
+        case 'CREAS_OP':
+            hasPermission = canViewCreasOperacional;
+            break;
+        case 'CRAS':
+            hasPermission = canViewAnyCrasModule; 
+            break;
+        case 'VIGILANCIA':
+            // Se a rota for VIGILANCIA, apenas Vigilancia (ou Gestor Geral que tem todas as perms)
+            hasPermission = isVigilancia || canAccessAnaliseGroup; // Assumindo que Gestor está em Analise
+            break;
+        default:
+            hasPermission = false;
+    }
 
-    return hasPermission ? element : <Navigate to={fallbackPath} replace />;
+    return hasPermission ? element : <Navigate to={fallbackPath} replace />;
 }
 // ===============================================================
 
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
-    return <div>Carregando sistema...</div>;
-  }
+  if (isLoading) {
+    return <div>Carregando sistema...</div>;
+  }
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-          <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-                {/* 🛑 CORREÇÃO: Usa o componente RedirectHome na rota raiz 🛑 */}
-            <Route index element={<RedirectHome />} /> 
-            
-                {/* 🛑 ROTAS DE ANÁLISE E GESTÃO (Protegidas) 🛑 */}
-            <Route path="dashboard" element={<RouteProtegida element={<Dashboard />} requiredAccess="ANALISE" />} />
-            <Route path="painel-vigilancia" element={<RouteProtegida element={<PainelVigilancia />} requiredAccess="ANALISE" />} />
-            <Route path="relatorios" element={<RouteProtegida element={<Relatorios />} requiredAccess="ANALISE" />} />
-            <Route path="integracoes" element={<RouteProtegida element={<Integracoes />} requiredAccess="ANALISE" />} />
-            
-                {/* 🛑 ROTAS CREAS (Operacionais e Dados) 🛑 */}
-            <Route path="cadastro" element={<RouteProtegida element={<Cadastro />} requiredAccess="ANALISE" />} /> 
-            <Route path="cadastro/:id" element={<RouteProtegida element={<Cadastro />} requiredAccess="ANALISE" />} />
-            <Route path="consulta" element={<RouteProtegida element={<Consulta />} requiredAccess="ANALISE" />} /> 
-            <Route path="caso/:id" element={<RouteProtegida element={<CasoDetalhe />} requiredAccess="ANALISE" />} />
-            <Route path="demandas" element={<RouteProtegida element={<Demandas />} requiredAccess="ANALISE" />} />
-            <Route path="demandas/:id" element={<RouteProtegida element={<DemandaDetalhe />} requiredAccess="ANALISE" />} />
-            <Route path="controle-mse" element={<RouteProtegida element={<ControleMSE />} requiredAccess="CREAS_OP" />} />
-
-                {/* 🛑 ROTAS DO NOVO MÓDULO CRAS (Protegidas) 🛑 */}
-                <Route path="cras/:unitName/cadastro" element={<RouteProtegida element={<CrasProntuario />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
-                <Route path="cras/:unitName/cadastro/:id" element={<RouteProtegida element={<CrasProntuario />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
-                <Route path="cras/:unitName/consulta" element={<RouteProtegida element={<CrasConsulta />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
-                
-                {/* 🛑 CORREÇÃO FINAL: Rota de visualização deve renderizar o componente de VIEW 🛑 */}
-                <Route path="cras/:unitName/prontuario/:id" element={<RouteProtegida element={<CrasProntuarioView />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+          <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
                 
-                {/* 🛑 CORRIGIDO: Substituir Dashboard por Componente Em Breve (para evitar loops) */}
-                <Route path="cras/:unitName/gestantes" element={<RouteProtegida element={<EmBreve />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
-                <Route path="cras/:unitName/instrumentais" element={<RouteProtegida element={<EmBreve />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+            <Route index element={<RedirectHome />} /> 
+            
+                {/* 🛑 ROTAS DE ANÁLISE E GESTÃO (BI - ANALISE group) 🛑 */}
+            <Route path="dashboard" element={<RouteProtegida element={<Dashboard />} requiredAccess="ANALISE" />} />
+            <Route path="painel-vigilancia" element={<RouteProtegida element={<PainelVigilancia />} requiredAccess="ANALISE" />} />
+            <Route path="relatorios" element={<RouteProtegida element={<Relatorios />} requiredAccess="ANALISE" />} />
+            <Route path="integracoes" element={<RouteProtegida element={<Integracoes />} requiredAccess="ANALISE" />} />
+            
+                {/* 🛑 ROTAS CREAS (Operacionais - CREAS_OP group) 🛑 */}
+            <Route path="cadastro" element={<RouteProtegida element={<Cadastro />} requiredAccess="CREAS_OP" />} /> 
+            <Route path="cadastro/:id" element={<RouteProtegida element={<Cadastro />} requiredAccess="CREAS_OP" />} />
+            <Route path="consulta" element={<RouteProtegida element={<Consulta />} requiredAccess="CREAS_OP" />} /> 
+            <Route path="caso/:id" element={<RouteProtegida element={<CasoDetalhe />} requiredAccess="CREAS_OP" />} />
+            <Route path="demandas" element={<RouteProtegida element={<Demandas />} requiredAccess="CREAS_OP" />} />
+            <Route path="demandas/:id" element={<RouteProtegida element={<DemandaDetalhe />} requiredAccess="CREAS_OP" />} />
+            <Route path="controle-mse" element={<RouteProtegida element={<ControleMSE />} requiredAccess="CREAS_OP" />} />
+
+                {/* 🛑 ROTAS DO NOVO MÓDULO CRAS (CRAS group) 🛑 */}
+                {/* Form de Criação/Edição */}
+                <Route path="cras/:unitName/cadastro" element={<RouteProtegida element={<CrasCaseForm />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+                <Route path="cras/:unitName/cadastro/:id" element={<RouteProtegida element={<CrasCaseForm />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+                {/* Lista de Casos */}
+                <Route path="cras/:unitName/consulta" element={<RouteProtegida element={<CrasCaseList />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+                {/* Visualização de Detalhes (Prontuário) */}
+                <Route path="cras/:unitName/prontuario/:id" element={<RouteProtegida element={<CrasCaseDetail />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+                
+                {/* ⭐️ Rota de Instrumentais ATIVADA ⭐️ */}
+                <Route path="cras/:unitName/instrumentais" element={<RouteProtegida element={<CrasInstrumentais />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+                {/* Rota de Gestantes (Placeholder) */}
+                <Route path="cras/:unitName/gestantes" element={<RouteProtegida element={<EmBreve />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
+
+                {/* ⭐️ NOVA ROTA (B.E. Impressão) ⭐️ */}
+                <Route path="cras/:unitName/beneficio/:id/print" element={<RouteProtegida element={<BeneficioPrintPage />} requiredAccess="CRAS" fallbackPath="/dashboard" />} />
 
 
-                
-                {/* 🛑 ROTAS DE ADMINISTRAÇÃO 🛑 */}
-            <Route path="gerenciar-usuarios" element={<RouteProtegida element={<GerenciarUsuarios />} requiredAccess="ADMIN" />} />
-          </Route>
+                
+                {/* 🛑 ROTAS DE ADMINISTRAÇÃO 🛑 */}
+            <Route path="gerenciar-usuarios" element={<RouteProtegida element={<GerenciarUsuarios />} requiredAccess="ADMIN" />} />
+          </Route>
 
-          <Route path="*" element={<Navigate to="/login" />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  );
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }

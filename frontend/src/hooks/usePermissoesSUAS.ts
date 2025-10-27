@@ -7,8 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 // =========================================================
 export const CREAS_UNIT_ID = 1; 
 
-// 💡 Nota: Em um projeto real, esses dados viriam de uma API ou Store central.
-// Mantendo a estrutura para seguir o seu código.
 export const CRAS_UNITS = [
     { id: 2, name: "CRAS Geralda Medeiros", urlName: "geralda-medeiros" },
     { id: 3, name: "CRAS Mariana Alves", urlName: "mariana-alves" },
@@ -20,13 +18,13 @@ export const CRAS_UNIT_IDS = CRAS_UNITS.map(u => u.id);
 
 
 // =========================================================
-// ⭐️ INTERFACE DE RETORNO DO HOOK (CORRIGIDA) ⭐️
+// ⭐️ INTERFACE DE RETORNO DO HOOK (ATUALIZADA) ⭐️
 // =========================================================
 interface PermissoesSUAS {
-    // Info do usuário (NOVOS ADICIONADOS)
-    unitId: number | null; // 🟢 NOVO: ID da unidade do usuário
+    // Info do usuário
+    unitId: number | null; 
     userCrasUnit: typeof CRAS_UNITS[0] | undefined;
-    dashboardFilterUnits: number[]; // 🟢 NOVO: Array de IDs de unidade para filtrar dados em Dashboard/Vigilância
+    dashboardFilterUnits: number[]; 
     
     // Status de lotação e perfis principais
     isGestorGeral: boolean;
@@ -36,6 +34,8 @@ interface PermissoesSUAS {
     
     // Permissões de Acesso Finais (o que o usuário pode fazer)
     canViewCRAS: boolean;
+    // 🟢 CORREÇÃO: Propriedade canViewVigilancia adicionada à interface
+    canViewVigilancia: boolean; 
     canAccessCreasData: boolean;
     canViewCreasOperacional: boolean;
     canAccessAnaliseGroup: boolean;
@@ -76,37 +76,41 @@ export function usePermissoesSUAS(): PermissoesSUAS {
     // Variáveis mantidas por compatibilidade
     const canAccessCreasData = canAccessAnaliseGroup; 
     const canViewCRAS = isGestorGeral || isLotadoNoCRAS;
+    // 🟢 Variável canViewVigilancia definida pela lógica correta
+    const canViewVigilancia = isGestorGeral || isVigilancia;
     const canManageUsers = isGestorGeral || isCoordenador;
-    
-    // =========================================================
-    // ⭐️ 3. LÓGICA DE FILTRO DE DADOS (PARA DASHBOARDS/PAINÉIS) ⭐️
-    // =========================================================
-    let dashboardFilterUnits: number[] = [-99]; // Padrão: Acesso negado
+    
+    // =========================================================
+    // ⭐️ 3. LÓGICA DE FILTRO DE DADOS (PARA DASHBOARDS/PAINÉIS) ⭐️
+    // =========================================================
+    let dashboardFilterUnits: number[] = [-99]; // Padrão: Acesso negado
 
-    if (isGestorGeral) {
-        // Gestor Geral vê todos os dados (array vazio sinaliza 'sem filtro' no backend)
-        dashboardFilterUnits = []; 
-    } else if (isVigilancia || isLotadoNoCreas) {
-        // Vigilância e Servidor CREAS veem SOMENTE os dados do CREAS (ID 1).
-        dashboardFilterUnits = [CREAS_UNIT_ID];
-    } else if (isLotadoNoCRAS && userCrasUnit) {
-        // Servidor CRAS vê apenas os seus dados (Não relevante para o Dashboard PAEFI, mas útil para rotas CRAS)
-        dashboardFilterUnits = [userCrasUnit.id];
-    }
-    // Para todos os outros perfis sem permissão explícita, permanece [-99]
+    if (isGestorGeral) {
+        // Gestor Geral vê todos os dados (array vazio sinaliza 'sem filtro' no backend)
+        dashboardFilterUnits = []; 
+    } else if (isVigilancia || isLotadoNoCreas) {
+        // Vigilância e Servidor CREAS veem SOMENTE os dados do CREAS (ID 1).
+        dashboardFilterUnits = [CREAS_UNIT_ID];
+    } else if (isLotadoNoCRAS && userCrasUnit) {
+        // Servidor CRAS vê apenas os seus dados (Não relevante para o Dashboard PAEFI, mas útil para rotas CRAS)
+        dashboardFilterUnits = [userCrasUnit.id];
+    }
+    // Para todos os outros perfis sem permissão explícita, permanece [-99]
 
     // =========================================================
     // 4. RETORNO DE PERMISSÕES (ATUALIZADO)
     // =========================================================
     return {
-        unitId: userUnitIdNum, // 🟢 NOVO: ID da unidade
+        unitId: userUnitIdNum, 
         userCrasUnit,
-        dashboardFilterUnits, // 🟢 NOVO: Array de filtro
+        dashboardFilterUnits, 
         isGestorGeral, 
         isVigilancia, 
         isLotadoNoCRAS, 
         isLotadoNoCreas,
         canViewCRAS, 
+        // 🟢 CORREÇÃO: canViewVigilancia adicionada ao objeto de retorno
+        canViewVigilancia,
         canAccessCreasData, 
         canViewCreasOperacional,
         canAccessAnaliseGroup, 

@@ -92,4 +92,3 @@ export default function ReassignCasesModal({ fromUser, allUsers, isOpen, onClose
     </Dialog>
   );
 }
-// O UserEditModal.tsx não precisa de alterações nesta etapa.

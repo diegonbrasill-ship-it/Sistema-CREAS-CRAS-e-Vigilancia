@@ -7,6 +7,13 @@ import { QueryResult } from "pg";
 import { authMiddleware, checkRole } from "../middleware/auth";
 import { logAction } from "../services/logger";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
+// 🛑 REMOVIDA A IMPORTAÇÃO PROBLEMÁTICA DE CONSTANTES
+
+// ⭐️ CORREÇÃO LOCAL: Declarando constantes para resolver erro de exportação ⭐️
+const CREAS_UNIT_ID = 1; 
+const CRAS_UNIT_IDS = [3, 4, 5, 6]; 
+// --------------------------------------------------------------------------
+
 
 const router = Router();
 
@@ -20,83 +27,77 @@ router.use(authMiddleware, unitAccessMiddleware('users', 'unit_id'));
 
 
 // =======================================================================
-// MIDDLEWARE AUXILIAR: Checa se o usuário pode editar o alvo (Baseado no unit_id)
+// MIDDLEWARE AUXILIAR: Checa se o usuário pode editar o alvo (NOVO MODELO)
 // =======================================================================
 async function checkUserUnitAccess(req: Request, res: Response, next: NextFunction) {
-    const { id } = req.params;
-    const accessFilter = req.accessFilter!;
+    const { id: targetUserId } = req.params;
+    const access = req.access!; // Novo objeto de acesso injetado
+    
+    // 1. O usuário Gestor Geral pode editar qualquer um
+    if (access.isGestorGeral) {
+        return next();
+    }
 
-    // 1. Resolve Placeholders e Parâmetros
-    const params: (string | number)[] = [id];
-    let unitWhere = accessFilter.whereClause;
-    
-    // Substituir $X, $Y pelos números reais dos placeholders ($2, $3...)
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
-        params.push(accessFilter.params[0]);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
-        params.push(accessFilter.params[0], accessFilter.params[1]);
-    }
-
-    // 2. Checa se o ID do usuário (req.params.id) está dentro da(s) unidade(s) permitida(s).
-    const query = cleanSqlString(`SELECT id FROM users WHERE id = $1 AND ${unitWhere}`);
-    
-    try {
-        // ✅ CORREÇÃO: Usando pool.query diretamente para evitar erro de 'release'
-        const result = await pool.query(query, params);
-        if (result.rowCount === 0) {
-            return res.status(403).json({ message: "Acesso Proibido. Você não pode editar usuários de outras unidades." });
-        }
-        next();
-    } catch (error) {
-        console.error("Erro na checagem de acesso de usuário:", error);
-        res.status(500).json({ message: "Erro de validação de acesso." });
-    }
+    // 2. Checagem estrita para Coordenador/Técnico
+    // Eles só podem editar usuários que estão na mesma unidade que eles.
+    if (access.userUnitId === null) {
+        // Usuário sem lotação (e que não é Gestor/Vigilância) não pode gerenciar ninguém.
+        return res.status(403).json({ message: "Acesso Proibido. Usuário sem lotação não pode gerenciar outros servidores." });
+    }
+    
+    try {
+        const query = cleanSqlString(`
+            SELECT id FROM users WHERE id = $1 AND unit_id = $2
+        `);
+        // Checa se o usuário alvo pertence à mesma unidade do administrador logado
+        const result = await pool.query(query, [targetUserId, access.userUnitId]);
+        
+        if (result.rowCount === 0) {
+            return res.status(403).json({ message: "Acesso Proibido. Você só pode editar usuários da sua unidade." });
+        }
+        next();
+    } catch (error) {
+        console.error("Erro na checagem de acesso de usuário:", error);
+        res.status(500).json({ message: "Erro de validação de acesso." });
+    }
 }
 
 
 // =======================================================================
-// ROTA GET /users (Listagem: AGORA LISTA TODOS ATIVOS DA UNIDADE)
+// ROTA GET /users (Listagem: ELIMINANDO $X/$Y)
 // =======================================================================
 router.get("/", 
-    // ✅ CORREÇÃO: Removido checkRole para permitir a listagem de técnicos.
-    async (req: Request, res: Response) => {
-    const accessFilter = req.accessFilter!; 
+    async (req: Request, res: Response) => {
     
+    const access = req.access!; 
+
     try {
         let query = 'SELECT id, username, role, nome_completo, cargo, is_active, unit_id FROM users'; 
         const params: (string | number)[] = [];
         const additionalWhereClauses: string[] = [];
+        let paramIndex = 1;
 
-        // O filtro de unidade já está no req.accessFilter!
-        if (accessFilter.whereClause !== 'TRUE') { 
-            
-            // 1. Resolve Placeholders e Parâmetros
-            let unitWhere = accessFilter.whereClause;
-            
-            if (accessFilter.params.length === 1) {
-                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
-            } else if (accessFilter.params.length === 2) {
-                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
-            }
-            
-            // Adicionar os parâmetros da unidade à lista principal
-            params.push(...accessFilter.params);
-
-            // 2. Query com filtro de unidade
-            additionalWhereClauses.push(unitWhere);
+        // 1. FILTRO DE SEGURANÇA POR UNIDADE (Substitui a lógica obsoleta de $X/$Y)
+        if (!access.isGestorGeral) { 
+            // Coordenador/Técnico/Vigilância: Vê APENAS a sua unidade
+            if (access.userUnitId !== null) {
+                params.push(access.userUnitId);
+                additionalWhereClauses.push(`unit_id = $${paramIndex++}`);
+            } else {
+                // Usuário sem lotação (e que não é Gestor/Vigilância) não pode listar ninguém
+                additionalWhereClauses.push(`FALSE`); 
+            }
         } 
-        
-        // ⭐️ FIX: Lista APENAS usuários ativos.
-        additionalWhereClauses.push('is_active = true');
+        
+        // 2. FILTRO DE STATUS: Lista APENAS usuários ativos.
+        additionalWhereClauses.push('is_active = true');
 
-        // Juntar as cláusulas e montar a query
-        if (additionalWhereClauses.length > 0) {
-             query += ` WHERE ${additionalWhereClauses.join(' AND ')} ORDER BY nome_completo ASC`;
-        } else {
-             query += ` ORDER BY nome_completo ASC`;
-        }
+        // Juntar as cláusulas e montar a query
+        if (additionalWhereClauses.length > 0) {
+             query += ` WHERE ${additionalWhereClauses.join(' AND ')} ORDER BY nome_completo ASC`;
+        } else {
+             query += ` ORDER BY nome_completo ASC`;
+        }
 
         const finalQuery = cleanSqlString(query); 
         const result = await pool.query(finalQuery, params);
@@ -106,7 +107,7 @@ router.get("/",
         console.error("Erro ao listar usuários:", err.message);
         res.status(500).json({ message: "Erro ao buscar usuários." });
     }
-    }
+    }
 );
 
 
@@ -127,10 +128,10 @@ router.post("/", checkRole(['coordenador', 'gestor']), async (req: Request, res:
         return res.status(400).json({ message: "Todos os campos (usuário, senha, perfil, nome completo, cargo, unidade) são obrigatórios." });
     }
     
-    // ⭐️ CORREÇÃO CRÍTICA AQUI: Adicionamos as novas roles do CRAS
-    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia', 'coordenador_cras', 'tecnico_cras'];
+    // ⭐️ CORREÇÃO CRÍTICA: Lista de Roles Válidas expandida e verificada
+    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia', 'coordenador_cras', 'tecnico_cras', 'admin'];
     if (!validRoles.includes(role)) {
-        return res.status(400).json({ message: `Perfil (role) inválido. Role recebida: ${role}. Roles aceitas: ${validRoles.join(', ')}` });
+        return res.status(400).json({ message: `Perfil (role) inválido. Roles aceitas: ${validRoles.join(', ')}` });
     }
 
     try {
@@ -172,21 +173,33 @@ router.post("/", checkRole(['coordenador', 'gestor']), async (req: Request, res:
 // =======================================================================
 router.put("/:id", checkRole(['coordenador', 'gestor']), checkUserUnitAccess, async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { username, role, nome_completo, cargo } = req.body;
+    // ⭐️ CORREÇÃO: unit_id é opcional, mas se vier deve ser um número/null válido
+    const { username, role, nome_completo, cargo, unit_id } = req.body;
     const adminUser = req.user!;
 
     if (!username || !role || !nome_completo || !cargo) {
         return res.status(400).json({ message: "Todos os campos são obrigatórios para edição." });
     }
 
+    // ⭐️ CORREÇÃO: Lista de Roles Válidas expandida e verificada
+    const validRoles = ['tecnico_superior', 'tecnico_medio', 'coordenador', 'gestor', 'vigilancia', 'coordenador_cras', 'tecnico_cras', 'admin'];
+    if (!validRoles.includes(role)) {
+        return res.status(400).json({ message: `Perfil (role) inválido. Roles aceitas: ${validRoles.join(', ')}` });
+    }
+
     try {
+        // Se o Front-end não enviar o unit_id (que é o comportamento do modal que vimos), 
+        // a lógica de PUT deve garantir que o valor não seja NULL (a menos que seja Gestor/Vigilância).
+        // Aqui, confiamos que o Front-end enviou o unit_id original (como vimos no UserEditModal)
+
         const query = cleanSqlString(`
             UPDATE users 
-            SET username = $1, role = $2, nome_completo = $3, cargo = $4 
-            WHERE id = $5
+            SET username = $1, role = $2, nome_completo = $3, cargo = $4, unit_id = $5 
+            WHERE id = $6
             RETURNING id, username, role, nome_completo, cargo, is_active, unit_id;
         `);
-        const result = await pool.query(query, [username, role, nome_completo, cargo, id]);
+        // Parâmetros: username, role, nome_completo, cargo, unit_id, id
+        const result = await pool.query(query, [username, role, nome_completo, cargo, unit_id, id]);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Usuário não encontrado.' });
@@ -196,7 +209,7 @@ router.put("/:id", checkRole(['coordenador', 'gestor']), checkUserUnitAccess, as
             userId: adminUser.id,
             username: adminUser.username,
             action: 'UPDATE_USER',
-            details: { updatedUserId: id, updatedUsername: username }
+            details: { updatedUserId: id, updatedUsername: username, updatedUnitId: unit_id }
         });
 
         res.status(200).json(result.rows[0]);
@@ -242,7 +255,7 @@ router.patch("/:id/status", checkRole(['coordenador', 'gestor']), checkUserUnitA
 });
 
 router.post("/reatribuir", checkRole(['coordenador', 'gestor']), async (req: Request, res: Response) => {
-// ... (Código POST /reatribuir inalterado)
+// ... (Código POST /reatribuir mantido inalterado - já é seguro)
     const { fromUserId, toUserId } = req.body;
     const adminUser = req.user!;
     const adminUnitId = adminUser.unit_id; 

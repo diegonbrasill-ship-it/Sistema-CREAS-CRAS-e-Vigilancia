@@ -1,4 +1,5 @@
 // frontend/src/pages/PainelVigilancia.tsx
+// ⭐️ ATUALIZADO para usar a tipagem padronizada CaseListEntry ⭐️
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
@@ -11,7 +12,7 @@ import GraficoBarras from '../../components/vigilancia/GraficoBarras';
 import GraficoPizza from '../../components/vigilancia/GraficoPizza';
 import ListaCasosModal from '../../components/DrillDown/ListaCasosModal';
 
-// Nossas funções da API
+// Nossas funções da API e NOVAS INTERFACES
 import { 
   getVigilanciaFluxoDemanda, 
   getVigilanciaSobrecargaEquipe, 
@@ -19,7 +20,8 @@ import {
   getVigilanciaFontesAcionamento, 
   getVigilanciaTaxaReincidencia,
   getVigilanciaPerfilViolacoes, 
-  getCasosFiltrados
+  getCasosFiltrados,
+  CaseListEntry // ⭐️ NOVO: Tipagem padronizada ⭐️
 } from '../../services/api'; 
 
 import './PainelVigilancia.css';
@@ -41,28 +43,23 @@ interface PainelData {
   perfilViolacoes: PerfilViolencia[];
 }
 
-interface CasoParaLista {
-  id: number;
-  nome?: string;
-  tecRef: string;
-  dataCad: string;
-  bairro?: string;
-}
+// 🛑 REMOVIDO: CasoParaLista substituída por CaseListEntry (importada do api.ts)
+// interface CasoParaLista { ... }
 
 // ⭐️ MAPA DE FILTROS PARA VIGILÂNCIA ⭐️
 const VIGILANCIA_FILTERS_MAP: { [key: string]: { campo: string, valor?: string } | null } = {
-    // KPI's de Acesso
-    'total_ativos': { campo: 'status', valor: 'Ativo' }, 
-    'novos_no_mes': { campo: 'mes', valor: new Date().toISOString().substring(0, 7) }, 
-    'reincidentes': { campo: 'reincidente', valor: 'Sim' }, 
-    
-    // Filtros de Gráfico
-    'por_bairro': { campo: 'bairro' }, 
-    'por_canal': { campo: 'canalDenuncia' }, 
-    'por_violencia': { campo: 'tipoViolencia' }, 
-    
-    // Casos Específicos
-    'casos_novos_30d': { campo: 'dataCad', valor: 'ultimos_30_dias' }, 
+    // Filtros para o Back-end (vigilancia.ts espera filtros específicos)
+    'total_ativos': { campo: 'status', valor: 'Ativo' }, 
+    'novos_no_mes': { campo: 'mes', valor: new Date().toISOString().substring(0, 7) }, 
+    'reincidentes': { campo: 'reincidentes', valor: 'Sim' }, // Usando 'reincidentes' do JSONB
+    
+    // Filtros de Gráfico
+    'por_bairro': { campo: 'por_bairro' }, 
+    'por_canal': { campo: 'por_canal' }, 
+    'por_violencia': { campo: 'por_violencia' }, 
+    
+    // Casos Específicos
+    'casos_novos_30d': { campo: 'dataCad', valor: 'ultimos_30_dias' }, 
 };
 
 
@@ -73,7 +70,8 @@ const PainelVigilancia: React.FC = () => {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalTitle, setModalTitle] = useState('');
-    const [modalCases, setModalCases] = useState<CasoParaLista[]>([]);
+    // ⭐️ ATUALIZADO: Usando CaseListEntry ⭐️
+    const [modalCases, setModalCases] = useState<CaseListEntry[]>([]);
     const [isModalLoading, setIsModalLoading] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
 
@@ -113,29 +111,46 @@ const PainelVigilancia: React.FC = () => {
         fetchAllPainelData();
     }, []);
 
-    // LÓGICA CORRIGIDA PARA TRADUÇÃO DE FILTROS E CHAMADA DA API
+    // LÓGICA CORRIGIDA PARA TRADUÇÃO DE FILTROS E CHAMADA DA API
     const handleDrillDown = async (action: string, valor: string | null = null, title: string) => {
         setModalError(null); 
         setModalTitle(title);
         setIsModalOpen(true);
         setIsModalLoading(true);
         setModalCases([]);
-        
-        const map = VIGILANCIA_FILTERS_MAP[action];
-        let filtroParam: string | undefined = undefined;
-        let valorParam: string | undefined = undefined;
-
-        if (map) {
-            filtroParam = map.campo;
-            valorParam = map.valor || valor || undefined;
-        } else {
-             filtroParam = action;
-             valorParam = valor || undefined;
-        }
+        
+        const map = VIGILANCIA_FILTERS_MAP[action];
+        let filtroParam: string | undefined = undefined;
+        let valorParam: string | undefined = undefined;
+        
+        // O Back-end agora lida com o mapeamento, então simplificamos o Front-end
+        // para passar filtro e valor como os nomes esperados.
+        if (map && map.campo === 'status') {
+            // Caso especial para filtros de status
+            filtroParam = 'status'; 
+            valorParam = map.valor;
+        } else if (map && map.campo === 'dataCad') {
+            // Caso especial para filtros de data (últimos 30 dias)
+            filtroParam = 'dataCad';
+            valorParam = map.valor;
+        } else if (valor) {
+            // Para todos os gráficos (bairro, canal, violência)
+            filtroParam = action; // Ex: 'por_bairro'
+            valorParam = valor;
+        } else {
+            // Fallback para casos sem valor dinâmico (ex: reincidentes)
+            filtroParam = action;
+            valorParam = map?.valor;
+        }
 
         try {
-            // ✅ CORRIGIDO: Passando a 'origem' para que o api.ts chame o endpoint correto
-            const data = await getCasosFiltrados({ filtro: filtroParam, valor: valorParam, origem: 'vigilancia' });
+            // ✅ CORRIGIDO: getCasosFiltrados retorna CaseListEntry[] 
+            const data: CaseListEntry[] = await getCasosFiltrados({ 
+                filtro: filtroParam, 
+                valor: valorParam, 
+                origem: 'vigilancia' 
+            });
+            
             setModalCases(data);
         } catch (err: any) {
             setModalError("Seu perfil não tem permissão para visualizar esta lista detalhada.");
@@ -146,7 +161,7 @@ const PainelVigilancia: React.FC = () => {
     };
 
     if (loading) {
-// ... (código de carregamento inalterado)
+// ... (código de carregamento)
         return (
             <div className="painel-container flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
@@ -167,7 +182,7 @@ const PainelVigilancia: React.FC = () => {
                 {painelData && (
                     <>
                         {/* KPI Sobrecarga: DrillDown para todos os casos ativos */}
-                        <div onClick={() => handleDrillDown('total_ativos', null, 'Total de Casos Ativos')} className="cursor-pointer transition-transform hover:scale-105">
+                        <div onClick={() => handleDrillDown('total_ativos', 'Ativo', 'Total de Casos Ativos')} className="cursor-pointer transition-transform hover:scale-105">
                             <CardKPI
                                 title="Sobrecarga da Equipe"
                                 subtitle={`(${painelData.sobrecarga.totalCasosAtivos} Casos Ativos)`}
@@ -176,7 +191,7 @@ const PainelVigilancia: React.FC = () => {
                             />
                         </div>
                         {/* KPI Fluxo de Demanda: DrillDown para casos dos últimos 30 dias */}
-                        <div onClick={() => handleDrillDown('casos_novos_30d', null, 'Casos Novos no Último Mês')} className="cursor-pointer transition-transform hover:scale-105">
+                        <div onClick={() => handleDrillDown('casos_novos_30d', 'ultimos_30_dias', 'Casos Novos no Último Mês')} className="cursor-pointer transition-transform hover:scale-105">
                             <CardKPI
                                 title="Fluxo de Demanda"
                                 subtitle="(Novos casos no último mês)"
@@ -185,7 +200,7 @@ const PainelVigilancia: React.FC = () => {
                             />
                         </div>
                         {/* KPI Reincidência: DrillDown para casos reincidentes */}
-                        <div onClick={() => handleDrillDown('reincidentes', null, 'Casos Reincidentes')} className="cursor-pointer transition-transform hover:scale-105">
+                        <div onClick={() => handleDrillDown('reincidente', 'Sim', 'Casos Reincidentes')} className="cursor-pointer transition-transform hover:scale-105">
                             <CardKPI 
                                 title="Taxa de Reincidência" 
                                 subtitle="(Últimos 12 meses)" 
@@ -212,7 +227,7 @@ const PainelVigilancia: React.FC = () => {
                     <h2 className="painel-subtitle">Fontes de Acionamento</h2>
                     {painelData && painelData.fontesAcionamento && (
                         <GraficoBarras 
-                            // ✅ CORREÇÃO: Mapeamento de nome/valor
+                            // ✅ CORREÇÃO: Mapeamento de nome/valor
                             data={painelData.fontesAcionamento.map(d => ({ name: d.fonte, value: d.quantidade }))} 
                             onBarClick={(data) => handleDrillDown('por_canal', data.name, `Fonte de Acionamento: ${data.name}`)}
                         />
@@ -221,7 +236,7 @@ const PainelVigilancia: React.FC = () => {
                     <h2 className="painel-subtitle">Perfil das Violações</h2>
                     {painelData && painelData.perfilViolacoes && (
                         <GraficoPizza 
-                            // ✅ CORREÇÃO: Mapeamento de nome/valor
+                            // ✅ CORREÇÃO: Mapeamento de nome/valor
                             data={painelData.perfilViolacoes.map(d => ({ name: d.tipo, value: d.quantidade }))} 
                             onSliceClick={(data) => handleDrillDown('por_violencia', data.name, `Tipo de Violência: ${data.name}`)}
                         />
@@ -233,7 +248,7 @@ const PainelVigilancia: React.FC = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={modalTitle}
-                cases={modalCases}
+                cases={modalCases} // cases é CaseListEntry[]
                 isLoading={isModalLoading}
                 errorMessage={modalError} 
             />

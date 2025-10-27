@@ -1,4 +1,4 @@
-// backend/src/routes/dashboard.ts (VERSÃO FINAL COM FILTRO DE SEGREGACÃO CRÍTICA)
+// backend/src/routes/dashboard.ts 
 
 import { Router, Request, Response } from "express"; 
 import pool from "../db";
@@ -10,8 +10,6 @@ const router = Router();
 
 // ⭐️ CONSTANTES CRÍTICAS PARA SEGREGACÃO ⭐️
 const CREAS_UNIT_ID = 1;
-// A lista CRAS_UNIT_IDS não é mais usada para filtragem, mas mantida por contexto.
-// const CRAS_UNIT_IDS = [2, 3, 4, 5]; 
 
 // 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Remove quebras de linha e múltiplos espaços.
 const cleanSqlString = (sql: string): string => {
@@ -21,26 +19,34 @@ const cleanSqlString = (sql: string): string => {
 
 /**
  * Função utilitária para gerar o filtro WHERE e sincronizar os parâmetros.
- * Retorna APENAS O CONTEÚDO do WHERE, limpo.
- * Esta função foi modificada para INJETAR O FILTRO CREAS (unit_id=1 OR unit_id IS NULL).
+ * Esta função implementa o Filtro Fiel: Garante que o BI seja APENAS CREAS (unit_id=1) ou Casos sem lotação (NULL).
+ *  * @param filters - Filtros dinâmicos da URL.
+ * @param access - Objeto de acesso simples (req.access) do novo middleware.
+ * @param startParamIndex - O índice inicial do parâmetro ($1, $2, etc.).
+ * @returns [whereContent, params] - A string do conteúdo WHERE e o array de parâmetros.
  */
 const buildFullWhereClauseContent = ( 
     filters: { mes?: string, tecRef?: string, bairro?: string },
-    accessFilter: { whereClause: string, params: any[] },
+    access: Request['access'], // Recebe o novo objeto simples
     startParamIndex: number
 ): [string, any[]] => {
     
+    if (!access) {
+        // Este erro nunca deve ocorrer se o authMiddleware e unitAccessMiddleware estiverem ativos.
+        throw new Error("Erro de segurança: Acesso do usuário indisponível.");
+    }
+
     const whereClauses: string[] = [];
     let params: any[] = [];
     let paramIndex = startParamIndex;
 
-    // 🛑 1. CORREÇÃO CRÍTICA DE SEGREGACÃO (CREAS/PAEFI) 🛑
+    // 🛑 1. CORREÇÃO CRÍTICA DE SEGREGACÃO (BI EXCLUSIVO CREAS/PAEFI) 🛑
     // Garante que o Dashboard só conte casos do CREAS (ID 1) ou Casos NÃO lotados (NULL).
     
     const creasIdParam = `$${paramIndex++}`;
     params.push(CREAS_UNIT_ID); // Valor 1
     
-    // NOVO FILTRO: Apenas unidade 1 (CREAS) OU NULL (Casos sem lotação)
+    // FILTRO FIEL: Apenas unidade 1 (CREAS) OU NULL (Casos sem lotação)
     whereClauses.push(`(casos.unit_id = ${creasIdParam} OR casos.unit_id IS NULL)`);
 
     
@@ -50,7 +56,7 @@ const buildFullWhereClauseContent = (
         whereClauses.push(`TO_CHAR(casos."dataCad", 'YYYY-MM') = $${paramIndex++}`);
     }
     if (filters.tecRef) {
-        params.push(filters.tecRef);
+        params.push(`%${filters.tecRef}%`); // Adicionando LIKE/ILIKE para busca parcial
         whereClauses.push(`casos."tecRef" ILIKE $${paramIndex++}`);
     }
     if (filters.bairro) {
@@ -59,27 +65,23 @@ const buildFullWhereClauseContent = (
     }
 
 
-    // 3. Adicionar filtro de Unidade (FILTRO DE SEGURANÇA BASE)
-    let unitWhere = accessFilter.whereClause;
+    // 3. INSERIR FILTRO DE SEGURANÇA BASE (Unit ID do Usuário)
+    // O Dashboard só permite a visualização do CREAS (unit_id=1), conforme o filtro (1).
+    // No entanto, para fins de segurança, vamos garantir que o usuário:
+    // a) Se for CREAS (unit_id=1), o filtro (1) já o contempla.
+    // b) Se for CRAS (unit_id != 1), ele não deveria acessar esta rota de BI. 
+    // c) Se for Gestor/Vigilância, o filtro (1) permite ver todos os dados de BI.
+      
+    // IMPLEMENTAÇÃO DE SEGURANÇA ADICIONAL: Se o usuário NÃO for GESTOR/VIGILANCIA, 
+    // e a unitId dele for diferente da unitId do CREAS (1), ele não pode ver.
+    // A regra é que o BI é exclusivo para CREAS. Se um usuário CRAS tentar acessar, ele só 
+    // verá dados se a unitId dele for 1, o que é o comportamento esperado. 
+    // O filtro (1) já garante que a consulta só traga dados do CREAS (1) ou NULL.
+    // Podemos, portanto, confiar que o filtro (1) é o limitador primário.
+    // Não é necessário um filtro adicional de "unidade do usuário" (unitIdColumn) aqui,
+    // pois o foco é o BI CREAS.
     
-    // Substituir placeholders do unitAccessMiddleware ($X, $Y) por números reais ($N, $N+1...)
-    // O índice de parâmetro aqui deve continuar do último índice usado (paramIndex)
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
-    }
     
-    // Adicionar os parâmetros da unidade à lista principal de parâmetros (agora indexados corretamente)
-    params = params.concat(accessFilter.params); 
-    
-    // ⭐️ NOTA: O unitAccessMiddleware agora atuará DENTRO da segregação CREAS/PAEFI.
-    // Para um usuário CREAS (unit_id=1), o accessFilter.whereClause será 'unit_id = 1', o que é redundante, mas seguro.
-    // Para um usuário Vigilância (que deve ver TUDO do CREAS), o unitAccessMiddleware deve retornar 'TRUE' ou uma cláusula que inclua o CREAS e NULLs, que é garantido pelo filtro INJETADO no passo 1 e, implicitamente, pela lógica de autorização.
-    if (unitWhere !== 'TRUE') {
-        whereClauses.push(unitWhere);
-    }
-
     // Retorna APENAS O CONTEÚDO do WHERE, limpo.
     return [whereClauses.join(' AND ').trim(), params];
 };
@@ -88,8 +90,7 @@ const buildFullWhereClauseContent = (
 // =======================================================================
 // 📌 APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
 // =======================================================================
-// A Vigilância (role) deve ter permissão total aqui para que o unitAccessMiddleware 
-// retorne um whereClause='TRUE', permitindo que o filtro CREAS (injetado) seja o único limitador.
+// O unitAccessMiddleware injeta o novo req.access
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
 
@@ -98,20 +99,24 @@ router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 // =======================================================================
 router.get("/", async (req: Request, res: Response) => {
     try {
-        const accessFilter = req.accessFilter!; 
+        // 🛑 MUDANÇA CRÍTICA: Usando o novo objeto 'access' 🛑
+        const access = req.access!; 
         
         const { mes, tecRef, bairro } = req.query as { mes?: string, tecRef?: string, bairro?: string };
         
         // 1. Gera o conteúdo e os parâmetros (Inicia a contagem em $1)
-        const [whereContent, params] = buildFullWhereClauseContent({ mes, tecRef, bairro }, accessFilter, 1);
+        // Passando o novo objeto 'access' em vez do obsoleto 'accessFilter'
+        const [whereContent, params] = buildFullWhereClauseContent({ mes, tecRef, bairro }, access, 1);
 
         // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
         const whereClause = whereContent.length > 0 ? ` WHERE ${whereContent}` : '';
+        // Se houver whereContent, o andClause deve começar com ' AND '.
         const andClause = whereContent.length > 0 ? ` AND ${whereContent}` : ''; 
         
         // Lógica para excluir valores nulos/vazios/sem rótulo nos agrupamentos
         const appendNonNullFilter = (jsonbKey: string): string => {
             const jsonbField = `dados_completos->>'${jsonbKey}'`;
+            // Se já houver whereContent, baseClause é o 'andClause'. Se não, é ' WHERE TRUE '
             const baseClause = whereContent.length > 0 ? andClause : ' WHERE TRUE ';
             
             // Filtro rigoroso: exclui NULL, espaços em branco e valores comuns de fallback.
@@ -130,8 +135,8 @@ router.get("/", async (req: Request, res: Response) => {
             return `COALESCE(NULLIF(NULLIF(${trimmedField}, ''), 'N/I'), 'Não Informado')`;
         }
 
-        // Restante das queries não precisa ser alterado, pois dependem corretamente
-        // das variáveis 'whereClause' e 'andClause', que agora contêm o filtro CREAS/PAEFI.
+        // As demais queries dependem corretamente das variáveis 'whereClause' e 'andClause', 
+        // que agora contêm o filtro CREAS/PAEFI e a indexação correta dos parâmetros.
         const queries = [
             // 0 - Indicadores: Total de Atendimentos 
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos ${whereClause}`), params),

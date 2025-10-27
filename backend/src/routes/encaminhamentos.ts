@@ -11,7 +11,7 @@ const router = express.Router();
 
 // 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Essencial para remover o erro 'syntax error at or near " "'
 const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
+    return sql.replace(/\s+/g, ' ').trim();
 };
 
 
@@ -28,8 +28,11 @@ router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Re
   const userId = req.user!.id;
   const username = req.user!.username;
   const { casoId, servicoDestino, dataEncaminhamento, observacoes } = req.body;
-  const userUnitId = req.user!.unit_id;
- 
+  const userUnitId = req.user!.unit_id; // ✅ userUnitId no escopo da função
+
+  // O casoId é obtido do req.body (não precisamos de casoId da requisição, pois já está no body)
+  // Usamos o tipo original do body
+
   if (!casoId || !servicoDestino || !dataEncaminhamento) {
     return res.status(400).json({ message: 'Campos obrigatórios estão faltando.' });
   }
@@ -50,11 +53,11 @@ router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Re
       username,
       action: 'CREATE_ENCAMINHAMENTO',
       details: { 
-        casoId, 
-        encaminhamentoId: novoEncaminhamento.id, 
-        servico: novoEncaminhamento.servicoDestino,
-        unitId: userUnitId 
-      }
+        casoId, 
+        encaminhamentoId: novoEncaminhamento.id, 
+        servico: novoEncaminhamento.servicoDestino,
+        unitId: userUnitId 
+      }
     });
 
     res.status(201).json({ 
@@ -76,7 +79,9 @@ router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (
   const { id } = req.params;
   const { status, dataRetorno } = req.body;
   const { id: userId, username } = req.user!;
-  const casoId = (req as any).casoId; // CasoId obtido do middleware
+  // ⭐️ REFORÇO DE ESCOPO: Garante que casoId e unitId estejam seguros no escopo
+  const casoId = (req as any).casoId; 
+  const userUnitId = req.user!.unit_id; 
 
   if (!status) {
     return res.status(400).json({ message: 'O novo status é obrigatório.' });
@@ -94,7 +99,7 @@ router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (
     const result = await pool.query(query, [status, dataRetorno, id]);
 
     if (result.rowCount === 0) {
-        // Esta checagem é redundante após o middleware, mas mantida como fail-safe
+        // Esta checagem é redundante após o middleware, mas mantida como fail-safe
       return res.status(404).json({ message: 'Encaminhamento não encontrado.' }); 
     }
 
@@ -109,7 +114,7 @@ router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (
         encaminhamentoId: encaminhamentoAtualizado.id,
         servico: encaminhamentoAtualizado.servicoDestino,
         novoStatus: status,
-        unitId: req.user!.unit_id 
+        unitId: userUnitId // Usa a variável local reforçada
       }
     });
 

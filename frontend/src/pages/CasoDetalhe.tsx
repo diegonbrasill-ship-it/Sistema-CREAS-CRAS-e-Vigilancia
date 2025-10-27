@@ -1,14 +1,16 @@
 // frontend/src/pages/CasoDetalhe.tsx
+// ⭐️ Componente de Visualização de Prontuário CREAS/Geral ⭐️
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Importações dos serviços da API, agora com os tipos corretos
+// Importações dos serviços da API, agora com os tipos corrigidos
 import {
   getCasoById,
-  CasoDetalhado,
+  // ⭐️ ATUALIZADO: Usando as novas interfaces padronizadas ⭐️
+  CaseDetail,
   DemandaResumida,
   getAcompanhamentos,
   createAcompanhamento,
@@ -20,7 +22,7 @@ import {
   downloadAnexo,
   updateCasoStatus,
   deleteCaso,
-  Anexo // Importado o tipo Anexo
+  Anexo // Importado o tipo Anexo
 } from "../services/api";
 
 // Importações de componentes UI
@@ -37,19 +39,33 @@ import { ArrowLeft, Loader2, CheckCircle, Upload, Download, FileText, Power, Pow
 
 // Tipagens locais
 interface Encaminhamento { id: number; servicoDestino: string; dataEncaminhamento: string; status: string; observacoes: string; tecRef: string; }
-// A interface Anexo foi movida para api.ts, mas o componente a usa.
-// interface Anexo { id: number; nomeOriginal: string; tamanhoArquivo: number; dataUpload: string; descricao: string; uploadedBy: string; } 
+// A interface Anexo já está importada do api.ts
 
 
-// Componente auxiliar
+// Componente auxiliar REFATORADO para maior clareza e controle de N/A
 function DataItem({ label, value }: { label: string; value: any }) {
-  if (value === null || value === undefined || value === "" || label === 'status' || label === 'demandasVinculadas' || label === 'unit_id') return null; 
-  return (
-    <div className="py-2">
-      <p className="text-sm font-medium text-slate-500 capitalize">{label.replace(/([A-Z])/g, " $1")}</p>
-      <p className="text-base text-slate-900 break-words">{String(value)}</p>
-    </div>
-  );
+    // Lista de chaves que NÃO devem ser renderizadas no loop
+    const ignoredKeys = ['status', 'demandasVinculadas', 'unit_id', 'dados_completos', 'id'];
+
+    if (value === null || value === undefined || value === "" || ignoredKeys.includes(label)) return null; 
+    
+    // Formata a label: 'primeiraInfSuas' -> 'Primeira Inf Suas'
+    const formattedLabel = label.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase());
+
+    // Se for data, formata (melhoria de UX)
+    let formattedValue = String(value);
+    if (label.toLowerCase().includes('data')) {
+        try {
+            formattedValue = new Date(value).toLocaleDateString('pt-BR');
+        } catch {}
+    }
+
+    return (
+      <div className="py-2">
+        <p className="text-sm font-medium text-slate-500">{formattedLabel}</p>
+        <p className="text-base text-slate-900 break-words">{formattedValue || 'N/A'}</p>
+      </div>
+    );
 }
 
 const listaDeServicos = [ "CRAS", "CREAS", "Conselho Tutelar", "Ministério Público", "Defensoria Pública", "Poder Judiciário", "Delegacia Especializada de Atendimento à Mulher (DEAM)", "Delegacia de Proteção à Criança e ao Adolescente (DPCA)", "Centro de Referência da Mulher", "CAPS I (Infantil)", "CAPS AD (Álcool e Drogas)", "CAPS III (Transtorno Mental)", "Unidade de Saúde (UBS/PSF)", "Maternidade / Hospital", "Secretaria de Educação", "Secretaria de Habitação", "INSS", "Programa Criança Feliz", "Serviço de Convivência e Fortalecimento de Vínculos (SCFV)", "Consultório na Rua", "Abordagem Social", "Centro POP", "Acolhimento Institucional (Abrigo)", "Outros" ];
@@ -58,19 +74,18 @@ const listaDeServicos = [ "CRAS", "CREAS", "Conselho Tutelar", "Ministério Púb
 export default function CasoDetalhe() {
   // ✅ EXTRAÇÃO SIMPLES: Confia no React Router para passar a string ID
   const { id } = useParams<{ id: string }>();
-  
+  
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // REGRA CORRIGIDA: Todos os perfis operacionais têm autonomia sobre o prontuário.
-  // ⭐️ CORREÇÃO AQUI: Garante que userRole é uma string vazia se for null/undefined
+  // REGRA DE PERMISSÃO: Permissão operacional geral
   const userRole = user?.role || ''; 
-  
   const isOperacional = userRole.includes('gestor') || userRole.includes('coordenador') || 
-                        userRole.includes('tecnico') || userRole.includes('vigilancia'); 
-  const canDelete = isOperacional;  
+                        userRole.includes('tecnico') || userRole.includes('vigilancia'); 
+  const canDelete = isOperacional;  
 
-  const [caso, setCaso] = useState<CasoDetalhado | null>(null);
+  // ⭐️ ATUALIZADO: Usando a interface CaseDetail ⭐️
+  const [caso, setCaso] = useState<CaseDetail | null>(null);
   const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
   const [novoAcompanhamento, setNovoAcompanhamento] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -93,6 +108,7 @@ export default function CasoDetalhe() {
     // Usa o ID extraído
     if (!id) return;
     try {
+      // ⭐️ getCasoById agora retorna CaseDetail ⭐️
       const [casoData, acompanhamentosData, encaminhamentosData, anexosData] =
         await Promise.all([
           getCasoById(id),
@@ -116,6 +132,8 @@ export default function CasoDetalhe() {
     fetchData();
   }, [fetchData]);
 
+  // ... (handleSalvarAcompanhamento e outras funções operacionais mantidas) ...
+
   const handleSalvarAcompanhamento = async () => {
     if (!id || !novoAcompanhamento.trim()) {
       toast.warn("O texto do acompanhamento não pode estar vazio.");
@@ -137,7 +155,7 @@ export default function CasoDetalhe() {
       setIsSaving(false);
     }
   };
-
+  
   const handleSalvarEncaminhamento = async () => {
     if (!id || !novoEncaminhamentoServico || !novoEncaminhamentoData) {
       toast.warn("Serviço de Destino e Data são obrigatórios.");
@@ -166,7 +184,7 @@ export default function CasoDetalhe() {
       setIsSavingEnc(false);
     }
   };
-
+  
   const handleAtualizarStatus = async (encaminhamentoId: number, novoStatus: string) => {
     if (!isOperacional) {
         toast.error("Você não tem permissão para atualizar status.");
@@ -183,13 +201,13 @@ export default function CasoDetalhe() {
       setUpdatingEncId(null);
     }
   };
-
+  
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
     }
   };
-
+  
   const handleUploadAnexo = async () => {
     if (!id || !selectedFile) {
       toast.warn("Por favor, selecione um arquivo para enviar.");
@@ -217,7 +235,7 @@ export default function CasoDetalhe() {
       setIsUploading(false);
     }
   };
-
+  
   const handleDownloadAnexo = async (anexoId: number) => {
     // Downloads são permitidos para todos que podem ver o caso (Back-end checa)
     setDownloadingAnexoId(anexoId);
@@ -237,7 +255,7 @@ export default function CasoDetalhe() {
       setDownloadingAnexoId(null);
     }
   };
-
+  
   const handleDesligarCaso = async () => {
     if (!id || !window.confirm("Você tem certeza que deseja DESLIGAR este caso?")) return;
     if (!isOperacional) {
@@ -292,14 +310,22 @@ export default function CasoDetalhe() {
     }
   };
 
+
+  // ... (Fim das funções operacionais) ...
+
+
   if (isLoading) { return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>; }
   if (!caso) { return <div className="text-center p-10">Não foi possível carregar os dados do caso. Tente novamente mais tarde.</div>; }
   
   const dataCadastroFormatada = new Date(caso.dataCad).toLocaleDateString( "pt-BR", { timeZone: "UTC" });
+  // O caso.tecRef deve ser nome de usuário no Back-end, mas no Front-end é o nome completo
+  // Usaremos o nome completo do usuário logado se o tecRef estiver ausente no caso
+  const tecRefDisplay = caso.tecRef || user?.nome_completo || 'N/A';
 
   return (
   <div className="space-y-6">
     <div className="flex justify-between items-start flex-wrap gap-4">
+      {/* ⭐️ ROTA CORRIGIDA: Voltar para a Consulta CREAS/Geral ⭐️ */}
       <Button asChild variant="outline">
         <Link to="/consulta"><ArrowLeft className="mr-2 h-4 w-4" />Voltar para a Lista de Casos</Link>
       </Button>
@@ -308,6 +334,7 @@ export default function CasoDetalhe() {
         {/* 📌 BOTÕES OPERACIONAIS (Visível para TODOS os Operacionais) */}
         {isOperacional && (
           <>
+            {/* ⭐️ ROTA CORRIGIDA: Edita o caso na rota CREAS/Geral ⭐️ */}
             <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4"/>Editar Dados</Button>
             
             {caso.status === 'Ativo' ? (
@@ -316,7 +343,7 @@ export default function CasoDetalhe() {
               <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4"/>Reativar Caso</Button>
             )}
             
-            {/* 📌 EXCLUSÃO PERMANENTE (Visível para TODOS os Operacionais) */}
+            {/* EXCLUSÃO PERMANENTE (Visível para TODOS os Operacionais) */}
             <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
           </>
         )}
@@ -329,12 +356,13 @@ export default function CasoDetalhe() {
             <CardTitle className="text-2xl">{caso.nome || "[Caso sem nome]"}</CardTitle>
             {caso.status !== 'Ativo' && (<Badge variant="destructive" className="text-sm">{`Status: ${caso.status}`}</Badge>)}
           </div>
-          <CardDescription>Prontuário de Atendimento | Cadastrado em: {dataCadastroFormatada} por {caso.tecRef}</CardDescription>
+          <CardDescription>Prontuário de Atendimento | Cadastrado em: {dataCadastroFormatada} por {tecRefDisplay}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="border-t pt-4">
             <h3 className="text-lg font-semibold text-slate-800 mb-2">Informações Cadastrais</h3>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-x-6">
+              {/* ⭐️ RENDERIZAÇÃO MELHORADA: Usa CaseDetail e DataItem refatorado ⭐️ */}
               {Object.entries(caso).map(([key, value]) => (<DataItem key={key} label={key} value={value} />))}
             </div>
           </div>

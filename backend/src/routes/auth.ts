@@ -24,14 +24,14 @@ router.post("/login", async (req, res) => {
         }
         
         const user = result.rows[0];
-        
-        // 2. Checa unit_id (se for null, bloqueia, exceto se for Gestor que tem unit_id=null)
-        if (!user.unit_id && user.role !== 'gestor') { // Gestor é a única exceção
-             console.error(`ERRO CRÍTICO: Usuário ${username} não possui unit_id. Cadastro incompleto.`);
-             await logAction({ userId: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User unit_id is missing' } });
-             return res.status(403).json({ message: "Erro de configuração do usuário: Unidade de trabalho não definida." });
-        }
-        
+        
+        // 2. 🚨 FIX CRÍTICO DE SEGURANÇA: Bloqueia se unit_id for nulo, exceto para Gestor e Vigilância
+        if (!user.unit_id && user.role !== 'gestor' && user.role !== 'vigilancia') { 
+             console.error(`ERRO CRÍTICO: Usuário ${username} não possui unit_id. Cadastro incompleto.`);
+             await logAction({ userId: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User unit_id is missing' } });
+             return res.status(403).json({ message: "Erro de configuração do usuário: Unidade de trabalho não definida." });
+        }
+        
         const isPasswordCorrect = await bcrypt.compare(password, user.passwordhash);
         
         if (!isPasswordCorrect) {
@@ -46,7 +46,7 @@ router.post("/login", async (req, res) => {
 
         await logAction({ userId: user.id, username: user.username, action: 'LOGIN_SUCCESS', details: { unitId: user.unit_id } });
         
-        // 3. 📌 FIX CRÍTICO: Incluir unit_id no payload do JWT
+        // 3. Incluir unit_id no payload do JWT
         const tokenPayload = {
             id: user.id,
             username: user.username,
@@ -54,7 +54,7 @@ router.post("/login", async (req, res) => {
             nome_completo: user.nome_completo,
             cargo: user.cargo,
             is_active: user.is_active,
-            unit_id: user.unit_id, // 🔥 ESTA LINHA CORRIGE O ERRO DE SEGURANÇA
+            unit_id: user.unit_id, 
         };
         
         const token = jwt.sign(
@@ -66,15 +66,7 @@ router.post("/login", async (req, res) => {
         res.json({
             message: "Login bem-sucedido!",
             token,
-            user: { 
-                id: user.id, 
-                username: user.username, 
-                role: user.role,
-                nome_completo: user.nome_completo,
-                cargo: user.cargo,
-                is_active: user.is_active,
-                unit_id: user.unit_id
-            }
+            user: tokenPayload
         });
 
     } catch (err: any) {

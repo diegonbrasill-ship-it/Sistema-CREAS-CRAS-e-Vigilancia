@@ -2,12 +2,14 @@
 
 import { Router, Request, Response } from "express";
 import pool from "../db";
-import { authMiddleware } from "../middleware/auth";
+import { authMiddleware, AuthenticatedUser } from "../middleware/auth";
 import { logAction } from "../services/logger";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware"; 
 import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants"; 
 import { checkCaseAccess } from "../middleware/caseAccess.middleware"; 
-import { AuthenticatedUser } from '../middleware/auth'; 
+// ⭐️ CORREÇÃO: Constantes locais para o middleware de acesso de caso ⭐️
+const CREAS_UNIT_IDS = [3, 4, 5, 6]; 
+
 
 const router = Router();
 
@@ -16,8 +18,14 @@ const cleanSqlString = (sql: string): string => {
     return sql.replace(/\s+/g, ' ').trim();
 };
 
+// Interface de tipos (mantida)
+interface MseRegistroBody {
+    // ... (Tipagem mantida)
+}
+
+
 // =======================================================================
-// 📌 MÓDULO CRÍTICO: ANONIMIZAÇÃO (Tipagem Corrigida)
+// 📌 MÓDULO CRÍTICO: ANONIMIZAÇÃO 
 // =======================================================================
 function anonimizarDemandaSeNecessario(user: { unit_id: number | null }, demanda: any): any {
     const isVigilancia = user.unit_id === UNIT_ID_VIGILANCIA;
@@ -43,6 +51,7 @@ function anonimizarDemandaSeNecessario(user: { unit_id: number | null }, demanda
 // =======================================================================
 // APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
 // =======================================================================
+// Aplica auth e o novo unitAccessMiddleware em TUDO (para garantir que req.access exista)
 router.use(authMiddleware, unitAccessMiddleware('c', 'unit_id'));
 
 
@@ -51,13 +60,24 @@ router.use(authMiddleware, unitAccessMiddleware('c', 'unit_id'));
 // =======================================================================
 router.get("/", async (req: Request, res: Response) => {
     const user = req.user as AuthenticatedUser; 
-    const accessFilter = req.accessFilter!;
+    const access = req.access!; // Novo objeto de acesso
     
     try {
-        
-        // 🛑 RESTAURAÇÃO: Usamos a query mais simples que deve funcionar
-        // O filtro de unidade será aplicado pela lógica do router.use, mas não será
-        // explicitamente usado no WHERE. Isso DEVE carregar a lista.
+        // 1. FILTRO DE SEGURANÇA BASEADO NO NOVO MODELO
+        let whereClause = 'TRUE';
+        const params: any[] = [];
+        let paramIndex = 1;
+
+        if (!access.isGestorGeral && !access.isVigilancia) {
+            // Se não é Gestor/Vigilância, filtre pela unidade do usuário
+            if (access.userUnitId) {
+                params.push(access.userUnitId);
+                whereClause = `d.unit_id = $${paramIndex++}`;
+            } else {
+                // Bloqueia usuários operacionais sem lotação
+                return res.json([]); 
+            }
+        }
         
         const query = cleanSqlString(`
             SELECT
@@ -69,11 +89,11 @@ router.get("/", async (req: Request, res: Response) => {
             LEFT JOIN casos c ON d.caso_associado_id = c.id
             LEFT JOIN users u_tec ON d.tecnico_designado_id = u_tec.id
             LEFT JOIN users u_reg ON d.registrado_por_id = u_reg.id
+            WHERE ${whereClause}
             ORDER BY d.data_recebimento DESC;
         `);
         
-        // 🛑 REMOVEMOS TODOS OS PARÂMETROS ADICIONAIS PARA EVITAR O ERRO DE BIND
-        const result = await pool.query(query, []); 
+        const result = await pool.query(query, params); 
         
         const dadosProcessados = result.rows.map((demanda: any) => anonimizarDemandaSeNecessario(user, demanda));
 
@@ -100,18 +120,18 @@ router.post("/", checkCaseAccess('body', 'caso_associado_id'), async (req: Reque
     }
 
     try {
-        const prazoResposta = prazo_resposta === '' ? null : prazo_resposta;
-
-        const query = cleanSqlString(`
+        const prazoResposta = prazo_resposta === '' ? null : prazo_resposta;
+        // ⭐️ Adiciona unit_id na criação ⭐️
+        const query = cleanSqlString(`
             INSERT INTO demandas (
                 tipo_documento, instituicao_origem, numero_documento, data_recebimento, 
-                prazo_resposta, assunto, caso_associado_id, tecnico_designado_id, registrado_por_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
+                prazo_resposta, assunto, caso_associado_id, tecnico_designado_id, registrado_por_id, unit_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
         `);
         const result = await pool.query(query, [
             tipo_documento, instituicao_origem, numero_documento, data_recebimento,
             prazoResposta, 
-            assunto, caso_associado_id, tecnico_designado_id, registrado_por_id
+            assunto, caso_associado_id, tecnico_designado_id, registrado_por_id, userUnitId // Passa o unitId
         ]);
         const novaDemandaId = result.rows[0].id;
         
@@ -130,22 +150,49 @@ router.post("/", checkCaseAccess('body', 'caso_associado_id'), async (req: Reque
 });
 
 // =======================================================================
-// ROTA: Buscar uma demanda específica por ID (GET /api/demandas/:id)
-// =======================================================================
-// =======================================================================
-// ROTA: Buscar uma demanda específica por ID (GET /api/demandas/:id) - CORREÇÃO FINAL DE SINTAXE
+// ROTA: Buscar uma demanda específica por ID (GET /api/demandas/:id) - CORRIGIDA SEGURANÇA
 // =======================================================================
 router.get("/:id", async (req: Request, res: Response) => {
     const user = req.user as AuthenticatedUser; 
-    const accessFilter = req.accessFilter!;
+    const access = req.access!; // NOVO OBJETO DE ACESSO
     const { id } = req.params;
 
     try {
-        // 1. Buscar a demanda SEM FILTRO DE ACESSO (apenas por ID)
+        // 1. Buscando dados da Demanda para Checagem de Acesso
+        const checkQuery = cleanSqlString(`
+            SELECT d.registrado_por_id, d.tecnico_designado_id, c.unit_id AS caso_unit_id, d.unit_id AS demanda_unit_id
+            FROM demandas d
+            LEFT JOIN casos c ON d.caso_associado_id = c.id
+            WHERE d.id = $1
+        `);
+        const checkResult = await pool.query(checkQuery, [id]);
+        
+        if (checkResult.rowCount === 0) {
+            return res.status(404).json({ message: "Demanda não encontrada." });
+        }
+        
+        const { caso_unit_id, demanda_unit_id, registrado_por_id, tecnico_designado_id } = checkResult.rows[0];
+
+        // 2. LÓGICA DE AUTORIZAÇÃO (Substitui a lógica antiga e insegura)
+        const isGestorMaximo = access.isGestorGeral;
+        const isVigilancia = access.isVigilancia;
+        const isRegistradorOuDesignado = registrado_por_id === user.id || tecnico_designado_id === user.id;
+        
+        // Acesso se o caso/demanda pertencer à unidade do usuário (ou se o caso for nulo/demanda registrada por ele)
+        const isNaUnidade = caso_unit_id === user.unit_id || demanda_unit_id === user.unit_id;
+        // const isCasoDoGestorPrincipal = demandaBase.caso_unit_id === null; // <-- NÃO MAIS NECESSÁRIO AQUI
+
+        const temPermissao = isGestorMaximo || isVigilancia || isRegistradorOuDesignado || isNaUnidade;
+
+        if (!temPermissao) {
+            return res.status(403).json({ message: "Acesso Proibido. Esta demanda pertence a outra unidade ou você não tem vínculo." });
+        }
+        
+        // 3. Buscar a demanda completa
         const demandaBaseQuery = cleanSqlString(`
             SELECT
                 d.*, c.nome AS nome_caso, c.unit_id AS caso_unit_id,
-                u_tec.username AS tecnico_designado, u_reg.username AS registrado_por
+                u_tec.nome_completo AS tecnico_designado, u_reg.nome_completo AS registrado_por
             FROM demandas d
             LEFT JOIN casos c ON d.caso_associado_id = c.id
             LEFT JOIN users u_tec ON d.tecnico_designado_id = u_tec.id
@@ -155,30 +202,9 @@ router.get("/:id", async (req: Request, res: Response) => {
         
         const demandaResult = await pool.query(demandaBaseQuery, [id]);
 
-        if (demandaResult.rowCount === 0) {
-            return res.status(404).json({ message: "Demanda não encontrada." });
-        }
-        
-        const demandaBase = demandaResult.rows[0];
-        
-        // 2. CHECAGEM DE PERMISSÃO NO TYPESCRIPT (Para evitar erro SQL de sintaxe)
-        const isGestorMaximo = accessFilter.whereClause === 'TRUE';
-        const isRegistradorOuDesignado = demandaBase.registrado_por_id === user.id || demandaBase.tecnico_designado_id === user.id;
-        const isCasoDaUnidade = demandaBase.caso_unit_id === user.unit_id;
-        const isCasoDoGestorPrincipal = demandaBase.caso_unit_id === null;
+        const demandaBase = demandaResult.rows[0]; // Variável definida aqui
 
-        // Regra de Acesso: Gestor Máximo Vê Tudo OU (Caso Associado é da Unidade OU ele registrou/foi designado)
-        const temPermissao = isGestorMaximo || 
-                             isRegistradorOuDesignado || 
-                             isCasoDaUnidade ||
-                             isCasoDoGestorPrincipal;
-
-        if (!temPermissao) {
-             return res.status(403).json({ message: "Acesso Proibido. Esta demanda pertence a outra unidade." });
-        }
-
-
-        // 3. Montar Resposta (apenas se a permissão passar)
+        // 4. Montar Resposta (anexos e anonimização)
         const anexosQuery = cleanSqlString(`
             SELECT id, "nomeOriginal", "dataUpload" 
             FROM anexos 
@@ -205,76 +231,78 @@ router.get("/:id", async (req: Request, res: Response) => {
 // ROTA: Atualizar o status de uma demanda (PATCH /api/demandas/:id/status) - ESTABILIDADE MÁXIMA
 // =======================================================================
 router.patch("/:id/status", async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    const user = req.user as AuthenticatedUser;
-    const { id: userId, username, unit_id: userUnitId } = user;
-    const accessFilter = req.accessFilter!;
+    const { id } = req.params;
+    const { status } = req.body;
+    const user = req.user as AuthenticatedUser;
+    const { id: userId, username, unit_id: userUnitId } = user;
+    const access = req.access!; // NOVO OBJETO DE ACESSO
 
-    if (!status || !['Nova', 'Em Andamento', 'Finalizada'].includes(status)) {
-        return res.status(400).json({ message: "Status inválido." });
-    }
+    if (!status || !['Nova', 'Em Andamento', 'Finalizada'].includes(status)) {
+        return res.status(400).json({ message: "Status inválido." });
+    }
 
-    try {
-        // 1. Buscando dados da Demanda para Checagem de Acesso
-        const demandaCheckQuery = cleanSqlString(`
-            SELECT d.caso_associado_id, c.unit_id AS caso_unit_id, d.registrado_por_id, d.tecnico_designado_id
-            FROM demandas d
-            LEFT JOIN casos c ON d.caso_associado_id = c.id
-            WHERE d.id = $1
-        `);
-        const checkResult = await pool.query(demandaCheckQuery, [id]);
+    try {
+        // 1. Buscando dados da Demanda para Checagem de Acesso
+        const demandaCheckQuery = cleanSqlString(`
+            SELECT d.caso_associado_id, c.unit_id AS caso_unit_id, d.registrado_por_id, d.tecnico_designado_id, d.unit_id AS demanda_unit_id
+            FROM demandas d
+            LEFT JOIN casos c ON d.caso_associado_id = c.id
+            WHERE d.id = $1
+        `);
+        const checkResult = await pool.query(demandaCheckQuery, [id]);
 
-        if (checkResult.rowCount === 0) {
-            return res.status(404).json({ message: "Demanda não encontrada." });
-        }
+        if (checkResult.rowCount === 0) {
+            return res.status(404).json({ message: "Demanda não encontrada." });
+        }
 
-        const demandaBase = checkResult.rows[0];
-        
-        // 2. CHECAGEM DE PERMISSÃO NO TYPESCRIPT
-        const isGestorMaximo = accessFilter.whereClause === 'TRUE';
-        const isRegistradorOuDesignado = demandaBase.registrado_por_id === userId || demandaBase.tecnico_designado_id === userId;
-        const isCasoDaUnidade = demandaBase.caso_unit_id === userUnitId;
-        const isCasoSemAssociacao = demandaBase.caso_associado_id === null;
+        const { caso_unit_id, demanda_unit_id, registrado_por_id, tecnico_designado_id } = checkResult.rows[0];
+        
+        // 2. CHECAGEM DE PERMISSÃO (Substitui a lógica antiga e insegura)
+        const isGestorMaximo = access.isGestorGeral;
+        const isVigilancia = access.isVigilancia;
+        const isRegistradorOuDesignado = registrado_por_id === userId || tecnico_designado_id === userId;
+        
+        // Acesso se a demanda pertencer à unidade do usuário OU se for uma demanda sem caso associado
+        const isNaUnidade = demanda_unit_id === userUnitId;
+        // Corrigido o erro de referência a demandaBase, agora a lógica usa o checkResult
+        const isCasoSemAssociacao = demandaCheckQuery.includes('caso_associado_id') && demandaCheckQuery.includes('id') && checkResult.rows[0].caso_associado_id === null;
 
-        // Regra: Gestor Máximo OU (Registrador/Designado) OU (Caso na Unidade OU Demanda sem Caso Associado)
-        const temPermissao = isGestorMaximo || 
-                             isRegistradorOuDesignado || 
-                             isCasoDaUnidade ||
-                             isCasoSemAssociacao; 
 
-        if (!temPermissao) {
-             return res.status(403).json({ message: "Acesso Proibido. Você não tem permissão para alterar o status desta demanda." });
-        }
+        // Regra: Gestor/Vigilância Vê Tudo OU (Registrador/Designado) OU Demanda da Unidade
+        const temPermissao = isGestorMaximo || isVigilancia || isRegistradorOuDesignado || isNaUnidade; 
 
-        // 3. Execução da Query de Atualização Simples (Máxima Estabilidade)
-        const updateQuery = cleanSqlString(`
-            UPDATE demandas
-            SET status = $1
-            WHERE id = $2
-            RETURNING id, caso_associado_id;
-        `);
+        if (!temPermissao) {
+             return res.status(403).json({ message: "Acesso Proibido. Você não tem permissão para alterar o status desta demanda." });
+        }
 
-        const updateResult = await pool.query(updateQuery, [status, id]);
+        // 3. Execução da Query de Atualização Simples (Máxima Estabilidade)
+        const updateQuery = cleanSqlString(`
+            UPDATE demandas
+            SET status = $1
+            WHERE id = $2
+            RETURNING id, caso_associado_id;
+        `);
 
-        if (updateResult.rowCount === 0) {
-            return res.status(404).json({ message: 'Falha ao atualizar o status da demanda.' });
-        }
-        
-        const { caso_associado_id: casoId } = updateResult.rows[0];
+        const updateResult = await pool.query(updateQuery, [status, id]);
 
-        await logAction({ 
-            userId, 
-            username, 
-            action: 'UPDATE_DEMAND_STATUS', 
-            details: { demandaId: id, novoStatus: status, casoId, unitId: userUnitId } 
-        });
-        
-        res.status(200).json({ message: `Status da demanda atualizado para '${status}'.` });
-    } catch (err: any) {
-        console.error(`Erro ao atualizar status da demanda ${id}: ${err.message}`);
-        res.status(500).json({ message: "Erro interno ao atualizar status." });
-    }
+        if (updateResult.rowCount === 0) {
+            return res.status(404).json({ message: 'Falha ao atualizar o status da demanda.' });
+        }
+        
+        const { caso_associado_id: casoId } = updateResult.rows[0];
+
+        await logAction({ 
+            userId, 
+            username, 
+            action: 'UPDATE_DEMAND_STATUS', 
+            details: { demandaId: id, novoStatus: status, casoId, unitId: userUnitId } 
+        });
+        
+        res.status(200).json({ message: `Status da demanda atualizado para '${status}'.` });
+    } catch (err: any) {
+        console.error(`Erro ao atualizar status da demanda ${id}: ${err.message}`);
+        res.status(500).json({ message: "Erro interno ao atualizar status." });
+    }
 });
 
 export default router;
