@@ -7,8 +7,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = __importDefault(require("../db"));
 const logger_1 = require("../services/logger");
-const auth_1 = require("../middleware/auth");
+const auth_1 = require("../middleware/auth/auth");
 const constants_1 = require("../utils/constants");
+const autorized_creas_only_1 = require("../middleware/auth/autorized.creas.only");
 const router = (0, express_1.Router)();
 // SOLUÇÃO DE LIMPEZA EXTREMA
 const cleanSqlString = (sql) => {
@@ -16,7 +17,7 @@ const cleanSqlString = (sql) => {
 };
 // Aplica middlewares de segurança na ordem correta
 router.use(auth_1.authMiddleware);
-router.use(auth_1.authorizeCreasOnly);
+router.use(autorized_creas_only_1.authorizeCreasOnly);
 /**
  * @route POST /api/mse/registros
  * @desc  Cria um novo registro de Medida Socioeducativa (MSE)

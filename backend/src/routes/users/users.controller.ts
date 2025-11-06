@@ -18,6 +18,7 @@ export class UsersController {
     static async create(req: Request, res: Response) {
         try {
             const newUser = UsersService.createUsers(req.body, req.user)
+            res.json(newUser)
         } catch (err: any) {
             res.status(400).json({ message: err.message })
         }

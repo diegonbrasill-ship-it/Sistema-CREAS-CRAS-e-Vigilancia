@@ -1,6 +1,7 @@
 // src/routes/users/index.ts
 import { Router } from 'express';
-import { authMiddleware, checkRole } from '../../middleware/auth';
+import { authMiddleware } from '../../middleware/auth/auth';
+import { checkRole } from '../../middleware/auth/check.role';
 import { unitAccessMiddleware } from '../../middleware/unitAccess.middleware';
 import { UsersController } from './users.controller';
 import { checkUserUnitAccess } from './middleware';

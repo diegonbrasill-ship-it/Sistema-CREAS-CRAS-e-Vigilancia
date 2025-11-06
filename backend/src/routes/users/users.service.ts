@@ -15,20 +15,32 @@ export class UsersService {
     }
 
     static async createUsers(data: any, admin: any) {
-        const { username, password, role, nome_completo, cargo, unit_id } = data;
+
+        const {
+            username,
+            password, role,
+            nome_completo,
+            cargo,
+            unit_id } = data;
+
         const userExists: QueryResult = await pool.query(
             SQL.CLEAN('SELECT id FROM users WHERE username = $1'), [username]);
         if (userExists.rowCount && userExists.rowCount > 0)
             throw new Error('Este nome de usuário já está em uso.');
+
         const passwordHash = await bcrypt.hash(password, 10);
-        const result = await pool.query(SQL.CLEAN(SQL.CREATE_USER), [
-            username,
-            passwordHash,
-            role,
-            nome_completo,
-            cargo,
-            unit_id,
-        ]);
+
+        const result = await pool.query(
+            SQL.CLEAN(SQL.CREATE_USER),
+            [
+                username,
+                passwordHash,
+                role,
+                nome_completo,
+                cargo,
+                unit_id,
+            ]
+        );
 
         await logAction({
             userId: admin.id,
@@ -36,6 +48,8 @@ export class UsersService {
             action: 'CREATE_USER',
             details: { createdUserId: result.rows[0].id, createdUsername: username },
         });
+
+        return result.rows
     }
 
     static async updateUser(id: string, data: any, admin: any) {

@@ -3,6 +3,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.unitAccessMiddleware = void 0;
 const constants_1 = require("../utils/constants");
+// 📌 REMOVEMOS A INTERFACE AuthenticatedUser local para evitar o conflito TS2717.
+// Extensão da tipagem Request para incluir nosso filtro (acessível nas rotas)
 /**
  * Middleware para gerar a cláusula WHERE de restrição de acesso por Unidade.
  * @param tableName O nome da tabela principal a ser filtrada (ex: 'casos').

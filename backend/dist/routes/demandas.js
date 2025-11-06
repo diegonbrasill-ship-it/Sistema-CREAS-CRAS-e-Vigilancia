@@ -6,7 +6,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = __importDefault(require("../db"));
-const auth_1 = require("../middleware/auth");
+const auth_1 = require("../middleware/auth/auth");
 const logger_1 = require("../services/logger");
 const unitAccess_middleware_1 = require("../middleware/unitAccess.middleware");
 const constants_1 = require("../utils/constants");

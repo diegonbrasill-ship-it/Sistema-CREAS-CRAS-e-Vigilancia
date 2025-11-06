@@ -16,6 +16,7 @@ class UsersController {
     static async create(req, res) {
         try {
             const newUser = users_service_1.UsersService.createUsers(req.body, req.user);
+            res.json(newUser);
         }
         catch (err) {
             res.status(400).json({ message: err.message });

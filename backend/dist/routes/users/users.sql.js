@@ -21,7 +21,7 @@ exports.SQL = {
     `,
     UPDATE_STATUS: `
     UPDATE users
-    SET is_active = $1
+    SET is_active = $1 
     WHERE id = $2
     RETURNING id, username
     `,

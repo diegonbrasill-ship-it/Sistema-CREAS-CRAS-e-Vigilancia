@@ -2,7 +2,7 @@
 
 import express, { Router, Request, Response } from "express";
 import pool from "../db";
-import { authMiddleware } from "../middleware/auth";
+import { authMiddleware } from "../middleware/auth/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 // Importar tipos auxiliares, se necessário
 // import { anonimizarDadosSeNecessario } from './casos'; 
@@ -31,7 +31,7 @@ router.get("/casos", async (req: Request, res: Response) => {
     // Constrói o filtro de acesso (Visibilidade Gestor + Unidade CRAS)
     let unitParams = [...accessFilter.params];
     let unitWhere = accessFilter.whereClause;
-    
+
     // Substitui placeholders do accessFilter
     let paramIndex = 1;
     if (accessFilter.params.length === 1) {
@@ -39,11 +39,11 @@ router.get("/casos", async (req: Request, res: Response) => {
     } else if (accessFilter.params.length === 2) {
         unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
     }
-    
+
     // Filtro de Visibilidade: CRAS/Gestor Máximo/Gestor Criador
     // Adicionamos a checagem 'OR casos.unit_id IS NULL' para o Gestor Máximo
     const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
-    
+
     // Montagem da Query
     const query = cleanSqlString(`
         SELECT ${baseFields} 
@@ -51,13 +51,13 @@ router.get("/casos", async (req: Request, res: Response) => {
         WHERE ${finalUnitWhere}
         ORDER BY "dataCad" DESC
     `);
-    
+
     try {
         const result = await pool.query(query, unitParams);
 
         // NOTE: A anonimização deve ser tratada aqui, se necessário (Vigilância acessando CRAS)
         // Por enquanto, apenas devolvemos os dados filtrados.
-        res.json(result.rows); 
+        res.json(result.rows);
 
     } catch (err: any) {
         console.error("Erro ao listar casos do CRAS:", err.message);

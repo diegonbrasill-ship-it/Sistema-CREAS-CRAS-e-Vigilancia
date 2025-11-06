@@ -34,6 +34,7 @@ class UsersService {
             action: 'CREATE_USER',
             details: { createdUserId: result.rows[0].id, createdUsername: username },
         });
+        return result.rows;
     }
     static async updateUser(id, data, admin) {
         const { username, role, nome_completo, cargo } = data;

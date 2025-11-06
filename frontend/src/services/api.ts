@@ -1,6 +1,6 @@
 // frontend/src/services/api.ts
 
-const API_BASE_URL = "http://localhost:4000";
+const API_BASE_URL = "http://localhost:5173";
 
 // 🟢 NOVO: Interface base para os filtros de Dashboards/PainelVigilancia/Consultas.
 // Esta interface resolve os erros de tipagem "unidades does not exist"
@@ -147,7 +147,7 @@ const appendFiltros = (filters?: FiltrosBase): string => {
     const params = new URLSearchParams();
     if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
-            // Garante que apenas valores não nulos/vazios sejam anexados
+            // Garante que apenas valores não nulos/vazios sejam anexado
             if (value !== null && value !== undefined && value !== '') {
                 params.append(key, String(value));
             }
@@ -160,7 +160,7 @@ const appendFiltros = (filters?: FiltrosBase): string => {
 
 // AUTENTICAÇÃO
 export async function login(username: string, password: string): Promise<LoginResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const res = await fetch(`${API_BASE_URL}/api/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

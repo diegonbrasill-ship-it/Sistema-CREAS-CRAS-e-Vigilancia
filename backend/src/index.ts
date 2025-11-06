@@ -8,10 +8,11 @@ import path from "path";
 import { initDb } from "./db";
 
 // Importações das Rotas
-import authRoutes from "./routes/auth";
+import loginRoutes from "./routes/login/login";
 import usersRoutes from "./routes/users";
-import mseRoutes from "./routes/mse.routes";
 import casosRoutes from "./routes/casos";
+
+import mseRoutes from "./routes/mse.routes";
 import dashboardRoutes from './routes/dashboard';
 import acompanhamentosRoutes from "./routes/acompanhamentos";
 import relatoriosRoutes from "./routes/relatorios";
@@ -19,7 +20,6 @@ import vigilanciaRoutes from './routes/vigilancia';
 import encaminhamentosRoutes from "./routes/encaminhamentos";
 import anexosRoutes from "./routes/anexos";
 import crasRouter from './routes/cras';
-// 1. IMPORTAÇÃO da nova rota de demandas
 import demandasRoutes from "./routes/demandas";
 
 const app = express();
@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 4000;
     await initDb();
 
     // Rotas de Autenticação e Gerenciamento
-    app.use("/auth", authRoutes);
+    app.use("/api/login", loginRoutes);
     app.use("/api/users", usersRoutes);
     app.use("/api/mse", mseRoutes);
     app.use("/api/casos", casosRoutes);

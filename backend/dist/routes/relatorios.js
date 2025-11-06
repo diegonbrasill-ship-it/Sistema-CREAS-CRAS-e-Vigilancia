@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // backend/src/routes/relatorios.ts
 const express_1 = require("express");
 const db_1 = __importDefault(require("../db"));
-const auth_1 = require("../middleware/auth");
+const auth_1 = require("../middleware/auth/auth");
 const unitAccess_middleware_1 = require("../middleware/unitAccess.middleware"); // 📌 NOVO IMPORT
 const report_service_1 = require("../services/report.service");
 const router = (0, express_1.Router)();
