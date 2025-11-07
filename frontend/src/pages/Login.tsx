@@ -19,7 +19,7 @@ import secretariaLogo from "../assets/logos/secretaria.png";
 import creasLogo from "../assets/logos/creas.png";
 import paefiLogo from "../assets/logos/paefi.png";
 
-import "./Login.css";
+import "./login.css";
 
 type LoginProps = {
   onLogin?: () => void;
@@ -61,16 +61,16 @@ export default function Login({ onLogin }: LoginProps) {
       <header className="login-header">
         {/* Logo da Prefeitura à Esquerda */}
         <div className="header-side">
-          <img 
-            src={prefeituraLogo} 
-            alt="Prefeitura" 
+          <img
+            src={prefeituraLogo}
+            alt="Prefeitura"
             className="logo-prefeitura-canto"
           />
         </div>
-        
+
         {/* Logo RMSUAS no Centro */}
         <div className="header-center">
-           {/* 3. LOGO RMSUAS MAIOR (h-32 = 128px) */}
+          {/* 3. LOGO RMSUAS MAIOR (h-32 = 128px) */}
           <img src={rmsuasLogo} alt="Logo RMSUAS" className="h-32 object-contain" />
         </div>
 

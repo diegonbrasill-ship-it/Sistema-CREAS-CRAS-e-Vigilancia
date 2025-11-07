@@ -26,7 +26,7 @@ const cras_1 = __importDefault(require("./routes/cras"));
 const demandas_1 = __importDefault(require("./routes/demandas"));
 const app = (0, express_1.default)();
 // Configuração de CORS e outros middlewares
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 app.use((0, cors_1.default)({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(body_parser_1.default.json());
 app.use((0, cookie_parser_1.default)());

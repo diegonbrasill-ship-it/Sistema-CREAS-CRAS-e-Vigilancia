@@ -25,7 +25,7 @@ import demandasRoutes from "./routes/demandas";
 const app = express();
 
 // Configuração de CORS e outros middlewares
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
