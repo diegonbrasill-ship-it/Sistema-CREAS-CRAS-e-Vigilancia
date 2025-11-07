@@ -22,7 +22,6 @@ class CasosCrontroller {
         }
     }
     static async list(req, res) {
-        '';
         const user = req.user;
         const accessFilter = req.accessFilter;
         // Desestruturação da Query
@@ -37,9 +36,9 @@ class CasosCrontroller {
                 return `$${params.length}`;
             };
             // 1. FILTROS STATUS E MÊS
-            if (status && status !== 'todos') {
-                const ph = addParam(status);
-                whereClauses.push(`status = ${ph}::VARCHAR`);
+            if (status !== 'todos') {
+                const indexDoParametro = addParam(status);
+                whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
             }
             if (mes) {
                 const ph = addParam(mes);

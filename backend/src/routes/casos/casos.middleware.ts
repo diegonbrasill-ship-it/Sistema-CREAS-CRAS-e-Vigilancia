@@ -6,10 +6,12 @@ export function anonimizarDadosSeNecessario(
     data: any
 ): any {
     const isVigilancia = user.role === 'vigilancia';
+
     if (!isVigilancia || !data) return data;
 
     const anonimizarCaso = (caso: any) => {
         const deveAnonimizar = caso.unit_id === UNIT_ID_CREAS;
+
         if (!deveAnonimizar) return caso;
 
         const casoAnonimizado = { ...caso };

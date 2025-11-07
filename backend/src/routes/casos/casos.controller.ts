@@ -58,7 +58,6 @@ export class CasosCrontroller {
                 const indexDoParametro = addParam(status);
                 whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
             }
-
             if (mes) {
                 const ph = addParam(mes);
                 whereClauses.push(`TO_CHAR("dataCad", 'YYYY-MM') = ${ph}::VARCHAR`);

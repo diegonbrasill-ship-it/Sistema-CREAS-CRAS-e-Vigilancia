@@ -35,6 +35,5 @@ router.get("/:casoId/encaminhamentos", CasosCrontroller.getEncaminhamentos);
 // ROTA GET /casos/busca-rapida - BUSCA RÁPIDA PARA ASSOCIAÇÃO DE DEMANDAS
 router.get("/busca-rapida", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), CasosCrontroller.getFast);
 
-
 export default router;
 

@@ -36,7 +36,8 @@ class CasosService {
         });
         return novoCaso;
     }
-    static async list() { }
+    static async list() {
+    }
     static async update() { }
 }
 exports.CasosService = CasosService;
