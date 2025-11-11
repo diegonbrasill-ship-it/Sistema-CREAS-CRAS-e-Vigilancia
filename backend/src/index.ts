@@ -31,7 +31,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 2000;
 
 (async function start() {
   try {
@@ -52,7 +52,6 @@ const PORT = process.env.PORT || 4000;
     // 2. REGISTRO da nova rota de demandas
     app.use("/api/demandas", demandasRoutes);
 
-    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`));
   } catch (err) {
     console.error("Erro ao iniciar backend:", err);
     process.exit(1);

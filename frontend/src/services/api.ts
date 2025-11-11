@@ -1,6 +1,6 @@
 
 // frontend/src/services/api.ts
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE_URL = "https://prototipo-easysocial-api.onrender.com/";
 
 // 🟢 NOVO: Interface base para os filtros de Dashboards/PainelVigilancia/Consultas.
 // Esta interface resolve os erros de tipagem "unidades does not exist"
@@ -10,7 +10,7 @@ export interface FiltrosBase {
     bairro?: string;
 
     // Filtros de Unidade (NOVOS CAMPOS)
-    unidades?: string; // Lista de IDs separadas por vírgula (dashboardFilterUnits.join(','))
+    unidades?: string; // Li sta de IDs separadas por vírgula (dashboardFilterUnits.join(','))
     isFiltroTotal?: boolean; // Flag para Gestor Geral
 }
 
@@ -123,6 +123,7 @@ export interface DemandaDetalhada extends Demanda {
 
 // Função "Mestre" fetchWithAuth (mantida)
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Usuário não autenticado. Por favor, faça o login novamente.');
     const headers = new Headers(options.headers || {});
