@@ -25,19 +25,19 @@ import demandasRoutes from "./routes/demandas";
 const app = express();
 
 // Configuração de CORS e outros middlewares
+
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
+const PORT = process.env.PORT || 4000;
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-const PORT = process.env.PORT || 2000;
-
 (async function start() {
   try {
     await initDb();
 
-    // Rotas de Autenticação e Gerenciamento
     app.use("/api/login", loginRoutes);
     app.use("/api/users", usersRoutes);
     app.use("/api/mse", mseRoutes);
@@ -49,8 +49,9 @@ const PORT = process.env.PORT || 2000;
     app.use("/api/encaminhamentos", encaminhamentosRoutes);
     app.use("/api/anexos", anexosRoutes);
     app.use('/api/cras', crasRouter);
-    // 2. REGISTRO da nova rota de demandas
     app.use("/api/demandas", demandasRoutes);
+
+    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost : ${PORT}`))
 
   } catch (err) {
     console.error("Erro ao iniciar backend:", err);

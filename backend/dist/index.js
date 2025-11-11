@@ -27,11 +27,11 @@ const demandas_1 = __importDefault(require("./routes/demandas"));
 const app = (0, express_1.default)();
 // Configuração de CORS e outros middlewares
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
-app.use((0, cors_1.default)({ origin: FRONTEND_ORIGIN, credentials: true }));
+app.use((0, cors_1.default)());
 app.use(body_parser_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '..', 'uploads')));
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 2000;
 (async function start() {
     try {
         await (0, db_1.initDb)();
@@ -49,7 +49,6 @@ const PORT = process.env.PORT || 4000;
         app.use('/api/cras', cras_1.default);
         // 2. REGISTRO da nova rota de demandas
         app.use("/api/demandas", demandas_1.default);
-        app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`));
     }
     catch (err) {
         console.error("Erro ao iniciar backend:", err);
