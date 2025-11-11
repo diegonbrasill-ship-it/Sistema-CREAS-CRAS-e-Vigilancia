@@ -26,7 +26,7 @@ const app = express();
 
 // Configuração de CORS e outros middlewares
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
-app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
+app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
