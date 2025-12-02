@@ -1,10 +1,10 @@
 
 // frontend/src/services/api.ts
-const API_BASE_URL = import.meta.env.API_BASE_URL || "https://prototipo-easysocial-api.onrender.com";
+//const API_BASE_URL = import.meta.env.API_BASE_URL || "https://prototipo-easysocial-api.onrender.com";
+const API_BASE_URL = "http://localhost:3000"
 
 // 🟢 NOVO: Interface base para os filtros de Dashboards/PainelVigilancia/Consultas.
 // Esta interface resolve os erros de tipagem "unidades does not exist"
-
 export interface FiltrosBase {
     mes?: string;
     tecRef?: string;

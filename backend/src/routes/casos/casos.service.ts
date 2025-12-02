@@ -49,6 +49,35 @@ export class CasosService {
     static async list() {
 
     }
-    static async update() { }
+
+    static async update(data: any, admin: any) {
+
+        const { idParams, novosDados } = data;
+        const userId = admin.user!.id || null;
+        const username = admin.user!.username
+
+        const resultAtual = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.SELECT_BY_ID), [idParams]);
+
+        if (resultAtual.rowCount === 0) throw new Error('Caso não encontrado.')
+
+        const dadosExistentes = resultAtual.rows[0];
+
+        const dadosMesclados = {
+            ...dadosExistentes.dados_completos,
+            ...novosDados
+        };
+
+        // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
+        const dataCad = novosDados.dataCad || dadosExistentes.dataCad;
+        const tecRef = novosDados.tecRef || dadosExistentes.tecRef;
+        const nome = novosDados.nome || dadosExistentes.nome || null;
+
+        await pool.query(
+            CASOS_SQL.CLEAN(CASOS_SQL.UPDATE),
+            [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), idParams]
+        );
+
+        await logAction({ userId, username, action: 'UPDATE_CASE', details: { casoId: idParams } });
+    }
 
 }

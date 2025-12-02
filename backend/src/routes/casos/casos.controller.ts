@@ -159,6 +159,13 @@ export class CasosCrontroller {
     }
 
     static async update(req: Request, res: Response) {
+
+        try {
+            const casoAtualizado = CasosService.update(req.body, req.user)
+        } catch (err: any) {
+            console.error("Erro ao atualizar caso:", err.message)
+            res.status(500).json({ message: "Erro ao atualizar caso" })
+        }
         const { id } = req.params;
         const novosDados = req.body;
         const { id: userId, username } = req.user!;
@@ -186,6 +193,7 @@ export class CasosCrontroller {
 
             await logAction({ userId, username, action: 'UPDATE_CASE', details: { casoId: id } });
             res.status(200).json({ message: "Prontuário atualizado com sucesso!", caso: dadosMesclados });
+
         } catch (err: any) {
             console.error(`Erro ao atualizar caso ${id}:`, err.message);
             res.status(500).json({ message: "Erro interno ao atualizar o prontuário." });

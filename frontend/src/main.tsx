@@ -12,7 +12,7 @@ import 'react-toastify/dist/ReactToastify.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
-    
+
     {/* 2. ADICIONE O COMPONENTE AQUI, FORA DO APP */}
     <ToastContainer
       position="top-right"
@@ -26,5 +26,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       pauseOnHover
       theme="colored"
     />
+
   </React.StrictMode>,
 );

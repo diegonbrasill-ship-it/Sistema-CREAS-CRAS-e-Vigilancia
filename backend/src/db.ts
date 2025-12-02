@@ -18,12 +18,12 @@ const pool = new Pool({
 let isDbInitialized = false;
 
 export async function initDb() {
-  if (isDbInitialized) {
-    return pool;
-  }
+
+  if (isDbInitialized) return pool;
 
   const client = await pool.connect();
-  console.log("🐘 Conectado ao PostgreSQL com sucesso!");
+
+  console.log("🐘 Conectado ao PostgreSQL!");
 
   try {
     // --- 1. Tabela unidades ---
@@ -31,7 +31,11 @@ export async function initDb() {
       CREATE TABLE IF NOT EXISTS unidades (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
-        type VARCHAR(50) NOT NULL
+        type VARCHAR(50) NOT NULL,
+
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ 
       );
     `.trim());
 
@@ -40,24 +44,29 @@ export async function initDb() {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
-        passwordHash TEXT NOT NULL
+        passwordHash TEXT NOT NULL,
+        nome_completo TEXT,
+        cargo TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        role VARCHAR(50),
+        unit_id INTEGER REFERENCES unidades(id),
+
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
       );
     `.trim());
-
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS nome_completo TEXT`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cargo TEXT`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50)`.trim());
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
-
-    console.log("Tabela 'users' e 'unidades' verificada/atualizada.");
 
     // --- 3. Tabelas roles e permissions ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS roles (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
-        description TEXT
+        description TEXT,
+
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
       );
     `.trim());
 
@@ -65,7 +74,11 @@ export async function initDb() {
       CREATE TABLE IF NOT EXISTS permissions (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
-        description TEXT
+        description TEXT,
+
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
       );
     `.trim());
 
@@ -85,23 +98,24 @@ export async function initDb() {
       );
     `.trim());
 
-    console.log("Tabelas de papéis e permissões verificadas/criadas.");
-
     // --- 4. Tabela casos ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS casos (
         id SERIAL PRIMARY KEY,
-        "dataCad" DATE NOT NULL,
-        "tecRef" TEXT NOT NULL,
+        data_cad DATE NOT NULL,
+        tec_ref TEXT NOT NULL,
         nome TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'Ativo',
         dados_completos JSONB,
-        "userId" INTEGER NOT NULL REFERENCES users(id)
+        
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        unit_id INTEGER NOT NULL REFERENCES unidades(id),
+
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
       );
     `.trim());
-
-    await client.query(`ALTER TABLE casos ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES unidades(id)`.trim());
-    console.log("Tabela 'casos' verificada/criada.");
 
     // --- 5. Tabela registros_mse ---
     await client.query(`

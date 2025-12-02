@@ -21,18 +21,20 @@ import encaminhamentosRoutes from "./routes/encaminhamentos";
 import anexosRoutes from "./routes/anexos";
 import crasRouter from './routes/cras';
 import demandasRoutes from "./routes/demandas";
+import { requestLogger } from "./middleware/requestLogger.middleware";
 
 const app = express();
 
 // Configuração de CORS e outros middlewares
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 
 app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+//app.use(requestLogger);
 
 (async function start() {
   try {
@@ -51,7 +53,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
     app.use('/api/cras', crasRouter);
     app.use("/api/demandas", demandasRoutes);
 
-    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost : ${PORT}`))
+    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`))
 
   } catch (err) {
     console.error("Erro ao iniciar backend:", err);

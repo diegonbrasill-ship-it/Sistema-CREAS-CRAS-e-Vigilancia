@@ -133,6 +133,13 @@ class CasosCrontroller {
         }
     }
     static async update(req, res) {
+        try {
+            const casoAtualizado = casos_service_1.CasosService.update(req.body, req.user);
+        }
+        catch (err) {
+            console.error("Erro ao atualizar caso:", err.message);
+            res.status(500).json({ message: "Erro ao atualizar caso" });
+        }
         const { id } = req.params;
         const novosDados = req.body;
         const { id: userId, username } = req.user;

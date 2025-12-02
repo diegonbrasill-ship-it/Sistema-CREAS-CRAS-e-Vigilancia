@@ -24,6 +24,7 @@ const encaminhamentos_1 = __importDefault(require("./routes/encaminhamentos"));
 const anexos_1 = __importDefault(require("./routes/anexos"));
 const cras_1 = __importDefault(require("./routes/cras"));
 const demandas_1 = __importDefault(require("./routes/demandas"));
+const requestLogger_middleware_1 = require("./middleware/requestLogger.middleware");
 const app = (0, express_1.default)();
 // Configuração de CORS e outros middlewares
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
@@ -32,6 +33,7 @@ app.use((0, cors_1.default)());
 app.use(body_parser_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '..', 'uploads')));
+app.use(requestLogger_middleware_1.requestLogger);
 (async function start() {
     try {
         await (0, db_1.initDb)();
@@ -47,7 +49,7 @@ app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '..'
         app.use("/api/anexos", anexos_1.default);
         app.use('/api/cras', cras_1.default);
         app.use("/api/demandas", demandas_1.default);
-        app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost : ${PORT}`));
+        app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`));
     }
     catch (err) {
         console.error("Erro ao iniciar backend:", err);
