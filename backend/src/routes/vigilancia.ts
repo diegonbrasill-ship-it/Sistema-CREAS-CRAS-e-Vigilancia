@@ -57,7 +57,7 @@ router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit
         const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
         const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
 
-        const queryBase = `SELECT COUNT(id) AS "total" FROM casos WHERE "dataCad" >= CURRENT_DATE - INTERVAL '30 days'`;
+        const queryBase = `SELECT COUNT(id) AS "total" FROM casos WHERE data_cad >= CURRENT_DATE - INTERVAL '30 days'`;
 
         const finalQuery = cleanSqlString(queryBase + andClause);
         const result = await pool.query(finalQuery, unitParams);
@@ -77,7 +77,7 @@ router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', '
 
     try {
         const totalCasosBase = `SELECT COUNT(*) AS total FROM casos`;
-        const totalTecnicosBase = `SELECT COUNT(DISTINCT "tecRef") AS total FROM casos`;
+        const totalTecnicosBase = `SELECT COUNT(DISTINCT "tec_ref") AS total FROM casos`;
 
         const [casosResult, tecnicosResult] = await Promise.all([
             pool.query(cleanSqlString(totalCasosBase + whereClause), unitParams),
@@ -161,7 +161,7 @@ router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', '
     const andClause = unitFilterContent.length > 0 ? ` AND ${unitFilterContent}` : '';
 
     try {
-        const queryBase = `SELECT COUNT(id) AS "totalCasos", COUNT(id) FILTER (WHERE dados_completos->>'reincidente' = 'Sim') AS "casosReincidentes" FROM casos WHERE "dataCad" >= NOW() - INTERVAL '1 year'`;
+        const queryBase = `SELECT COUNT(id) AS "totalCasos", COUNT(id) FILTER (WHERE dados_completos->>'reincidente' = 'Sim') AS "casosReincidentes" FROM casos WHERE data_cad >= NOW() - INTERVAL '1 year'`;
 
         const finalQuery = cleanSqlString(queryBase + andClause);
         const result = await pool.query(finalQuery, unitParams);
@@ -240,7 +240,7 @@ router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'un
                     // CRÍTICO: Se a chave é 'dataCad' e o valor é 'ultimos_30_dias', aplica a lógica SQL de data
                     if (val === 'ultimos_30_dias') {
                         // ✅ CORREÇÃO: Usa a lógica de data correta.
-                        whereClauses.push(`"dataCad" >= CURRENT_DATE - INTERVAL '30 days'`);
+                        whereClauses.push(`data_cad >= CURRENT_DATE - INTERVAL '30 days'`);
                     } else {
                         // Fallback para caso não seja o filtro de 30 dias (incomum, mas seguro)
                         const ph = addParam(val);
@@ -274,7 +274,7 @@ router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'un
 
         // Montagem final da query
         let finalQuery = `
-            SELECT id, "dataCad", "tecRef", nome, status, unit_id, dados_completos->>'bairro' AS bairro
+            SELECT id, data_cad, "tec_ref", nome, status, unit_id, dados_completos->>'bairro' AS bairro
             FROM casos
         `;
 
@@ -282,7 +282,7 @@ router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'un
             finalQuery += ` WHERE ${whereClauses.join(' AND ')} `;
         }
 
-        finalQuery += ` ORDER BY "dataCad" DESC`;
+        finalQuery += ` ORDER BY data_cad DESC`;
 
         const result = await pool.query(cleanSqlString(finalQuery), params);
 

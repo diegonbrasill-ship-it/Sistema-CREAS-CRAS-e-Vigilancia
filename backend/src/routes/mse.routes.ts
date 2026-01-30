@@ -33,7 +33,7 @@ router.use(authorizeCreasOnly);
  * @desc  Cria um novo registro de Medida Socioeducativa (MSE)
  */
 router.post("/registros", async (req: Request, res: Response) => {
-    const userId = req.user!.id;
+    const user_id = req.user!.id;
     // Usa a unidade do usuário, com fallback para CREAS (ID 1)
     const unit_id = req.user!.unit_id ?? UNIT_ID_CREAS;
 
@@ -69,14 +69,14 @@ router.post("/registros", async (req: Request, res: Response) => {
         const params = [
             nome_adolescente, data_nascimento, responsavel, endereco, cleanContato, cleanNis,
             mse_tipo, mse_data_inicio, mse_duracao_meses, situacao, local_descumprimento,
-            pia_data_elaboracao, finalPiaStatus, userId, unit_id // Usa finalPiaStatus
+            pia_data_elaboracao, finalPiaStatus, user_id, unit_id // Usa finalPiaStatus
         ];
 
         const result = await pool.query(query, params) as QueryResult<{ id: number }>;
         const novoRegistroId = result.rows[0].id;
 
         await logAction({
-            userId,
+            user_id,
             username: req.user!.username,
             action: 'CREATE_MSE_REGISTRY',
             details: { registroId: novoRegistroId, adolescente: nome_adolescente, unitId: unit_id }

@@ -116,7 +116,7 @@ router.post("/", checkCaseAccess('body', 'caso_associado_id'), async (req: Reque
         const novaDemandaId = result.rows[0].id;
 
         await logAction({
-            userId: registrado_por_id,
+            user_id: registrado_por_id,
             username: req.user!.username,
             action: 'CREATE_DEMAND',
             details: { demandaId: novaDemandaId, assunto, casoAssociadoId: caso_associado_id, unitId: userUnitId }
@@ -208,7 +208,7 @@ router.patch("/:id/status", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
     const user = req.user as AuthenticatedUser;
-    const { id: userId, username, unit_id: userUnitId } = user;
+    const { id: user_id, username, unit_id: userUnitId } = user;
     const accessFilter = req.accessFilter!;
 
     if (!status || !['Nova', 'Em Andamento', 'Finalizada'].includes(status)) {
@@ -233,7 +233,7 @@ router.patch("/:id/status", async (req: Request, res: Response) => {
 
         // 2. CHECAGEM DE PERMISSÃO NO TYPESCRIPT
         const isGestorMaximo = accessFilter.whereClause === 'TRUE';
-        const isRegistradorOuDesignado = demandaBase.registrado_por_id === userId || demandaBase.tecnico_designado_id === userId;
+        const isRegistradorOuDesignado = demandaBase.registrado_por_id === user_id || demandaBase.tecnico_designado_id === user_id;
         const isCasoDaUnidade = demandaBase.caso_unit_id === userUnitId;
         const isCasoSemAssociacao = demandaBase.caso_associado_id === null;
 
@@ -264,7 +264,7 @@ router.patch("/:id/status", async (req: Request, res: Response) => {
         const { caso_associado_id: casoId } = updateResult.rows[0];
 
         await logAction({
-            userId,
+            user_id,
             username,
             action: 'UPDATE_DEMAND_STATUS',
             details: { demandaId: id, novoStatus: status, casoId, unitId: userUnitId }

@@ -2,17 +2,17 @@
 import pool from '../db';
 
 interface LogOptions {
-  userId?: number;
+  user_id?: number;
   username?: string;
   action: string;
   details?: object;
 }
 
-export async function logAction({ userId, username, action, details }: LogOptions): Promise<void> {
+export async function logAction({ user_id, username, action, details }: LogOptions): Promise<void> {
   try {
     await pool.query(
-      `INSERT INTO logs ("userId", username, action, details) VALUES ($1, $2, $3, $4)`,
-      [userId, username, action, details ? JSON.stringify(details) : null]
+      `INSERT INTO logs ("user_id", username, action, details) VALUES ($1, $2, $3, $4)`,
+      [user_id, username, action, details ? JSON.stringify(details) : null]
     );
   } catch (error) {
     console.error("Falha ao registrar ação no log de auditoria:", error);

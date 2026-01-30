@@ -25,7 +25,7 @@ router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
  * @access  Private
  */
 router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Response) => {
-  const userId = req.user!.id;
+  const user_id = req.user!.id;
   const username = req.user!.username;
   const { casoId, servicoDestino, dataEncaminhamento, observacoes } = req.body;
   const userUnitId = req.user!.unit_id;
@@ -37,16 +37,16 @@ router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Re
   try {
     const query = cleanSqlString(`
       INSERT INTO encaminhamentos
-        ("casoId", "userId", "servicoDestino", "dataEncaminhamento", observacoes)
+        ("casoId", user_id, "servicoDestino", "dataEncaminhamento", observacoes)
       VALUES
         ($1, $2, $3, $4, $5)
       RETURNING id, "servicoDestino";
     `);
-    const result = await pool.query(query, [casoId, userId, servicoDestino, dataEncaminhamento, observacoes]);
+    const result = await pool.query(query, [casoId, user_id, servicoDestino, dataEncaminhamento, observacoes]);
     const novoEncaminhamento = result.rows[0];
 
     await logAction({
-      userId,
+      user_id,
       username,
       action: 'CREATE_ENCAMINHAMENTO',
       details: {
@@ -75,7 +75,7 @@ router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Re
 router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (req: Request, res: Response) => {
   const { id } = req.params;
   const { status, dataRetorno } = req.body;
-  const { id: userId, username } = req.user!;
+  const { id: user_id, username } = req.user!;
   const casoId = (req as any).casoId; // CasoId obtido do middleware
 
   if (!status) {
@@ -101,7 +101,7 @@ router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (
     const encaminhamentoAtualizado = result.rows[0];
 
     await logAction({
-      userId,
+      user_id,
       username,
       action: 'UPDATE_ENCAMINHAMENTO_STATUS',
       details: {

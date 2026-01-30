@@ -22,7 +22,7 @@ export default function Relatorios() {
         setIsLoading(true);
         try {
             const pdfBlob = await generateReport({ startDate, endDate });
-            
+
             // Cria um link temporário para fazer o download do arquivo
             const url = window.URL.createObjectURL(pdfBlob);
             const link = document.createElement('a');

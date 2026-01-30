@@ -29,9 +29,9 @@ router.get("/:casoId", async (req, res) => {
     try {
         // ✅ CORREÇÃO: Usar $1 e não uma template string, resolvendo o erro SQL 'invalid input syntax'
         const query = cleanSqlString(`
-            SELECT a.*, u.username as "tecRef" 
+            SELECT a.*, u.username as tec_ref 
             FROM acompanhamentos a
-            JOIN users u ON a."userId" = u.id
+            JOIN users u ON a.user_id = u.id
             WHERE a."casoId" = $1 
             ORDER BY a.data DESC
         `);
@@ -49,7 +49,7 @@ router.get("/:casoId", async (req, res) => {
 router.post("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) => {
     const { casoId } = req.params;
     const { texto } = req.body;
-    const userId = req.user!.id;
+    const user_id = req.user!.id;
     const userUnitId = req.user!.unit_id;
 
     if (!texto) {
@@ -58,13 +58,13 @@ router.post("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) =>
 
     try {
         const query = cleanSqlString(`
-            INSERT INTO acompanhamentos (texto, "casoId", "userId") VALUES ($1, $2, $3) RETURNING *
+            INSERT INTO acompanhamentos (texto, "casoId", user_id) VALUES ($1, $2, $3) RETURNING *
         `);
-        const result = await pool.query(query, [texto, casoId, userId]);
+        const result = await pool.query(query, [texto, casoId, user_id]);
         const novoAcompanhamento = result.rows[0];
 
         await logAction({
-            userId,
+            user_id,
             username: req.user!.username,
             action: 'CREATE_ACOMPANHAMENTO',
             details: { casoId, acompanhamentoId: novoAcompanhamento.id, unitId: userUnitId }

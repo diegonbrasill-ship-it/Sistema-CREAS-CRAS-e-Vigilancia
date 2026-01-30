@@ -19,7 +19,7 @@ const cleanSqlString = (sql: string): string => {
  * Retorna APENAS O CONTEÚDO do WHERE, limpo.
  */
 const buildFullWhereClauseContent = (
-    filters: { mes?: string, tecRef?: string, bairro?: string },
+    filters: { mes?: string, tec_ref?: string, bairro?: string },
     accessFilter: { whereClause: string, params: any[] },
     startParamIndex: number
 ): [string, any[]] => {
@@ -28,14 +28,14 @@ const buildFullWhereClauseContent = (
     let params: any[] = [];
     let paramIndex = startParamIndex;
 
-    // 1. Adicionar filtros existentes (mes, tecRef, bairro)
+    // 1. Adicionar filtros existentes (mes, tec_ref, bairro)
     if (filters.mes) {
         params.push(filters.mes);
-        whereClauses.push(`TO_CHAR(casos."dataCad", 'YYYY-MM') = $${paramIndex++}`);
+        whereClauses.push(`TO_CHAR(casos.data_cad, 'YYYY-MM') = $${paramIndex++}`);
     }
-    if (filters.tecRef) {
-        params.push(filters.tecRef);
-        whereClauses.push(`casos."tecRef" ILIKE $${paramIndex++}`);
+    if (filters.tec_ref) {
+        params.push(filters.tec_ref);
+        whereClauses.push(`casos.tec_ref ILIKE $${paramIndex++}`);
     }
     if (filters.bairro) {
         params.push(filters.bairro);
@@ -86,10 +86,10 @@ router.get("/", async (req: Request, res: Response) => {
     try {
         const accessFilter = req.accessFilter!;
 
-        const { mes, tecRef, bairro } = req.query as { mes?: string, tecRef?: string, bairro?: string };
+        const { mes, tec_ref, bairro } = req.query as { mes?: string, tec_ref?: string, bairro?: string };
 
         // 1. Gera o conteúdo e os parâmetros (Inicia a contagem em $1)
-        const [whereContent, params] = buildFullWhereClauseContent({ mes, tecRef, bairro }, accessFilter, 1);
+        const [whereContent, params] = buildFullWhereClauseContent({ mes, tec_ref, bairro }, accessFilter, 1);
 
         // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
         const whereClause = whereContent.length > 0 ? ` WHERE ${whereContent}` : '';
@@ -121,7 +121,7 @@ router.get("/", async (req: Request, res: Response) => {
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos ${whereClause}`), params),
 
             // 1. Novos no Mês (A query base tem WHERE, usa andClause)
-            pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE "dataCad" >= date_trunc('month', CURRENT_DATE) ${andClause}`), params),
+            pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE data_cad >= date_trunc('month', CURRENT_DATE) ${andClause}`), params),
 
             // 2 - 4 (Queries que usam andClause)
             pool.query(cleanSqlString(`SELECT COUNT(id) AS total FROM casos WHERE dados_completos->>'inseridoPAEFI' = 'Sim' ${andClause}`), params),
@@ -164,8 +164,8 @@ router.get("/", async (req: Request, res: Response) => {
             pool.query(cleanSqlString(`SELECT CASE WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' ELSE 'Não informado' END as name, COUNT(*) as value FROM casos ${whereClause} AND dados_completos->>'idade' IS NOT NULL AND TRIM(dados_completos->>'idade') <> '' GROUP BY name ORDER BY value DESC`), params),
 
             // 20, 21, 22 - Opções para os Filtros (Reforçando checagem TRIM() )
-            pool.query(cleanSqlString(`SELECT DISTINCT TO_CHAR("dataCad", 'YYYY-MM') AS mes FROM casos ${whereClause} AND "dataCad" IS NOT NULL GROUP BY mes ORDER BY mes DESC`), params),
-            pool.query(cleanSqlString(`SELECT DISTINCT "tecRef" FROM casos ${whereClause} AND "tecRef" IS NOT NULL GROUP BY "tecRef" ORDER BY "tecRef" ASC`), params),
+            pool.query(cleanSqlString(`SELECT DISTINCT TO_CHAR(data_cad, 'YYYY-MM') AS mes FROM casos ${whereClause} AND data_cad IS NOT NULL GROUP BY mes ORDER BY mes DESC`), params),
+            pool.query(cleanSqlString(`SELECT DISTINCT tec_ref FROM casos ${whereClause} AND tec_ref IS NOT NULL GROUP BY tec_ref ORDER BY tec_ref ASC`), params),
             pool.query(cleanSqlString(`SELECT DISTINCT dados_completos->>'bairro' AS bairro FROM casos ${whereClause} AND dados_completos->>'bairro' IS NOT NULL AND TRIM(dados_completos->>'bairro') <> '' GROUP BY bairro ORDER BY bairro ASC`), params)
         ];
 
@@ -202,7 +202,7 @@ router.get("/", async (req: Request, res: Response) => {
             },
             opcoesFiltro: {
                 meses: results[20].rows.map((r: any) => r.mes),
-                tecnicos: results[21].rows.map((r: any) => r.tecRef),
+                tecnicos: results[21].rows.map((r: any) => r.tec_ref),
                 bairros: results[22].rows.map((r: any) => r.bairro),
             }
         };

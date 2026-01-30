@@ -11,6 +11,7 @@ export class UsersService {
     static async listUsers(where: string, params: any[]) {
         const query = `${SQL.LIST_USERS} AND ${where} ORDER BY nome_completo ASC`
         const result = await pool.query(SQL.CLEAN(query), params)
+
         return result.rows
     }
 
@@ -43,7 +44,7 @@ export class UsersService {
         );
 
         await logAction({
-            userId: admin.id,
+            user_id: admin.id,
             username: admin.username,
             action: 'CREATE_USER',
             details: { createdUserId: result.rows[0].id, createdUsername: username },
@@ -60,7 +61,7 @@ export class UsersService {
             throw new Error("Usuario não encontrado ou não existe.")
         }
         await logAction({
-            userId: admin.id,
+            user_id: admin.id,
             username: admin.username,
             action: 'UPDATE_USER',
             details: { updatedUserId: id, updatedUsername: username },

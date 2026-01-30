@@ -102,7 +102,7 @@ router.get('/casos/:casoId', async (req: Request, res: Response) => {
         anex.id, anex."nomeOriginal", anex."tamanhoArquivo", 
         anex."dataUpload", anex.descricao, usr.username AS "uploadedBy"
       FROM anexos anex
-      LEFT JOIN users usr ON anex."userId" = usr.id
+      LEFT JOIN users usr ON anex."user_id" = usr.id
       WHERE anex."casoId" = $1 
       ORDER BY anex."dataUpload" DESC;
     `);
@@ -131,7 +131,7 @@ router.post(
 
         const { casoId } = req.params;
         const { descricao } = req.body;
-        const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
+        const { id: user_id, username, unit_id: userUnitId } = (req as any).user!;
         const uploadedFile = req.file as Express.Multer.File;
         const { originalname, filename, path: filePath, mimetype, size } = uploadedFile;
 
@@ -139,18 +139,18 @@ router.post(
             // ⭐️ CORREÇÃO DO SCHEMA SQL
             const query = cleanSqlString(`
         INSERT INTO anexos 
-          ("casoId", "userId", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
+          ("casoId", "user_id", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
         VALUES 
           ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id, "nomeOriginal";
       `);
             const result = await pool.query(query, [
-                casoId, userId, originalname, filename, filePath, mimetype, size, descricao
+                casoId, user_id, originalname, filename, filePath, mimetype, size, descricao
             ]);
             const novoAnexo = result.rows[0];
 
             await logAction({
-                userId,
+                user_id,
                 username,
                 action: 'UPLOAD_CASE_ATTACHMENT',
                 details: { casoId, anexoId: novoAnexo.id, nomeArquivo: novoAnexo.nomeOriginal, unitId: userUnitId }
@@ -178,7 +178,7 @@ router.post(
         // ... (lógica de upload demanda inalterada)
         const { demandaId } = req.params;
         const { descricao } = req.body;
-        const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
+        const { id: user_id, username, unit_id: userUnitId } = (req as any).user!;
         const uploadedFile = req.file as Express.Multer.File;
         const { originalname, filename, path: filePath, mimetype, size } = uploadedFile;
 
@@ -186,18 +186,18 @@ router.post(
             // ⭐️ CORREÇÃO DO SCHEMA SQL
             const query = cleanSqlString(`
                 INSERT INTO anexos
-                  ("demandaId", "userId", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
+                  ("demandaId", "user_id", "nomeOriginal", "nomeArmazenado", "caminhoArquivo", "tipoArquivo", "tamanhoArquivo", descricao)
                 VALUES
                   ($1, $2, $3, $4, $5, $6, $7, $8)
                 RETURNING id, "nomeOriginal";
             `);
             const result = await pool.query(query, [
-                demandaId, userId, originalname, filename, filePath, mimetype, size, descricao
+                demandaId, user_id, originalname, filename, filePath, mimetype, size, descricao
             ]);
             const novoAnexo = result.rows[0];
 
             await logAction({
-                userId,
+                user_id,
                 username,
                 action: 'UPLOAD_DEMAND_ATTACHMENT',
                 details: { demandaId, anexoId: novoAnexo.id, nomeArquivo: novoAnexo.nomeOriginal, unitId: userUnitId }
@@ -217,7 +217,7 @@ router.post(
 // =======================================================================
 router.get('/download/:id', checkAnexoAccess, async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { id: userId, username, unit_id: userUnitId } = (req as any).user!;
+    const { id: user_id, username, unit_id: userUnitId } = (req as any).user!;
     const casoId = (req as any).casoId;
 
     try {
@@ -232,7 +232,7 @@ router.get('/download/:id', checkAnexoAccess, async (req: Request, res: Response
         const filePath = path.resolve(anexo.caminhoArquivo);
 
         await logAction({
-            userId,
+            user_id,
             username,
             action: 'DOWNLOAD_ATTACHMENT',
             details: { anexoId: id, nomeArquivo: anexo.nomeOriginal, casoId, unitId: userUnitId }

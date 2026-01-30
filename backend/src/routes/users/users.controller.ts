@@ -8,8 +8,9 @@ export class UsersController {
     static async list(req: Request, res: Response) {
         const { whereClause, params } = req.accessFilter!;
         try {
-            const users = UsersService.listUsers(whereClause, params)
-            res.json(users)
+            const users = await UsersService.listUsers(whereClause, params)
+            res.status(200).json(users)
+
         } catch (err: any) {
             res.status(500).json({ message: err.message })
         }

@@ -1,0 +1,54 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            /* =================================================================
+         * CONFIGURAÇÃO DO BACKEND (Node.js)
+         * ================================================================= */
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Backend (CREAS API)",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            // 1. Define a pasta 'backend' como a raiz da execução.
+            // Isso é vital para que o Node encontre o node_modules e o .env locais.
+            "cwd": "${workspaceFolder}/backend",
+            // 2. Argumentos de Runtime: Usa ts-node para rodar TypeScript sem compilar
+            "runtimeArgs": [
+                "-r",
+                "ts-node/register"
+            ],
+            // 3. Arquivo de Entrada: Identificado na sua árvore em 'backend/src/index.ts'
+            "args": [
+                "${workspaceFolder}/backend/src/index.ts"
+            ],
+            // Opcional: Garante que carregue variáveis de ambiente se necessário
+            "envFile": "${workspaceFolder}/backend/.env"
+        },
+        {
+            /* =================================================================
+         * CONFIGURAÇÃO DO FRONTEND (Chrome)
+         * ================================================================= */
+            "type": "chrome",
+            "request": "launch",
+            "name": "Debug Frontend (Vite Client)",
+            "url": "http://localhost:5173", // Confirme se seu Vite roda nesta porta
+            // 4. Raiz da Web: Aponta para onde está o código React
+            "webRoot": "${workspaceFolder}/frontend/src",
+            "userDataDir": false, // Abre uma instância limpa do Chrome para debug
+            "sourceMapPathOverrides": {
+                "webpack:///./src/*": "${webRoot}/*"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack: CREAS System",
+            "configurations": [
+                "Debug Backend (CREAS API)",
+                "Debug Frontend (Vite Client)"
+            ]
+        }
+    ]
+}

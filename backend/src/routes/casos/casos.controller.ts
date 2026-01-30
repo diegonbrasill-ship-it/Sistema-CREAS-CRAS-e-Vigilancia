@@ -13,7 +13,7 @@ export class CasosCrontroller {
 
         // necessidade de definir mais os erros de rotas?
         try {
-            const novoCaso = CasosService.createCaso(req.body, req.user)
+            const novoCaso = await CasosService.createCaso(req.body, req.user)
             res.status(201).json(novoCaso);
 
         } catch (err: any) {
@@ -28,10 +28,10 @@ export class CasosCrontroller {
         const user = req.user!;
         const accessFilter = req.accessFilter!;
 
-        // Desestruturação da Query
+        // Desestruturação da requisiçao
         const {
             q,
-            tecRef,
+            tec_ref,
             filtro,
             valor,
             status = 'Ativo',
@@ -60,11 +60,11 @@ export class CasosCrontroller {
             }
             if (mes) {
                 const ph = addParam(mes);
-                whereClauses.push(`TO_CHAR("dataCad", 'YYYY-MM') = ${ph}::VARCHAR`);
+                whereClauses.push(`TO_CHAR(data_cad, 'YYYY-MM') = ${ph}::VARCHAR`);
             }
 
-            // 2. FILTRO DE BUSCA (geral ou por tecRef/filtro)
-            const searchTerm = valor && filtro === 'q' ? valor : tecRef;
+            // 2. FILTRO DE BUSCA (geral ou por tec_ref/filtro)
+            const searchTerm = valor && filtro === 'q' ? valor : tec_ref;
             if (searchTerm) {
                 const wild = `%${searchTerm}%`;
                 const p1 = addParam(wild);
@@ -74,7 +74,7 @@ export class CasosCrontroller {
 
                 whereClauses.push(CASOS_SQL.CLEAN(`
               (nome ILIKE ${p1} OR
-               "tecRef" ILIKE ${p2} OR
+               tec_ref ILIKE ${p2} OR
                dados_completos->>'nis' ILIKE ${p3} OR
                dados_completos->>'cpf' ILIKE ${p4})
             `));
@@ -140,7 +140,7 @@ export class CasosCrontroller {
 
             // Montagem final da query
             if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
-            query += ` ORDER BY "dataCad" DESC`;
+            query += ` ORDER BY data_cad DESC`;
 
             // Debug: verifique se placeholders e params estão sincronizados
             console.log("DEBUG: FINAL QUERY:", CASOS_SQL.CLEAN(query));
@@ -159,43 +159,54 @@ export class CasosCrontroller {
     }
 
     static async update(req: Request, res: Response) {
+
         const { id } = req.params;
-        const novosDados = req.body;
-        const { id: userId, username } = req.user!;
+        const casoUpdate = req.body;
+        const { id: user_id, username } = req.user!;
+
+        console.log("Update caso (put)")
+        console.log("dados do front")
+        console.log(casoUpdate)
 
         try {
-            const resultAtual = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.SELECT_BY_ID), [id]);
-            if (resultAtual.rowCount === 0) return res.status(404).json({ message: "Caso não encontrado." });
 
-            const dadosExistentes = resultAtual.rows[0];
-
+            const dataBaseSelectResponse = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.SELECT_BY_ID), [id]);
+            if (dataBaseSelectResponse.rowCount === 0) return res.status(404).json({ message: "Caso não encontrado." });
+            const casoAtual = dataBaseSelectResponse.rows[0];
+            // junção de dados bem porca
             const dadosMesclados = {
-                ...dadosExistentes.dados_completos,
-                ...novosDados
+                ...casoAtual.dados_completos,
+                ...casoUpdate
             };
+            const data_cad = casoUpdate.data_cad || casoAtual.data_cad;
+            const tec_ref = casoUpdate.tec_ref || casoAtual.tec_ref;
+            const nome = casoUpdate.nome || casoAtual.nome || null;
+            //Update no banco
+            console.log("dados do mesclados")
+            console.log(dadosMesclados)
 
-            // ⭐️ CORREÇÃO CRÍTICA: Mesclagem de dados
-            const dataCad = novosDados.dataCad || dadosExistentes.dataCad;
-            const tecRef = novosDados.tecRef || dadosExistentes.tecRef;
-            const nome = novosDados.nome || dadosExistentes.nome || null;
-
-            await pool.query(
+            const dataBaseUpdateResponse = await pool.query(
                 CASOS_SQL.CLEAN(CASOS_SQL.UPDATE),
-                [dataCad, tecRef, nome, JSON.stringify(dadosMesclados), id]
+                [data_cad, tec_ref, nome, JSON.stringify(dadosMesclados), id]
             );
-
-            await logAction({ userId, username, action: 'UPDATE_CASE', details: { casoId: id } });
+            const updatedCaso = dataBaseUpdateResponse.rows[0]
+            console.log("caso atualizado")
+            console.log(updatedCaso)
+            await logAction({ user_id, username, action: 'UPDATE_CASE', details: { casoId: id } });
             res.status(200).json({ message: "Prontuário atualizado com sucesso!", caso: dadosMesclados });
+
         } catch (err: any) {
+
             console.error(`Erro ao atualizar caso ${id}:`, err.message);
             res.status(500).json({ message: "Erro interno ao atualizar o prontuário." });
+
         }
     }
 
     static async patch(req: Request, res: Response) {
         const { id } = req.params;
         const { status } = req.body;
-        const { id: userId, username } = req.user!;
+        const { id: user_id, username } = req.user!;
         if (!status || !['Ativo', 'Desligado', 'Arquivado'].includes(status)) {
             return res.status(400).json({ message: "Status inválido. Valores permitidos: Ativo, Desligado, Arquivado." });
         }
@@ -203,7 +214,7 @@ export class CasosCrontroller {
             const result = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.UPDATE_STATUS), [status, id]);
             if (result.rowCount === 0) return res.status(404).json({ message: 'Caso não encontrado.' });
 
-            await logAction({ userId, username, action: 'UPDATE_CASE_STATUS', details: { casoId: id, nomeVitima: result.rows[0].nome, novoStatus: status } });
+            await logAction({ user_id, username, action: 'UPDATE_CASE_STATUS', details: { casoId: id, nomeVitima: result.rows[0].nome, novoStatus: status } });
             res.status(200).json({ message: `Caso ${id} atualizado para '${status}' com sucesso.` });
         } catch (err: any) {
             console.error(`Erro ao atualizar status do caso ${id}:`, err.message);
@@ -213,13 +224,13 @@ export class CasosCrontroller {
 
     static async delete(req: Request, res: Response) {
         const { id } = req.params;
-        const { id: userId, username } = req.user!;
+        const { id: user_id, username } = req.user!;
         try {
             const result = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.DELETE), [id]);
 
             if (result.rowCount === 0) return res.status(404).json({ message: 'Caso não encontrado.' });
 
-            await logAction({ userId, username, action: 'DELETE_CASE', details: { casoId: id, nomeVitima: result.rows[0].nome } });
+            await logAction({ user_id, username, action: 'DELETE_CASE', details: { casoId: id, nomeVitima: result.rows[0].nome } });
             res.status(200).json({ message: 'Caso excluído com sucesso.' });
         } catch (err: any) {
             console.error("Erro ao excluir caso:", err.message);
@@ -264,7 +275,7 @@ export class CasosCrontroller {
 
             const demandasQuery = CASOS_SQL.CLEAN(`
                 SELECT id, tipo_documento, instituicao_origem, data_recebimento, status
-                FROM demandas
+                FROM demandas   
                 WHERE caso_associado_id = $1
                 ORDER BY data_recebimento DESC
             `);
@@ -273,10 +284,10 @@ export class CasosCrontroller {
             const casoCompleto = {
                 ...casoBase.dados_completos,
                 id: casoBase.id,
-                dataCad: casoBase.dataCad,
-                tecRef: casoBase.tecRef,
+                data_cad: casoBase.data_cad,
+                tec_ref: casoBase.tec_ref,
                 nome: casoBase.nome,
-                userId: casoBase.userId,
+                user_id: casoBase.user_id,
                 status: casoBase.status,
                 unit_id: casoBase.unit_id,
                 demandasVinculadas: demandasResult.rows
@@ -312,9 +323,9 @@ export class CasosCrontroller {
 
         const checkQuery = CASOS_SQL.CLEAN(`
             SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
-                   enc.observacoes, usr.username AS "tecRef"
+                   enc.observacoes, usr.username AS tec_ref
             FROM encaminhamentos enc
-            LEFT JOIN users usr ON enc."userId" = usr.id
+            LEFT JOIN users usr ON enc."user_id" = usr.id
             LEFT JOIN casos c ON enc."casoId" = c.id
             WHERE enc."casoId" = $1 AND ${finalUnitWhere}
             ORDER BY enc."dataEncaminhamento" DESC
@@ -387,7 +398,7 @@ export class CasosCrontroller {
 
             // 3. Montagem final da query (combinando busca, status Ativo e segurança)
             const query = CASOS_SQL.CLEAN(`
-                SELECT id, nome, "tecRef", dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
+                SELECT id, nome, tec_ref, dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
                 FROM casos
                 WHERE status = 'Ativo' 
                   AND (${searchClause})
