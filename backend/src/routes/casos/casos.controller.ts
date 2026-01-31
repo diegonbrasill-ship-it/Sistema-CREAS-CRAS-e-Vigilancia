@@ -294,7 +294,7 @@ export class CasosCrontroller {
             };
 
             const dadosProcessados = anonimizarDadosSeNecessario(user, casoCompleto);
-            res.json(dadosProcessados);
+            res.status(200).json(dadosProcessados);
         } catch (err: any) {
             console.error(`Erro ao buscar detalhes do caso ${id}:`, err.message);
             res.status(500).json({ message: "Erro ao buscar detalhes do caso." });
@@ -307,7 +307,7 @@ export class CasosCrontroller {
         const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
 
         // 1. Resolve Placeholders para a checagem de acesso
-        const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1
+        const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1 
         let unitWhere = accessFilter.whereClause;
 
         if (accessFilter.params.length === 1) {
@@ -322,13 +322,13 @@ export class CasosCrontroller {
         const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
 
         const checkQuery = CASOS_SQL.CLEAN(`
-            SELECT enc.id, enc."servicoDestino", enc."dataEncaminhamento", enc.status,
+            SELECT enc.id, enc.servico_destino, enc.data_encaminhamento, enc.status,
                    enc.observacoes, usr.username AS tec_ref
             FROM encaminhamentos enc
-            LEFT JOIN users usr ON enc."user_id" = usr.id
-            LEFT JOIN casos c ON enc."casoId" = c.id
-            WHERE enc."casoId" = $1 AND ${finalUnitWhere}
-            ORDER BY enc."dataEncaminhamento" DESC
+            LEFT JOIN users usr ON enc.user_id = usr.id
+            LEFT JOIN casos c ON enc.caso_id = c.id
+            WHERE enc.caso_id = $1 AND ${finalUnitWhere}
+            ORDER BY enc.data_encaminhamento DESC
         `);
 
         try {

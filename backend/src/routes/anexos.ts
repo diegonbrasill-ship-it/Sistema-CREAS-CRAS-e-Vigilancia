@@ -29,7 +29,7 @@ async function checkAnexoAccess(req: Request, res: Response, next: express.NextF
 
     try {
         // 1. Busca o casoId associado ao anexo/demanda
-        const casoResultQuery = cleanSqlString('SELECT "casoId", "demandaId" FROM anexos WHERE id = $1');
+        const casoResultQuery = cleanSqlString('SELECT caso_id, demanda_id FROM anexos WHERE id = $1');
         const casoResult = await pool.query(casoResultQuery, [anexoId]);
 
         if (casoResult.rowCount === 0) {
@@ -86,35 +86,38 @@ router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 // =======================================================================
 // ROTA para listar os anexos de um CASO (Ajuste de Colunas)
 // =======================================================================
-router.get('/casos/:casoId', async (req: Request, res: Response) => {
-    const { casoId } = req.params;
+router.get('/casos/:caso_id', async (req: Request, res: Response) => {
+    const { caso_id } = req.params;
 
-    const parsedId = parseInt(casoId, 10);
+
+
+    const parsedId = parseInt(caso_id, 10);
     if (isNaN(parsedId)) {
-        console.error(`ERRO: casoId inválido recebido: ${casoId}`);
+        console.error(`ERRO: caso_id inválido recebido: ${caso_id}`);
         return res.status(400).json({ message: 'ID de caso inválido.' });
     }
 
     try {
-        // ⭐️ CORREÇÃO DO SCHEMA SQL: Colunas alteradas para o seu padrão (nomeOriginal, dataUpload, casoId)
+        // ⭐️ CORREÇÃO DO SCHEMA SQL: Colunas alteradas para o seu padrão (nomeOriginal, dataUpload, caso_id)
         const query = cleanSqlString(`
       SELECT
-        anex.id, anex."nomeOriginal", anex."tamanhoArquivo", 
-        anex."dataUpload", anex.descricao, usr.username AS "uploadedBy"
+      anex.id, anex.nome_original, anex.tamanho_arquivo, anex.descricao, usr.username AS "uploadedBy"
       FROM anexos anex
-      LEFT JOIN users usr ON anex."user_id" = usr.id
-      WHERE anex."casoId" = $1 
-      ORDER BY anex."dataUpload" DESC;
+      LEFT JOIN users usr ON anex.user_id = usr.id
+      WHERE anex.caso_id = $1 
+      ORDER BY anex.created_at DESC;
     `);
 
         // Passar o ID parseado
         const result = await pool.query(query, [parsedId]);
         res.json(result.rows);
+
     } catch (err: any) {
         console.error(`Erro ao listar anexos: ${err.message}`);
         res.status(500).json({ message: 'Erro ao buscar anexos.' });
     }
 });
+
 
 // =======================================================================
 // ROTA: Upload de anexo para um CASO (Corrigido as colunas)

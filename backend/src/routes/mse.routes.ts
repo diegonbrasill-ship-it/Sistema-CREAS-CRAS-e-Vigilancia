@@ -157,5 +157,26 @@ router.get("/registros", async (req: Request, res: Response) => {
     }
 });
 
+router.get("/registros/:registro_id", async (req: Request, res: Response) => {
 
+    const registro_id = req.params.registro_id;
+    const idNumerico = parseInt(registro_id)
+    const getByIdQuery = `
+    SELECT 
+    r.id, r.nome_adolescente, r.data_nascimento, r.responsavel, r.endereco, r.contato,
+    r.nis, r.mse_tipo, r.mse_data_inicio, r.mse_duracao_meses, r.situacao, r.local_descumprimento,
+    r.pia_data_elaboracao, r.pia_status
+    FROM registros_mse r
+    WHERE r.id = $1
+    `
+    try {
+        const responseDataBase = await pool.query(cleanSqlString(getByIdQuery), [registro_id])
+        if (responseDataBase.rowCount === 0) return res.status(404).json({ message: "Erro: caso não encontrado!" })
+        return res.status(200).json(responseDataBase.rows[0])
+
+    } catch (err: any) {
+        console.error("Erro ao listar registro MSE:", err.message);
+        res.status(500).json({ message: `Erro interno ao buscar registro MSE de id ${idNumerico}` });
+    }
+});
 export default router;

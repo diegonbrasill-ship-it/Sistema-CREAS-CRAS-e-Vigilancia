@@ -32,8 +32,8 @@ router.get("/:casoId", async (req, res) => {
             SELECT a.*, u.username as tec_ref 
             FROM acompanhamentos a
             JOIN users u ON a.user_id = u.id
-            WHERE a."casoId" = $1 
-            ORDER BY a.data DESC
+            WHERE a.caso_id= $1 
+            ORDER BY a.created_at DESC
         `);
         const result = await pool.query(query, [casoId]);
         res.json(result.rows);

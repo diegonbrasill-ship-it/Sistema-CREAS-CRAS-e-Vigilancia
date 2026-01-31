@@ -33,7 +33,7 @@ const formSchema = z.object({
         data_cad: z.string().min(1, "A data do cadastro é obrigatória."),
         tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
         tipo_violencia: z.string().optional().nullable(),
-        localOcorrencia: z.string().optional().nullable(),
+        local_ocorrencia: z.string().optional().nullable(),
         nome: z.string().optional().nullable(),
         cpf: z.string().optional().nullable().refine(validateCPF, { message: "CPF inválido." }),
         nis: z.string().optional().nullable().refine(validateNIS, { message: "NIS deve conter 11 dígitos." }),
@@ -151,18 +151,17 @@ export default function Cadastro() {
 
                 try {
                         if (isEditMode) {
+                                console.log("esta caindo no EditModeSubmit")
                                 const dirtyData: Partial<CasoForm> = {};
-
-                                // Mapeia APENAS os campos modificados (dirtyFields)
+                                // mapeamento dos campos modificados (dirtyFields)
                                 (Object.keys(dirtyFields) as Array<keyof CasoForm>).forEach(key => {
                                         const value = getValues(key);
-                                        // Garante que campos vazios de texto sejam enviados como string vazia ou nula (Back-end lida)
+                                        //campos vazios de texto são enviados como string vazia ou nula (Back-end lida)
                                         (dirtyData as any)[key] = (value === null || value === undefined) ? '' : value;
                                 });
 
-                                // ⭐️ REINTRODUZ DADOS OBRIGATÓRIOS DO CASO ⭐️
-                                // Garante que data_cad e tec_ref sempre sejam enviados no PUT para evitar a quebra do Back-end.
 
+                                // Insere data_cad e tec_ref update(PUT) para evitar a quebra do Back-end.
                                 (dirtyData as any).data_cad = data.data_cad;
                                 (dirtyData as any).tec_ref = data.tec_ref;
 
@@ -175,17 +174,28 @@ export default function Cadastro() {
                                 // 📌 Ação de Edição (PUT)
                                 console.log("dados do modo de edição")
                                 console.log(dirtyData)
+
                                 await updateCase(id, dirtyData);
                                 toast.success("✅ Progresso salvo com sucesso!");
 
                                 reset(data, { keepValues: true, keepDefaultValues: true }); // Reseta o dirty state
-
+                                toast.success("Prontuário finalizado!");
+                                navigate(`/caso/${id}`);
                         } else {
-
+                                console.log("esta caindo no modo criation")
                                 // 📌 Ação de Criação (POST)
                                 // ⭐️ CORREÇÃO 1: Inclui o unit_id do usuário logado no payload
+
+                                const { data_cad, tec_ref, tipo_violencia, local_ocorrencia } = payload;
+                                const dados_completos_payload = {
+
+                                        tipo_violencia: tipo_violencia,
+                                        local_ocorrencia: local_ocorrencia
+                                }
                                 const payloadComUnidade = {
-                                        ...payload,
+                                        data_cad: data_cad,
+                                        tec_ref: tec_ref,
+                                        dados_completos_payload: dados_completos_payload,
                                         unit_id: user?.unit_id // ✅ Adiciona o ID da unidade
                                 };
 
@@ -216,14 +226,13 @@ export default function Cadastro() {
                 if (!id) return;
                 // Salva as últimas alterações e navega
                 await handleSubmit(onSubmit)();
-                toast.success("Prontuário finalizado!");
-                navigate(`/caso/${id}`);
+
         };
 
         const handleClearForm = () => {
                 // Limpa o formulário apenas no modo CRIAÇÃO
                 if (isEditMode) {
-                        toast.warn("Não é possível limpar um prontuário em edição. Use o botão 'Novo Registro Limpo'.");
+                        toast.warn("Não é possível limpar um prontuário em edição.");
                         return;
                 }
                 navigate('/cadastro', { replace: true });
@@ -276,8 +285,8 @@ export default function Cadastro() {
                                                                 <div className="grid md:grid-cols-3 gap-4">
                                                                         <div className="space-y-2"><Label>Tipo de Violência</Label><Controller control={control} name="tipo_violencia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Física">Física</SelectItem><SelectItem value="Psicológica">Psicológica</SelectItem><SelectItem value="Sexual">Sexual</SelectItem></SelectContent></Select>)} /></div>
                                                                         <div className="space-y-2">
-                                                                                <Label htmlFor="localOcorrencia">Local da Ocorrência</Label>
-                                                                                <Controller name="localOcorrencia" control={control} render={({ field }) => (<Input id="localOcorrencia" {...field} value={field.value ?? ''} />)} />
+                                                                                <Label htmlFor="local_ocorrencia">Local da Ocorrência</Label>
+                                                                                <Controller name="local_ocorrencia" control={control} render={({ field }) => (<Input id="local_ocorrencia" {...field} value={field.value ?? ''} />)} />
                                                                         </div>
                                                                 </div>
                                                         </TabsContent>

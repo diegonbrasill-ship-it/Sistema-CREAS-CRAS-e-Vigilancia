@@ -10,7 +10,7 @@ export class CasosService {
 
         const {
             nome,
-            dataCad,
+            data_cad,
             tec_ref,
             status,
             unit_id,
@@ -20,12 +20,11 @@ export class CasosService {
         console.log('dados vindos do front:')
         console.log(data)
 
-
         const nomeToUse = nome || null;
         const tecRefToUse = tec_ref || null;
         const unitIdToUse = unit_id || admin.user!.unit_id || null;
         const statusToUse = status || 'Ativo'; // Padrão 'Ativo' para novos casos
-        const dataCadToUse = dataCad || new Date().toISOString().split('T')[0];
+        const data_cadToUse = data_cad || new Date().toISOString().split('T')[0];
         const dadosCompletosJSON = JSON.stringify(dados_completos_payload); // O objeto JSONB é o payload restante 
         const user_id = admin!.id;
         const username = admin!.username;
@@ -33,7 +32,7 @@ export class CasosService {
         const result = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.INSERT),
             [
                 nomeToUse,
-                dataCadToUse,
+                data_cadToUse,
                 tecRefToUse,
                 statusToUse,
                 unitIdToUse,
