@@ -15,10 +15,9 @@ router.post("/", async (req, res) => {
                 return res.status(400).json({ message: "Usuário e senha são obrigatórios." });
         }
 
-
         try {
 
-                const result = await pool.query(  // 1. Seleciona todos os campos necessários
+                const result = await pool.query(  // seleciona todos os campos necessários
                         'SELECT id, username, role, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
 
                 if (result.rowCount === 0) { //verifica se a query ao banco retornou algo
@@ -28,7 +27,7 @@ router.post("/", async (req, res) => {
 
                 const user = result.rows[0]; //salva todos os dados numa variavel user, faz sentido isso?
 
-
+                //TODO: adaptar ao novo modelo de cargos e permissões
                 if (!user.unit_id && user.role !== 'gestor') { // 2. Checa unit_id (se for null, bloqueia, exceto se cargo for Gestor)
                         console.error(`ERRO CRÍTICO: Usuário ${username} não possui unit_id. Cadastro incompleto.`);
                         await logAction({ user_id: user.id, username: user.username, action: 'LOGIN_FAILURE', details: { reason: 'User unit_id is missing' } });
@@ -61,12 +60,13 @@ router.post("/", async (req, res) => {
                         unit_id: user.unit_id,
                 };
 
-                const token = jwt.sign( // monta algo que deveria saber o que é 
+                const token = jwt.sign( // monta o token (código) JWT fornecido ao front 
                         tokenPayload,
                         process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes',
                         { expiresIn: '8h' }
                 );
 
+                //TODO: passar permissions relacionadas a cargo
                 res.json({
                         message: "Login bem-sucedido!",
                         token,

@@ -73,11 +73,12 @@ export default function GerenciarUsuarios() {
 
     const fetchUsers = async () => {
         try {
-            const response = await getUsers();
 
+            const response = await getUsers();
             const usersData = Array.isArray(response) ? response : response?.rows || response?.data || response?.results || [];
             console.log(usersData)
             setUsers(usersData);
+
         } catch (error: any) {
             toast.error(`Erro ao carregar servidores: ${error.message}`);
         } finally {

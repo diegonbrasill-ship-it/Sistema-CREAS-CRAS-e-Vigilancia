@@ -6,7 +6,7 @@ import { SQL } from './users.sql';
 
 export async function checkUserUnitAccess(req: Request, res: Response, next: NextFunction) {
     const { id } = req.params;
-    const accessFilter = req.accessFilter!; //esse cara vem de outra modulo de middleware chamado em outra camada
+    const accessFilter = req.accessFilter!; //esse cara vem de outro modulo de middleware chamado em outra camada
 
     // 1. Resolve Placeholders e Parâmetros
     const params: (string | number)[] = [id];
@@ -28,8 +28,8 @@ export async function checkUserUnitAccess(req: Request, res: Response, next: Nex
 
         const result = await pool.query(query, params);
         if (result.rowCount === 0) return res.status(403).json({ message: "Acesso Proibido. Você não pode editar usuários de outras unidades." });
-
         next(); // essa função deixa a "responsabilidade eou fluxo voltar para o controller"
+
     } catch (error) {
 
         console.error("Erro na checagem de acesso de usuário:", error);

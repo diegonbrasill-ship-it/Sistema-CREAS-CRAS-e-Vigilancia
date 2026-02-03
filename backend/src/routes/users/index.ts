@@ -9,7 +9,6 @@ import { checkUserUnitAccess } from './middleware';
 const router = Router();
 
 router.use(authMiddleware, unitAccessMiddleware('users', 'unit_id'));
-
 router.get('/', UsersController.list);
 router.post('/', checkRole(['coordenador', 'gestor']), UsersController.create);
 router.put('/:id', checkRole(['coordenador', 'gestor']), checkUserUnitAccess, UsersController.update);
