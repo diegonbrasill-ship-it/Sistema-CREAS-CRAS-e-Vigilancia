@@ -1,9 +1,10 @@
 
 // frontend/src/services/api.ts
-const API_BASE_URL = import.meta.env.API_BASE_URL || "https://prototipo-easysocial-api.onrender.com";
-//"https://prototipo-easysocial-api.onrender.com"
+//adicionar if modo debug
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+//Shttps://prototipo-easysocial-api.onrender.com"
 // http://localhost:4000
-// 🟢 NOVO: Interface base para os filtros de Dashboards/PainelVigilancia/Consultas.
+// 🟢 NOVO: Interface base para os filtros de Dashboards/Pai nelVigilancia/Consultas.
 // Esta interface resolve os erros de tipagem "unidades does not exist"
 
 export interface FiltrosBase {
@@ -105,7 +106,11 @@ export interface FiltrosCasos extends FiltrosBase {
 }
 
 export interface DemandaResumida {
-    id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; status: string;
+    id: number;
+    tipo_documento: string;
+    instituicao_origem: string;
+    data_recebimento: string;
+    status: string;
 }
 
 export interface CasoDetalhado {

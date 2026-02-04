@@ -1,10 +1,10 @@
-// backend/src/middleware/auth.ts
-
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UNIT_ID_CREAS } from "../../utils/constants";
 import { UserRole, AuthenticatedUser, TokenPayload } from "./authenticated.user"
 
+// serve para autenticação de usuário com token jwt
+// insere na request o payload de dados do usuário como (AutenticatedUser )
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const { authorization } = req.headers;
 
@@ -17,12 +17,12 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     try {
         const secret = process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes';
         const data = jwt.verify(token, secret);
-
         const { id, username, role, unit_id } = data as TokenPayload;
 
-        // Converte unit_id para number ou null de forma segura
+        //converte unit_id para number ou null de forma segura
         const safeUnitId = unit_id ?? null;
 
+        //insere dados do user na request
         req.user = { id, username, role: role as UserRole, unit_id: safeUnitId } as AuthenticatedUser;
 
         return next();

@@ -117,11 +117,9 @@ export default function GerenciarUsuarios() {
         try {
             await createUser(newUser);
             toast.success(`Servidor "${newUser.nome_completo}" criado com sucesso!`);
-
-            // 📌 FIX FINAL: Recarrega a lista DEPOIS do sucesso
             await fetchUsers();
 
-            // Limpa e reseta o default APÓS a recarga
+            //reseta o formulário
             setNewUser({ username: '', password: '', role: PROFILE_OPTIONS[0].value, nome_completo: '', cargo: '', unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1 });
         } catch (error: any) {
             toast.error(`Erro ao criar servidor: ${error.message}`);

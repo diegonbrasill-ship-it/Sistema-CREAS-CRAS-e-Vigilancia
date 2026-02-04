@@ -3,13 +3,19 @@ import pool from "../../db";
 import bcrypt from "bcryptjs";
 import { SQL } from "./users.sql"
 import { logAction } from '../../services/logger';
-import { QueryResult } from 'pg';
+import { Query, QueryResult } from 'pg';
 
 
 export class UsersService {
 
     static async listUsers(where: string, params: any[]) {
+        console.log("where_clause:", where)
+        console.log("params:", params)
+        console.log("QUERY")
+        console.log()
+
         const query = `${SQL.LIST_USERS} AND ${where} ORDER BY nome_completo ASC`
+        console.log(query)
         const result = await pool.query(SQL.CLEAN(query), params)
 
         return result.rows
@@ -28,6 +34,12 @@ export class UsersService {
             SQL.CLEAN('SELECT id FROM users WHERE username = $1'), [username]);
         if (userExists.rowCount && userExists.rowCount > 0)
             throw new Error('Este nome de usuário já está em uso.');
+
+
+        if (admin.role !== "gestor" && unit_id !== admin.unit_id)//deve criar apenas usuários para sua unidade
+            throw new Error('Você só pode criar cadastros para sua unidade');
+
+
 
         const passwordHash = await bcrypt.hash(password, 10);
 
