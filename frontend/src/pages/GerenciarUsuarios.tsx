@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getUsers, createUser, updateUserStatus, reassignUserCases, User } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-
+import { Units, Roles, UNIT_OPTIONS, ROLE_OPTIONS } from '../utils/constants';
 // Importações de UI e ícones
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,13 +17,22 @@ import { Loader2, UserPlus, Edit, Power, PowerOff, Users as UsersIcon } from 'lu
 import UserEditModal from '@/components/users/UserEditModal';
 import ReassignCasesModal from '@/components/users/ReassignCasesModal';
 
+
+
+// Helpers para pegar o nome pelo ID
+const getRoleLabel = (roleId: number | string) => {
+    return Roles[Number(roleId) as keyof typeof Roles] || 'Não definido';
+};
+const getUnitLabel = (unitId: number | string) => {
+    return Units[Number(unitId) as keyof typeof Units] || 'Não atribuída';
+};
+
 // ========================================================
 // 📌 Módulos de Mapeamento de Nomenclatura (INCLUINDO ROLES CRAS)
 // ========================================================
-
 const UNIDADES_DISPONIVEIS = [
     { id: 1, nome: 'CREAS' },
-    { id: 2, nome: 'CRAS Geralda Medeiros' }, // IDs corrigidos e alinhados com a Sidebar
+    { id: 2, nome: 'CRAS Geralda Medeiros' },
     { id: 3, nome: 'CRAS Mariana Alves' },
     { id: 4, nome: 'CRAS Matheus Leitão' },
     { id: 5, nome: 'CRAS Severina Celestino' },
@@ -31,7 +40,6 @@ const UNIDADES_DISPONIVEIS = [
     { id: 7, nome: 'Centro POP' },
     { id: 8, nome: 'Conselho Tutelar Norte' },
 ];
-
 const PROFILE_OPTIONS = [
     { value: "tecnico_superior", label: "Técnico de Nível Superior" },
     { value: "tecnico_medio", label: "Técnico de Nível Médio" },
@@ -48,8 +56,13 @@ const getProfileLabel = (roleValue: string) => {
 };
 
 interface NewUserState {
-    username: string; password: string; role: string; nome_completo: string; cargo: string;
+    username: string;
+    password: string;
+    role: string;
+    nome_completo: string;
+    cargo: string;
     unit_id: number | null;
+    role_id: number
 }
 
 
@@ -58,13 +71,15 @@ export default function GerenciarUsuarios() {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
     const [newUser, setNewUser] = useState<NewUserState>({
         username: '',
         password: '',
-        role: PROFILE_OPTIONS[0].value,
+        role: ROLE_OPTIONS[0].value, //TODO: trocar por novo enum (manter esse atributo)
         nome_completo: '',
         cargo: '',
-        unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1
+        unit_id: UNIT_OPTIONS[0].id, //TODO: trocar aqui tbm de acordo com novo enum
+        role_id: ROLE_OPTIONS[0].id, //TODO: colocar coiso aq no number
     });
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -96,9 +111,12 @@ export default function GerenciarUsuarios() {
         setNewUser(prev => ({ ...prev, [name]: value } as NewUserState));
     };
 
-    // ⭐️ CORREÇÃO 1: Este handler deve receber o VALUE interno (a role string)
     const handleRoleChange = (value: string) => {
-        setNewUser(prev => ({ ...prev, role: value }));
+        setNewUser(prev => ({ 
+            ...prev,
+            role: value,
+            role_id: ROLE_OPTIONS.find(u => u.value === value)!.id, 
+        }));
     };
 
     const handleUnitChange = (value: string) => {
@@ -115,12 +133,21 @@ export default function GerenciarUsuarios() {
 
         setIsSaving(true);
         try {
+            console.log(newUser)
             await createUser(newUser);
             toast.success(`Servidor "${newUser.nome_completo}" criado com sucesso!`);
             await fetchUsers();
 
             //reseta o formulário
-            setNewUser({ username: '', password: '', role: PROFILE_OPTIONS[0].value, nome_completo: '', cargo: '', unit_id: UNIDADES_DISPONIVEIS[0]?.id ?? 1 });
+            setNewUser({
+                username: '',
+                password: '',
+                role: ROLE_OPTIONS[0].value,
+                nome_completo: '',
+                cargo: '',
+                unit_id: UNIT_OPTIONS[0].id,
+                role_id: ROLE_OPTIONS[0].id,
+            });
         } catch (error: any) {
             toast.error(`Erro ao criar servidor: ${error.message}`);
         } finally {
@@ -159,7 +186,7 @@ export default function GerenciarUsuarios() {
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold">Gestão de Servidores</h1>
-            <p className="text-slate-500">Gerencie contas de acesso da equipe do SUAS-Patos/PB. (Sua Unidade: {UNIDADES_DISPONIVEIS.find(u => u.id === user?.unit_id)?.nome || "Não Atribuída"})</p>
+            <p className="text-slate-500">Gerencie contas de acesso da equipe do SUAS-Patos/PB. (Sua Unidade: {UNIT_OPTIONS.find(u => u.id === user?.unit_id)?.nome || "Não Atribuída"})</p>
 
             <Card>
                 <CardHeader>
@@ -168,21 +195,50 @@ export default function GerenciarUsuarios() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <div className="space-y-2 col-span-2"><Label htmlFor="nome_completo">Nome Completo</Label><Input name="nome_completo" placeholder="Ex: João Paulo da Silva" value={newUser.nome_completo} onChange={handleInputChange} /></div>
-                        <div className="space-y-2"><Label htmlFor="cargo">Cargo/Função</Label><Input name="cargo" placeholder="Ex: Psicólogo, Assistente Social" value={newUser.cargo} onChange={handleInputChange} /></div>
 
-                        <div className="space-y-2"><Label htmlFor="unit_id">Unidade</Label><Select value={String(newUser.unit_id ?? '')} onValueChange={handleUnitChange}>
-                            <SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger>
-                            <SelectContent>
-                                {UNIDADES_DISPONIVEIS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
-                            </SelectContent>
-                        </Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p></div>
+                        <div className="space-y-2 col-span-2">
+                            <Label htmlFor="nome_completo">Nome Completo</Label>
+                            <Input name="nome_completo" placeholder="Ex: João Paulo da Silva" value={newUser.nome_completo} onChange={handleInputChange} />
+                        </div>
 
-                        <div className="space-y-2"><Label htmlFor="username">Nome de Usuário</Label><Input name="username" placeholder="ex: joao.silva" value={newUser.username} onChange={handleInputChange} /></div>
-                        <div className="space-y-2"><Label htmlFor="password">Senha Provisória</Label><Input name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} /></div>
-                        <div className="space-y-2"><Label htmlFor="role">Perfil de Acesso</Label><Select value={newUser.role} onValueChange={handleRoleChange}><SelectTrigger id="role"><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>
-                            {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
-                        </SelectContent></Select></div>
+                        <div className="space-y-2">
+                            <Label htmlFor="cargo">Cargo/Função</Label>
+                            <Input name="cargo" placeholder="Ex: Psicólogo, Assistente Social" value={newUser.cargo} onChange={handleInputChange} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="unit_id">Unidade</Label>
+                            <Select value={String(newUser.unit_id)} onValueChange={handleUnitChange}>
+                                <SelectTrigger id="unit_id"><SelectValue placeholder="Selecione a Unidade..." /></SelectTrigger>
+                                <SelectContent>
+                                    {UNIT_OPTIONS.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                                </SelectContent>
+                            </Select><p className="text-xs text-red-500">O gestor pode criar contas em qualquer unidade.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="username">Nome de Usuário</Label>
+                            <Input name="username" placeholder="ex: joao.silva" value={newUser.username} onChange={handleInputChange} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Senha Provisória</Label>
+                            <Input name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} />
+                        </div>
+
+                        <div className="space-y-2"><Label htmlFor="role">Perfil de Acesso</Label>
+                            <Select value={newUser.role} onValueChange={handleRoleChange}>
+                                <SelectTrigger id="role"> <SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                <SelectContent> {
+                                ROLE_OPTIONS.map(role => (
+                                <SelectItem key={role.id} value={role.value}>
+                                    {role.label}
+                                </SelectItem>
+                                ))} 
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                     </div>
                     <Button onClick={handleCreateUser} disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
@@ -213,7 +269,7 @@ export default function GerenciarUsuarios() {
                                     <TableCell>{user.cargo}</TableCell>
                                     <TableCell>{user.username}</TableCell>
                                     <TableCell>{getProfileLabel(user.role)}</TableCell>
-                                    <TableCell>{UNIDADES_DISPONIVEIS.find(u => u.id === user.unit_id)?.nome}</TableCell>
+                                    <TableCell>{UNIT_OPTIONS.find(u => u.id === user.unit_id)?.nome}</TableCell>
                                     <TableCell><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'Ativo' : 'Inativo'}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button variant="outline" size="sm" onClick={() => openEditModal(user)}>

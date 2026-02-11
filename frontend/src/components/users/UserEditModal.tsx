@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-toastify';
 import { updateUser, User } from '@/services/api'; 
-
+import { ROLE_OPTIONS, UNIT_OPTIONS } from '@/utils/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  nome_completo: z.string().min(3, "O nome completo é obrigatório."),
-  cargo: z.string().min(3, "O cargo é obrigatório."),
-  username: z.string().min(3, "O nome de usuário é obrigatório."),
-  role: z.string().min(1, "O perfil é obrigatório."),
+    nome_completo: z.string().min(3, "O nome completo é obrigatório."),
+    cargo: z.string().min(3, "O cargo é obrigatório."),
+    username: z.string().min(3, "O nome de usuário é obrigatório."),
+    role: z.string().min(1, "O perfil é obrigatório."),
 });
 type FormData = z.infer<typeof formSchema>;
 
@@ -45,27 +45,26 @@ export default function UserEditModal({ user, isOpen, onClose, onSuccess }: User
 
   useEffect(() => {
     if (user) {
-        // Mapeamento inverso para garantir que o valor interno (ex: 'tecnico') seja o valor do campo.
-        // Se a role antiga for "tecnico", definiremos como "tecnico_superior" para o formulário.
-        const mappedRole = user.role === 'tecnico' ? 'tecnico_superior' : user.role;
         
       reset({
         nome_completo: user.nome_completo,
         cargo: user.cargo,
         username: user.username,
-        role: mappedRole, // Usando o valor mapeado
-      });
+        role: user.role,
+        });
+
     }
   }, [user, reset]);
 
   const onSubmit = async (data: FormData) => {
-    if (!user) return;
-    
-    // Antes de enviar, o Back-end precisa entender o novo valor 'tecnico_superior'.
-    // Felizmente, o Back-end está esperando o valor que o select envia ('tecnico_superior' ou 'tecnico_medio').
-    
+    if (!user) return;
+    const payload = {
+        ...data, 
+        role_id: ROLE_OPTIONS.find(role => role.value === data.role)?.id
+    }
+    console.log(payload);
     try {
-      await updateUser(user.id, data); 
+      await updateUser(user.id, payload); 
       toast.success(`Servidor atualizado com sucesso!`);
       onSuccess();
       onClose();
@@ -97,7 +96,7 @@ export default function UserEditModal({ user, isOpen, onClose, onSuccess }: User
                             <SelectTrigger><SelectValue placeholder="Selecione o novo perfil..." /></SelectTrigger>
                             <SelectContent>
                                 {/* 📌 USO DO MAPEAMENTO DE NOMENCLATURA SUAS */}
-                                {PROFILE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
+                                {ROLE_OPTIONS.map(p => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
                             </SelectContent>
                         </Select>
                     )}

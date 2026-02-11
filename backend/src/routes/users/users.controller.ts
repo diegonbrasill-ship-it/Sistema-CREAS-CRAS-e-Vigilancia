@@ -6,14 +6,18 @@ import { MessageConfig } from "pg";
 export class UsersController {
 
     static async list(req: Request, res: Response) {
+
         const { whereClause, params } = req.accessFilter!;
+
         try {
             const users = await UsersService.listUsers(whereClause, params)
             res.status(200).json(users)
 
         } catch (err: any) {
+
             res.status(500).json({ message: err.message })
         }
+
     }
 
     static async create(req: Request, res: Response) {

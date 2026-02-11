@@ -30,6 +30,7 @@ type LoginResponse = {
         cargo: string;
         is_active: boolean;
         unit_id: number;
+        role_id: number
     };
 };
 type ChartData = { name: string; value: number; };
@@ -51,6 +52,7 @@ export interface User {
     cargo: string;
     is_active: boolean;
     unit_id: number | null;
+    role_id: number
 }
 
 // ... (MseTipo, MseSituacao e interfaces MSE mantidas) ...

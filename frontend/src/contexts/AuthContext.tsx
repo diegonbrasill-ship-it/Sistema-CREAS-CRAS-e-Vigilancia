@@ -10,6 +10,7 @@ interface User {
   nome_completo: string;
   cargo: string;
   unit_id: number | null; // Aceita NULL vindo do Gestor Geral
+  role_id: number
 }
 
 interface AuthContextType {
@@ -67,9 +68,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ? Number(response.user.unit_id)
           : null;
 
+      const safeRoleId = typeof response.user.role_id === 'number'
+        ? response.user.role_id
+        : response.user.role_id
+        //todo: se for nulo é para dar erro
+
+
     const safeUserToStore: User = {
       ...response.user,
       unit_id: safeUnitId,
+      role_id: safeRoleId
     };
 
     localStorage.setItem('token', response.token);

@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
         try {
 
                 const result = await pool.query(  // seleciona todos os campos necessários
-                        'SELECT id, username, role, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
+                        'SELECT id, username, role, role_id, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
 
                 if (result.rowCount === 0) { //verifica se a query ao banco retornou algo
                         await logAction({ username, action: 'LOGIN_FAILURE', details: { reason: 'User not found' } });
@@ -58,6 +58,7 @@ router.post("/", async (req, res) => {
                         cargo: user.cargo,
                         is_active: user.is_active,
                         unit_id: user.unit_id,
+                        permissions: [],
                 };
 
                 const token = jwt.sign( // monta o token (código) JWT fornecido ao front 
@@ -77,7 +78,8 @@ router.post("/", async (req, res) => {
                                 nome_completo: user.nome_completo,
                                 cargo: user.cargo,
                                 is_active: user.is_active,
-                                unit_id: user.unit_id
+                                unit_id: user.unit_id,
+                                permissions: [],
                         }
                 });
 
