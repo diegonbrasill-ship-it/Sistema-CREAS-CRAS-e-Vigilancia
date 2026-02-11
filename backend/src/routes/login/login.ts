@@ -16,10 +16,29 @@ router.post("/", async (req, res) => {
         }
 
         try {
+                const query = `SELECT 
+                                u.id,
+                                u.username,
+                                u.role,
+                                u.role_id,
+                                u.password_hash,
+                                u.is_active,
+                                u.unit_id,
+                                u.nome_completo,
+                                u.cargo,
+                                COALESCE(array_agg(p.name) FILTER (WHERE p.name IS NOT NULL), '{}') as permissions
+                        FROM users u
+                        LEFT JOIN roles r ON u.role_id = r.id
+                        LEFT JOIN role_permissions rp ON r.id = rp.role_id
+                        LEFT JOIN permissions p ON rp.permission_id = p.id
+                        WHERE u.username = $1 AND u.deleted_at IS NULL
+                        GROUP BY u.id, r.name;
+                `
+                const queryTeste = await pool.query(query,[username]);
 
                 const result = await pool.query(  // seleciona todos os campos necessários
                         'SELECT id, username, role, role_id, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
-
+                
                 if (result.rowCount === 0) { //verifica se a query ao banco retornou algo
                         await logAction({ username, action: 'LOGIN_FAILURE', details: { reason: 'User not found' } });
                         return res.status(401).json({ message: "Usuário ou senha inválidos." });

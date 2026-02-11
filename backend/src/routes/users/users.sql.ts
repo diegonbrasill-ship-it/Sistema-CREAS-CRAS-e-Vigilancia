@@ -6,9 +6,9 @@ export const SQL = {
     WHERE is_active = true
     `,
     CREATE_USER: `
-    INSERT INTO users (username, password_hash, role, nome_completo, cargo, is_active, unit_id)
-    VALUES($1,$2,$3,$4,$5, true,$6)
-    RETURNING id, username, role, nome_completo, cargo, is_active, unit_id
+    INSERT INTO users (username, password_hash, role, nome_completo, cargo, is_active, unit_id, role_id)
+    VALUES($1,$2,$3,$4,$5, true,$6, $7)
+    RETURNING id, username, role, nome_completo, cargo, is_active, unit_id, role_id
     `,
     UPDATE_USER: `
     UPDATE users

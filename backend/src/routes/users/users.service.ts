@@ -28,8 +28,12 @@ export class UsersService {
             password, role,
             nome_completo,
             cargo,
-            unit_id } = data;
-
+            unit_id,
+            role_id, 
+        } = data;
+        console.log('dados vindos do front')
+        console.log(data)
+        
         const userExists: QueryResult = await pool.query(
             SQL.CLEAN('SELECT id FROM users WHERE username = $1'), [username]);
         if (userExists.rowCount && userExists.rowCount > 0)
@@ -52,9 +56,11 @@ export class UsersService {
                 nome_completo,
                 cargo,
                 unit_id,
+                role_id,
             ]
         );
 
+        
         await logAction({
             user_id: admin.id,
             username: admin.username,
@@ -62,7 +68,11 @@ export class UsersService {
             details: { createdUserId: result.rows[0].id, createdUsername: username },
         });
 
+        console.log('dados vindos data base')
+        console.log(result.rows)
         return result.rows
+        
+
     }
 
     static async updateUser(id: string, data: any, admin: any) {

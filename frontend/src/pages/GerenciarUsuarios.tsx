@@ -148,8 +148,10 @@ export default function GerenciarUsuarios() {
                 unit_id: UNIT_OPTIONS[0].id,
                 role_id: ROLE_OPTIONS[0].id,
             });
+
         } catch (error: any) {
             toast.error(`Erro ao criar servidor: ${error.message}`);
+            console.log(`Erro ao criar servidor: ${error.message}`)
         } finally {
             setIsSaving(false);
         }
