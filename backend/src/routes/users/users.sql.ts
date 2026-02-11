@@ -1,4 +1,5 @@
 export const SQL = {
+   
     CLEAN: (sql: string) => sql.replace(/\s+/g, ' ').trim(),
     LIST_USERS: `
     SELECT id, username, role, nome_completo, cargo, is_active, unit_id
@@ -23,3 +24,4 @@ export const SQL = {
     RETURNING id, username
     `,
 }
+ //TODO: adaptar outras queries a nova coluna role_id

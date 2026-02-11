@@ -34,9 +34,9 @@ router.post("/", async (req, res) => {
                         WHERE u.username = $1 AND u.deleted_at IS NULL
                         GROUP BY u.id, r.name;
                 `
-                const queryTeste = await pool.query(query,[username]);
-
-                const result = await pool.query(  // seleciona todos os campos necessários
+                const result = await pool.query(query,[username]);
+                
+                const oldquery = await pool.query(  // seleciona todos os campos necessários
                         'SELECT id, username, role, role_id, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
                 
                 if (result.rowCount === 0) { //verifica se a query ao banco retornou algo
@@ -77,7 +77,7 @@ router.post("/", async (req, res) => {
                         cargo: user.cargo,
                         is_active: user.is_active,
                         unit_id: user.unit_id,
-                        permissions: [],
+                        permissions: user.permissions,
                 };
 
                 const token = jwt.sign( // monta o token (código) JWT fornecido ao front 
@@ -85,9 +85,8 @@ router.post("/", async (req, res) => {
                         process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes',
                         { expiresIn: '8h' }
                 );
-
-                //TODO: passar permissions relacionadas a cargo
-                res.json({
+               
+                const responseJson = {
                         message: "Login bem-sucedido!",
                         token,
                         user: {
@@ -98,9 +97,11 @@ router.post("/", async (req, res) => {
                                 cargo: user.cargo,
                                 is_active: user.is_active,
                                 unit_id: user.unit_id,
-                                permissions: [],
+                                permissions: user.permissions,
                         }
-                });
+                }
+
+                res.status(200).json(responseJson);
 
         } catch (err: any) {
                 console.error("FATAL: Erro no processo de login:", err.message);
