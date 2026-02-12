@@ -12,22 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge"; 
 
-// 🛑 AVISO: As CONSTANTES originais que definem as unidades foram mantidas, 
-// mas o CRAS_UNITS do hook DEVE ser o utilizado em um cenário real.
-// Para este exercício, o hook foi importado e é a base da permissão.
-// Se `../hooks/usePermissoesSUAS` já exporta CRAS_UNITS, a definição LOCAL pode ser redundante/removida.
-const CREAS_UNIT_ID = 1;
-const CRAS_UNIT_IDS = CRAS_UNITS.map(u => u.id); // Usando a constante importada do hook
-
-const UNIDADES_DISPONIVEIS = [
-    { id: 1, nome: 'CREAS' },
-    ...CRAS_UNITS.map(cras => ({ id: cras.id, nome: cras.name })), 
-    { id: 6, nome: 'Vigilancia SocioAssistencial' }, 
-    { id: 7, nome: 'Centro POP' },
-    { id: 8, nome: 'Conselho Tutelar Norte' },
-];
-
-// ⭐️ TIPAGEM PARA ESTRUTURA DE MENU ⭐️
 interface SubMenuItem {
     name: string;
     path: string;
@@ -38,8 +22,7 @@ interface SubMenuItem {
 interface MenuItem {
     title: string;
     icon: React.ElementType; // Icone principal (opcional, mas bom para tipagem)
-    isVisible: boolean;
-    isCrasGroup?: boolean; // Flag para o grupo CRAS
+    isVisible: boolean; // Flag para o grupo CRAS
     subItems?: SubMenuItem[];
 }
 
@@ -48,7 +31,6 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [openCrasUnitId, setOpenCrasUnitId] = useState<number | null>(null); 
   
   const username = user?.username || "Usuário";
   const userRole = (user?.role || '').toLowerCase().trim();
@@ -56,95 +38,73 @@ export default function Layout() {
   
   // ⭐️ UTILIZAÇÃO DO HOOK CENTRALIZADO ⭐️
   const { 
-      isGestorGeral, // Reutilizado no redirecionamento
-      isVigilancia,  // Reutilizado no redirecionamento
-      isLotadoNoCreas, // Reutilizado no redirecionamento
-      isLotadoNoCRAS, // Reutilizado no redirecionamento
       canAccessAnaliseGroup, 
-      canViewCreasOperacional, 
-      userCrasUnit // Para rotas dinâmicas do CRAS e redirecionamento
-  } = usePermissoesSUAS();
+      canViewCreasOperacional,
+      canAccessIntegrationsScreen,
+      canAccessDashboardScreen,
+      canAccessRelatoriosScreen,
+      canAccessVigilanciaScreen,
+      canManageCasos,
+      canManageUsers,
+      canManageDemandas,
+      canManageMse,
+  } = usePermissoesSUAS(); 
   
-  // As variáveis de permissão antigas foram substituídas pelas do hook.
-  // Apenas isGestorGeral, isVigilancia, isLotadoNoCreas e isLotadoNoCRAS 
-  // são mantidas/usadas no useEffect de redirecionamento.
-  const canViewAdmin = isGestorGeral || userRole.includes('coordenador'); 
-
-
-  // ✅ FUNÇÃO handleLogout
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
   
-  // ⭐️ EFEITO DE REDIRECIONAMENTO PÓS-LOGIN (MANTIDO) ⭐️
   useEffect(() => {
-       // 🛑 CRÍTICO: Se não for a rota raiz, A NAVEGAÇÃO É LIVRE.
-       if (location.pathname !== '/' && location.pathname !== '/cadastro' && location.pathname !== '/consulta' && location.pathname !== '/dashboard' && location.pathname !== '/painel-vigilancia') {
+       
+       if (
+        location.pathname !== '/' && 
+        location.pathname !== '/cadastro' && 
+        location.pathname !== '/consulta' && 
+        location.pathname !== '/dashboard' && 
+        location.pathname !== '/painel-vigilancia'
+      ) {
             return;
        }
-       
-       // 1. Gestor Máximo 
-       if (isGestorGeral && location.pathname === '/') {
+      
+       if (canAccessDashboardScreen && location.pathname === '/') {
             navigate('/dashboard', { replace: true });
             return;
        }
-       
-       // 2. Servidor Vigilância (Redirecionamento para o Painel de Vigilância)
-       if (isVigilancia && location.pathname === '/') {
+      if (canAccessVigilanciaScreen && location.pathname === '/') {
            navigate('/painel-vigilancia', { replace: true });
            return;
        }
-       
-       // 3. Servidor CRAS (Redirecionamento para a rota de cadastro CRAS)
-       if (isLotadoNoCRAS && userCrasUnit && location.pathname === '/') {
-           navigate(`/cras/${userCrasUnit.urlName}/cadastro`, { replace: true });
-           setOpenCrasUnitId(userCrasUnit.id);
-           return;
-       }
-       
-       // 4. Servidor CREAS (Redirecionamento para a rota CREAS padrão)
-       if (isLotadoNoCreas && location.pathname === '/') {
+       if (canViewCreasOperacional && location.pathname === '/') {
            navigate('/cadastro', { replace: true });
            return;
        }
-       
-   }, [isGestorGeral, isVigilancia, isLotadoNoCRAS, isLotadoNoCreas, userCrasUnit, navigate, location.pathname]);
-
-  // Função para alternar o submenu CRAS (mantida)
-  const toggleCrasMenu = (id: number) => {
-    setOpenCrasUnitId(prevId => (prevId === id ? null : id));
-  };
-
-
-  // ⭐️ ESTRUTURA DE DADOS DO MENU (COM FILTRO DE VISIBILIDADE) ⭐️
+   }, [ navigate, location.pathname, canAccessDashboardScreen,canAccessVigilanciaScreen, canViewCreasOperacional]);
+  
+ 
+  // ESTRUTURA DE DADOS DO MENU (COM FILTRO DE VISIBILIDADE)
   const menuItems: MenuItem[] = [
       // ⭐️ MÓDULOS CRAS (PROTEÇÃO CRAS)
       {
-          title: userCrasUnit ? `Módulos CRAS - ${userCrasUnit.name}` : "Módulos CRAS",
+          title: "MODULO CRAS",
           icon: Home,
-          isVisible: isLotadoNoCRAS, // CRAS ISOLADO
-          isCrasGroup: true,
+          isVisible: false,
           subItems: [
-              // Note que as rotas precisam usar o userCrasUnit.urlName para funcionar
-              // Estes subItems são apenas um 'placeholder' visual, o renderCrasLinks fará a renderização dinâmica.
-          ]
+            { name: "Novo Registro", path: "/cras/cadastro", icon: PlusCircle, isVisible: true },
+            { name: "Consulta", path: "/cras/consulta", icon: Search, isVisible: true },
+        ]
       },
       
       // ⭐️ MÓDULOS OPERACIONAIS CREAS (PROTEÇÃO CREAS_OP/ANÁLISE)
       {
           title: "Atendimento Operacional CREAS",
           icon: MapPin,
-          isVisible: canAccessAnaliseGroup, // Visível se puder acessar CREAS Data (Vigilância/CREAS/Gestor)
+          isVisible: canViewCreasOperacional, // Visível se puder acessar CREAS Data (Vigilância/CREAS/Gestor)
           subItems: [
-              // 🟢 CORREÇÃO APLICADA: canAccessAnaliseGroup permite que a Vigilância acesse Coleta de Dados
-              { name: "Coleta de Dados", path: "/cadastro", icon: PlusCircle, isVisible: canAccessAnaliseGroup }, 
-              // 🟢 Mantido: canViewCreasOperacional exclui a Vigilância (apenas CREAS/Gestor)
-              { name: "Controle MSE", path: "/controle-mse", icon: FileText, isVisible: canViewCreasOperacional },
-              // Rotas de Consulta/Visualização (Acesso a Dados CREAS)
-              { name: "Consulta de Casos", path: "/consulta", icon: Search, isVisible: canAccessAnaliseGroup },
-              { name: "Gerenciamento de Demandas", path: "/demandas", icon: Inbox, isVisible: canAccessAnaliseGroup },
+              { name: "Coleta de Dados", path: "/cadastro", icon: PlusCircle, isVisible: canManageCasos }, 
+              { name: "Controle MSE", path: "/controle-mse", icon: FileText, isVisible: canManageMse },
+              { name: "Consulta de Casos", path: "/consulta", icon: Search, isVisible: canManageCasos },
+              { name: "Gerenciamento de Demandas", path: "/demandas", icon: Inbox, isVisible: canManageDemandas },
           ]
       },
       
@@ -154,10 +114,10 @@ export default function Layout() {
           icon: BarChart3,
           isVisible: canAccessAnaliseGroup,
           subItems: [
-              { name: "Dashboard PAEFI", path: "/dashboard", icon: LayoutDashboard, isVisible: canAccessAnaliseGroup },
-              { name: "Painel de Vigilância", path: "/painel-vigilancia", icon: BarChart3, isVisible: canAccessAnaliseGroup }, // AGORA APARECE PARA CREAS E VIGILÂNCIA
-              { name: "Relatórios", path: "/relatorios", icon: FileText, isVisible: canAccessAnaliseGroup },
-              { name: "Integrações", path: "/integracoes", icon: Settings, isVisible: canAccessAnaliseGroup },
+              { name: "Dashboard PAEFI", path: "/dashboard", icon: LayoutDashboard, isVisible: canAccessDashboardScreen },
+              { name: "Painel de Vigilância", path: "/painel-vigilancia", icon: BarChart3, isVisible: canAccessVigilanciaScreen }, // AGORA APARECE PARA CREAS E VIGILÂNCIA
+              { name: "Relatórios", path: "/relatorios", icon: FileText, isVisible: canAccessRelatoriosScreen },
+              { name: "Integrações", path: "/integracoes", icon: Settings, isVisible: canAccessIntegrationsScreen },
           ]
       },
       
@@ -165,55 +125,12 @@ export default function Layout() {
       {
           title: "Administração",
           icon: Users,
-          isVisible: canViewAdmin,
+          isVisible: canManageUsers,
           subItems: [
-              { name: "Gerenciar Servidores", path: "/gerenciar-usuarios", icon: Users, isVisible: canViewAdmin },
+              { name: "Gerenciar Servidores", path: "/gerenciar-usuarios", icon: Users, isVisible: canManageUsers },
           ]
       },
   ];
-
-  // Função que mapeia os links do CRAS (Mantida e Ajustada)
-  // Esta função agora é um auxiliar para o grupo CRAS na iteração do menuItems.
-  const renderCrasLinks = (cras: typeof CRAS_UNITS[0], userCrasUnit: typeof CRAS_UNITS[0] | undefined, isGestorGeral: boolean) => {
-      const isCurrentOpen = openCrasUnitId === cras.id;
-      const linkClasses = "flex items-center text-sm gap-2 pl-3 py-1";
-      const activeLinkClass = "font-bold bg-green-50 text-green-700 rounded-sm";
-      const inactiveLinkClass = "text-slate-600 hover:bg-slate-100";
-      
-      // Renderiza se for Gestor Geral OU se for o CRAS lotado do usuário
-      const renderableCras = isGestorGeral || userCrasUnit?.id === cras.id;
-
-      if (!renderableCras) return null;
-
-      return (
-          <div key={cras.id} className="w-full">
-              <div 
-                  className={`flex justify-between items-center px-3 py-2 cursor-pointer transition-colors rounded-md ${isCurrentOpen ? 'bg-green-100 text-green-800 font-semibold' : 'hover:bg-slate-100 text-slate-700'}`}
-                  onClick={() => toggleCrasMenu(cras.id)}
-              >
-                  {cras.name}
-                  {isCurrentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-
-              {isCurrentOpen && userCrasUnit && ( // Renderiza os links CRAS apenas se a unidade estiver aberta
-                  <div className="ml-2 pl-2 space-y-1 border-l border-green-300 transition-all duration-300 ease-in-out">
-                      <Link to={`/cras/${cras.urlName}/cadastro`} className={`${linkClasses} ${location.pathname.startsWith(`/cras/${cras.urlName}/cadastro`) ? activeLinkClass : inactiveLinkClass}`}>
-                          <PlusCircle className="h-5 w-5" /> Novo Registro
-                      </Link>
-                      <Link to={`/cras/${cras.urlName}/consulta`} className={`${linkClasses} ${location.pathname.startsWith(`/cras/${cras.urlName}/consulta`) ? activeLinkClass : inactiveLinkClass}`}>
-                          <Search className="h-5 w-5" /> Consultar Usuário
-                      </Link>
-                      <Link to={`/cras/${cras.urlName}/gestantes`} className={`${linkClasses} ${location.pathname.endsWith('/gestantes') ? activeLinkClass : inactiveLinkClass}`}>
-                          <UserCheck className="h-5 w-5" /> Controle Gestantes
-                      </Link>
-                      <Link to={`/cras/${cras!.urlName}/instrumentais`} className={`${linkClasses} ${location.pathname.endsWith('/instrumentais') ? activeLinkClass : inactiveLinkClass}`}>
-                          <BookOpen className="h-5 w-5" /> Instrumentais
-                      </Link>
-                  </div>
-              )}
-          </div>
-      );
-  };
 
   // ⭐️ FUNÇÃO AUXILIAR PARA RENDERIZAR LINKS DE SUBMENU ⭐️
   const renderSubMenuItem = (item: SubMenuItem, index: number, linkColorClass: string) => {
@@ -237,8 +154,6 @@ export default function Layout() {
           </Link>
       );
   };
-
-
   return (
     <div className="min-h-screen w-full bg-slate-100 flex">
       {/* SIDEBAR */}
@@ -257,8 +172,12 @@ export default function Layout() {
             <div className="text-xs p-2 bg-yellow-100 border border-yellow-300 rounded">
                 <p>ROLE: <strong>{userRole || 'VAZIO'}</strong></p>
                 <p>UNIT ID: <strong>{String(userUnitId) || 'VAZIO'}</strong></p>
-                <p>CAN ACCESS ANÁLISE?: <strong>{canAccessAnaliseGroup ? 'SIM' : 'NÃO'}</strong></p>
-                <p>VER CREAS OP?: <strong>{canViewCreasOperacional ? 'SIM' : 'NÃO'}</strong></p>
+                <p>access to analise?: <strong>{canAccessAnaliseGroup ? 'SIM' : 'NÃO'}</strong></p>
+                <p>access to creas?: <strong>{canViewCreasOperacional ? 'SIM' : 'NÃO'}</strong></p>
+                <p>manage casos?: <strong>{canManageCasos ? 'SIM' : 'NÃO'}</strong></p>
+                <p>manage mse?: <strong>{canManageMse ? 'SIM' : 'NÃO'}</strong></p>
+                <p>manage demandas?: <strong>{canManageDemandas ? 'SIM' : 'NÃO'}</strong></p>
+                <p>manage users?: <strong>{canManageUsers ? 'SIM' : 'NÃO'}</strong></p>
             </div>
             {/* 🛑 FIM DO CÓDIGO DE DEBUG 🛑 */}
 
@@ -269,8 +188,7 @@ export default function Layout() {
                 
                 // Define a cor da tag e do link baseado no título
                 let titleColor = "slate";
-                if (group.isCrasGroup) titleColor = "green";
-                else if (group.title.includes("CREAS")) titleColor = "blue";
+                if (group.title.includes("CREAS")) titleColor = "blue";
                 else if (group.title.includes("Análise")) titleColor = "purple";
 
 
@@ -280,13 +198,9 @@ export default function Layout() {
                             {group.title}
                         </h3>
                         
-                        {/* Se for o grupo CRAS, usa a renderização especial para submenus dinâmicos */}
-                        {group.isCrasGroup ? (
-                            CRAS_UNITS.map(cras => renderCrasLinks(cras, userCrasUnit, isGestorGeral))
-                        ) : (
-                            // Renderiza os subitens para outros grupos
-                            group.subItems?.map((item, subIndex) => renderSubMenuItem(item, subIndex, titleColor))
-                        )}
+                        {group.subItems?.map((item, subIndex) =>
+                          renderSubMenuItem(item, subIndex, titleColor)
+                        )} 
                     </div>
                 );
             })}

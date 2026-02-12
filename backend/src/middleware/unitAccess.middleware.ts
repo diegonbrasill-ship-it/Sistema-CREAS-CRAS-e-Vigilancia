@@ -18,11 +18,11 @@ export const unitAccessMiddleware = (tableName: string, unitIdColumn: string = '
 
     return (req: Request, res: Response, next: NextFunction) => {
 
-        // req.user é tratado como tipo AuthenticatedUser
-        const user = req.user as AuthenticatedUser | undefined;
+ 
+        const user = req.user as AuthenticatedUser;
+        
 
-        // 1. Checagem de Segurança
-        if (!user) {
+        if (!user) { //verifica se existe usuário
             return res.status(401).json({ message: "Acesso não autorizado: Informação de Usuário ausente." });
         }
 
@@ -34,34 +34,20 @@ export const unitAccessMiddleware = (tableName: string, unitIdColumn: string = '
             };
             return next();
         }
+
         //unit_id deve existir para que a filtrafem de segurança funcione
         if (user.unit_id === null || user.unit_id === undefined) {
-            console.error(`ERRO DE SEGURANÇA: Usuário não-gestor sem unit_id. Role: ${user.role}`);
-            return res.status(403).json({ message: "Acesso negado. Servidor sem unidade de lotação definida." });
+            console.error(`ERRO DE SEGURANÇA: Usuário sem unit_id.`);
+            return res.status(403).json({ message: "Acesso negado. Servidor sem unidade definida." });
         }
 
         const userUnitId = user.unit_id;
         let unitParams: (string | number)[] = [];
         let unitWhereClause = '';
-
-        // Variável local para evitar o erro TS2367 //TODO: trocar dados estaticos para backend
-        const creasIdAsNumber: number = UNIT_ID_CREAS;
-
         // 2. REGRA PADRÃO: O usuário só acessa dados da sua Unidade.
         unitParams.push(userUnitId);
         // unitWhereClause usa o prefixo adaptativo (ex: "casos.unit_id" ou "c.unit_id")
-        unitWhereClause = `${tablePrefix}.${unitIdColumn} = $1`;
-
-        //3. REGRA DE EXCEÇÃO CRÍTICA: Vigilância (UNIT_ID_VIGILANCIA) acessa CREAS (UNIT_ID_CREAS).
-        if (userUnitId === UNIT_ID_VIGILANCIA) {
-
-            if (UNIT_ID_VIGILANCIA !== creasIdAsNumber) {
-
-                unitParams.push(UNIT_ID_CREAS);
-                unitWhereClause = `(${tablePrefix}."${unitIdColumn}" = $2 OR ${tablePrefix}."${unitIdColumn}" = $3)`;
-            }
-        }
-
+        unitWhereClause = `${tablePrefix}.${unitIdColumn}`;
         // 4. Injeta o filtro na requisição.
         req.accessFilter = {
             whereClause: unitWhereClause,

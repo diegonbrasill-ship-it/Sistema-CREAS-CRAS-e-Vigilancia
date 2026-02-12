@@ -1,5 +1,3 @@
-// frontend/src/contexts/AuthContext.tsx
-
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { login as apiLogin } from '../services/api';
 
@@ -11,6 +9,7 @@ interface User {
   cargo: string;
   unit_id: number | null; // Aceita NULL vindo do Gestor Geral
   role_id: number
+  permissions: Array<string>
 }
 
 interface AuthContextType {
@@ -33,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
 
-      if (token && userData && userData !== 'null') {
+      if (token && userData && userData !== null) {
         const parsedUser = JSON.parse(userData);
 
         // 🔒 Garante que unit_id nunca seja undefined e converte de string (se necessário) para number.
@@ -58,6 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (username: string, password: string) => {
+
     const response = await apiLogin(username, password);
 
     // Garante que o unit_id é tratado como number ou null antes de salvar
@@ -97,6 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
+
 };
 
 export const useAuth = () => {

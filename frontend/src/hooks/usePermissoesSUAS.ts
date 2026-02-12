@@ -1,115 +1,143 @@
 // frontend/src/hooks/usePermissoesSUAS.ts
 
 import { useAuth } from "@/contexts/AuthContext";
+import { entityPermissions, UNIT_OPTIONS } from "@/utils/constants";
 
 // =========================================================
-// ⭐️ CONSTANTES DO PROJETO CENTRALIZADAS (Exportadas para uso global) ⭐️
+// CONSTANTES DO PROJETO
 // =========================================================
-export const CREAS_UNIT_ID = 1; 
 
-// 💡 Nota: Em um projeto real, esses dados viriam de uma API ou Store central.
-// Mantendo a estrutura para seguir o seu código.
+export const CREAS_UNIT_ID = 1;
+
 export const CRAS_UNITS = [
-    { id: 2, name: "CRAS Geralda Medeiros", urlName: "geralda-medeiros" },
-    { id: 3, name: "CRAS Mariana Alves", urlName: "mariana-alves" },
-    { id: 4, name: "CRAS Matheus Leitão", urlName: "matheus-leitao" },
-    { id: 5, name: "CRAS Severina Celestino", urlName: "severina-celestino" },
+  { id: 2, name: "CRAS Geralda Medeiros", urlName: "geralda-medeiros" },
+  { id: 3, name: "CRAS Mariana Alves", urlName: "mariana-alves" },
+  { id: 4, name: "CRAS Matheus Leitão", urlName: "matheus-leitao" },
+  { id: 5, name: "CRAS Severina Celestino", urlName: "severina-celestino" },
 ];
 
 export const CRAS_UNIT_IDS = CRAS_UNITS.map(u => u.id);
-
-
-// =========================================================
-// ⭐️ INTERFACE DE RETORNO DO HOOK (CORRIGIDA) ⭐️
-// =========================================================
-interface PermissoesSUAS {
-    // Info do usuário (NOVOS ADICIONADOS)
-    unitId: number | null; // 🟢 NOVO: ID da unidade do usuário
-    userCrasUnit: typeof CRAS_UNITS[0] | undefined;
-    dashboardFilterUnits: number[]; // 🟢 NOVO: Array de IDs de unidade para filtrar dados em Dashboard/Vigilância
-    
-    // Status de lotação e perfis principais
-    isGestorGeral: boolean;
-    isVigilancia: boolean;
-    isLotadoNoCRAS: boolean;
-    isLotadoNoCreas: boolean;
-    
-    // Permissões de Acesso Finais (o que o usuário pode fazer)
-    canViewCRAS: boolean;
-    canAccessCreasData: boolean;
-    canViewCreasOperacional: boolean;
-    canAccessAnaliseGroup: boolean;
-    canManageUsers: boolean;
+interface PermissoesSUAS { //tipo do retorno
+  unitId: number | null;
+  dashboardFilterUnits: number[];
+  //perfil (legado)
+  isGestorGeral: boolean;
+  isVigilancia: boolean;
+  isLotadoNoCreas: boolean;
+  //acesso (legado)
+  canViewCreasOperacional: boolean;
+  canAccessAnaliseGroup: boolean;
+  canManageUsers: boolean;
+  //entidades
+  canManageUnits: boolean;
+  canManageCasos: boolean;
+  canManageMse: boolean;
+  canManageDemandas: boolean;
+  canManageAnexos: boolean;
+  canManageEncaminhamentos: boolean;
+  //telas
+  canAccessDashboardScreen: boolean;
+  canAccessVigilanciaScreen: boolean;
+  canAccessIntegrationsScreen: boolean;
+  canAccessRelatoriosScreen: boolean;
 }
 
-
 export function usePermissoesSUAS(): PermissoesSUAS {
-    const { user } = useAuth();
-    
-    // Sanitização e Preparação dos Dados
-    const rawRole = (user?.role || '').toString().toLowerCase().trim();
-    // Garante que unit_id é um número ou null
-    const userUnitIdNum = user?.unit_id ? Number(user.unit_id) : null; 
-    
-    // =========================================================
-    // 1. Detecção de Perfis e Lotação
-    // =========================================================
-    const isGestorGeral = ['gestor', 'admin'].some(r => rawRole.includes(r));
-    const isVigilancia = rawRole.includes('vigilancia');
-    const isCoordenador = rawRole.includes('coordenador');
+  const { user, isAuthenticated } = useAuth();
 
-    const isLotadoNoCreas = userUnitIdNum === CREAS_UNIT_ID;
-    const isLotadoNoCRAS = CRAS_UNIT_IDS.includes(userUnitIdNum as number);
-    const userCrasUnit = CRAS_UNITS.find(u => u.id === userUnitIdNum);
+  const role_id = user?.role_id
+  const rawRole = (user?.role || "").toLowerCase().trim();
+  const userUnitId = user?.unit_id ? Number(user.unit_id) : null;
+  const userPermissions: string[] = Array.isArray(user?.permissions)
+    ? user.permissions
+    : [];
 
+  const hasPermission = (permission: string): boolean =>
+    userPermissions.includes(permission);
 
-    // =========================================================
-    // 2. REGRAS DE ACESSO
-    // =========================================================
+  const hasAllPermissions = (requiredPermissions: string[]): boolean =>
+    requiredPermissions.every(permission =>
+      userPermissions.includes(permission)
+    );
 
-    // Acesso a Cadastro/MSE (Operacional CREAS estrito)
-    const canViewCreasOperacional = isGestorGeral || isLotadoNoCreas;
+  // --------------------------------------------------------
+  // Detecção de perfis
+  // --------------------------------------------------------
 
-    // Acesso ao grupo Análise/Dashboard/Dados CREAS
-    const canAccessAnaliseGroup = isGestorGeral || isLotadoNoCreas || isVigilancia;
-    
-    // Variáveis mantidas por compatibilidade
-    const canAccessCreasData = canAccessAnaliseGroup; 
-    const canViewCRAS = isGestorGeral || isLotadoNoCRAS;
-    const canManageUsers = isGestorGeral || isCoordenador;
-    
-    // =========================================================
-    // ⭐️ 3. LÓGICA DE FILTRO DE DADOS (PARA DASHBOARDS/PAINÉIS) ⭐️
-    // =========================================================
-    let dashboardFilterUnits: number[] = [-99]; // Padrão: Acesso negado
+  const isGestorGeral = ["gestor", "admin"].some(role =>
+    rawRole.includes(role)
+  );
 
-    if (isGestorGeral) {
-        // Gestor Geral vê todos os dados (array vazio sinaliza 'sem filtro' no backend)
-        dashboardFilterUnits = []; 
-    } else if (isVigilancia || isLotadoNoCreas) {
-        // Vigilância e Servidor CREAS veem SOMENTE os dados do CREAS (ID 1).
-        dashboardFilterUnits = [CREAS_UNIT_ID];
-    } else if (isLotadoNoCRAS && userCrasUnit) {
-        // Servidor CRAS vê apenas os seus dados (Não relevante para o Dashboard PAEFI, mas útil para rotas CRAS)
-        dashboardFilterUnits = [userCrasUnit.id];
-    }
-    // Para todos os outros perfis sem permissão explícita, permanece [-99]
+  const isVigilancia = rawRole.includes("vigilancia");
+  const isCoordenador = rawRole.includes("coordenador");
 
-    // =========================================================
-    // 4. RETORNO DE PERMISSÕES (ATUALIZADO)
-    // =========================================================
-    return {
-        unitId: userUnitIdNum, // 🟢 NOVO: ID da unidade
-        userCrasUnit,
-        dashboardFilterUnits, // 🟢 NOVO: Array de filtro
-        isGestorGeral, 
-        isVigilancia, 
-        isLotadoNoCRAS, 
-        isLotadoNoCreas,
-        canViewCRAS, 
-        canAccessCreasData, 
-        canViewCreasOperacional,
-        canAccessAnaliseGroup, 
-        canManageUsers
-    };
+  const isLotadoNoCreas = userUnitId === CREAS_UNIT_ID;
+  const isLotadoNoCRAS = CRAS_UNIT_IDS.includes(userUnitId as number);
+
+  const userCrasUnit = CRAS_UNITS.find(u => u.id === userUnitId);
+
+  // --------------------------------------------------------
+  // Regras legadas
+  // --------------------------------------------------------
+
+  
+
+  //entity control by permissions
+  const canManageUsers = hasAllPermissions(entityPermissions.users);
+  const canManageUnits = hasAllPermissions(entityPermissions.units);
+  const canManageCasos = hasAllPermissions(entityPermissions.casos);
+  const canManageMse = hasAllPermissions(entityPermissions.mse);
+  const canManageDemandas = hasAllPermissions(entityPermissions.demandas);
+  const canManageAnexos = hasAllPermissions(entityPermissions.anexos);
+  const canManageEncaminhamentos = hasAllPermissions(entityPermissions.encaminhamentos);
+
+  //screen access
+  const canAccessDashboardScreen = hasPermission("screen.dashboard.access");
+  const canAccessVigilanciaScreen = hasPermission("screen.vigilancia.access");
+  const canAccessIntegrationsScreen = hasPermission("screen.integrations.access");
+  const canAccessRelatoriosScreen = hasPermission("screen.relatorios.access");
+  
+  //legacy updated rules
+  const canViewCreasOperacional = canManageCasos && canManageMse && canManageDemandas;
+
+  const canAccessAnaliseGroup = canAccessDashboardScreen || canAccessIntegrationsScreen || canAccessRelatoriosScreen || canAccessVigilanciaScreen;
+
+  //TODO: Trocar, para aquele que não for gestor adicionar o filtro da sua unidade
+  //dashboardfilter 
+  let dashboardFilterUnits: number[] = [];
+
+  if (isGestorGeral) {
+    dashboardFilterUnits = [];
+  } else if (isVigilancia || isLotadoNoCreas) {
+    dashboardFilterUnits = [CREAS_UNIT_ID];
+  } else if (isLotadoNoCRAS && userCrasUnit) {
+    dashboardFilterUnits = [userCrasUnit.id];
+  }
+
+  return {
+    unitId: userUnitId,
+    dashboardFilterUnits,
+
+    // legado
+    isGestorGeral,
+    isVigilancia,
+    isLotadoNoCreas,
+    canViewCreasOperacional,
+    canAccessAnaliseGroup,
+    canManageUsers,
+
+    // entidades
+    canManageUnits,
+    canManageCasos,
+    canManageMse,
+    canManageDemandas,
+    canManageAnexos,
+    canManageEncaminhamentos,
+
+    // screens
+    canAccessDashboardScreen,
+    canAccessVigilanciaScreen,
+    canAccessIntegrationsScreen,
+    canAccessRelatoriosScreen,
+  };
 }

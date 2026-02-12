@@ -1,5 +1,8 @@
 
 // frontend/src/services/api.ts
+
+import { arrayOutputType } from "zod/v3";
+
 //adicionar if modo debug
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 //Shttps://prototipo-easysocial-api.onrender.com"
@@ -11,8 +14,6 @@ export interface FiltrosBase {
     mes?: string;
     tecRef?: string;
     bairro?: string;
-
-    // Filtros de Unidade (NOVOS CAMPOS)
     unidades?: string; // Li sta de IDs separadas por vírgula (dashboardFilterUnits.join(','))
     isFiltroTotal?: boolean; // Flag para Gestor Geral
 }
@@ -30,7 +31,8 @@ type LoginResponse = {
         cargo: string;
         is_active: boolean;
         unit_id: number;
-        role_id: number
+        role_id: number;
+        permissions: Array<string>;
     };
 };
 type ChartData = { name: string; value: number; };
@@ -134,6 +136,7 @@ export interface DemandaDetalhada extends Demanda {
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
     const token = localStorage.getItem('token');
+    
     if (!token) throw new Error('Usuário não autenticado. Por favor, faça o login novamente.');
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${token}`);
@@ -141,11 +144,14 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
         headers.set('Content-Type', 'application/json');
     }
     const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: `Erro ${response.status}: ${response.statusText}` }));
         throw new Error(errorData.message || 'Ocorreu um erro na requisição');
     }
+
     const contentType = response.headers.get('content-type');
+
     if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/octet-stream'))) {
         return response;
     }
@@ -167,7 +173,6 @@ const appendFiltros = (filters?: FiltrosBase): string => {
 };
 
 // --- FUNÇÕES DA API ---
-
 // AUTENTICAÇÃO
 export async function login(username: string, password: string): Promise<LoginResponse> {
     const res = await fetch(`${API_BASE_URL}/api/login/`, {
@@ -176,6 +181,7 @@ export async function login(username: string, password: string): Promise<LoginRe
         body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
+    console.log(data)
     if (!res.ok) throw new Error(data.message || 'Erro de autenticação');
     return data;
 }
@@ -187,9 +193,8 @@ export const updateCasoStatus = (casoId: string | number, status: string) => fet
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
 
-// ✅ CORREÇÃO 2: getCasosFiltrados agora aceita FiltrosCasos
 export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
-    // ⭐️ Determinar o endpoint
+    
     let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
     if (filters?.origem === 'vigilancia') {
         endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância

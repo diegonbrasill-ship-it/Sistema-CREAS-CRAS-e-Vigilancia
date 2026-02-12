@@ -10,7 +10,7 @@ export function anonimizarDadosSeNecessario(
     if (!isVigilancia || !data) return data;
 
     const anonimizarCaso = (caso: any) => {
-        const deveAnonimizar = caso.unit_id === UNIT_ID_CREAS;
+        const deveAnonimizar = caso.unit_id === UNIT_ID_CREAS; //TODO: trocar por consulta ao banco se for type CREAS?
 
         if (!deveAnonimizar) return caso;
 

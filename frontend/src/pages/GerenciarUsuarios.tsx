@@ -27,19 +27,7 @@ const getUnitLabel = (unitId: number | string) => {
     return Units[Number(unitId) as keyof typeof Units] || 'Não atribuída';
 };
 
-// ========================================================
-// 📌 Módulos de Mapeamento de Nomenclatura (INCLUINDO ROLES CRAS)
-// ========================================================
-const UNIDADES_DISPONIVEIS = [
-    { id: 1, nome: 'CREAS' },
-    { id: 2, nome: 'CRAS Geralda Medeiros' },
-    { id: 3, nome: 'CRAS Mariana Alves' },
-    { id: 4, nome: 'CRAS Matheus Leitão' },
-    { id: 5, nome: 'CRAS Severina Celestino' },
-    { id: 6, nome: 'Vigilancia SocioAssistencial' },
-    { id: 7, nome: 'Centro POP' },
-    { id: 8, nome: 'Conselho Tutelar Norte' },
-];
+
 const PROFILE_OPTIONS = [
     { value: "tecnico_superior", label: "Técnico de Nível Superior" },
     { value: "tecnico_medio", label: "Técnico de Nível Médio" },
@@ -270,7 +258,7 @@ export default function GerenciarUsuarios() {
                                     <TableCell className="font-medium">{user.nome_completo}</TableCell>
                                     <TableCell>{user.cargo}</TableCell>
                                     <TableCell>{user.username}</TableCell>
-                                    <TableCell>{getProfileLabel(user.role)}</TableCell>
+                                    <TableCell>{getRoleLabel(user.role)}</TableCell>
                                     <TableCell>{UNIT_OPTIONS.find(u => u.id === user.unit_id)?.nome}</TableCell>
                                     <TableCell><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'Ativo' : 'Inativo'}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">

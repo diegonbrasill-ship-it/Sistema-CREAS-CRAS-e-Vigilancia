@@ -17,13 +17,13 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     try {
         const secret = process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes';
         const data = jwt.verify(token, secret);
-        const { id, username, role, unit_id } = data as TokenPayload;
+        const { id, username, role, unit_id, role_id, permissions} = data as TokenPayload;
 
         //converte unit_id para number ou null de forma segura
         const safeUnitId = unit_id ?? null;
 
         //insere dados do user na request
-        req.user = { id, username, role: role as UserRole, unit_id: safeUnitId } as AuthenticatedUser;
+        req.user = { id, username, role: role as UserRole, unit_id: safeUnitId, role_id, permissions } as AuthenticatedUser;
 
         return next();
     } catch {

@@ -6,6 +6,8 @@ export interface AuthenticatedUser {
     username: string;
     role: UserRole | string;
     unit_id: number | null;
+    role_id: number;
+    permissions: Array<string>
 }
 
 export interface TokenPayload extends AuthenticatedUser {

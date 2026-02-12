@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { query, Request, Response } from "express";
 import pool from "../../db";
 import { CASOS_SQL } from "./casos.sql";
 import { logAction } from "../../services/logger";
@@ -24,13 +24,10 @@ export class CasosCrontroller {
     }
 
     static async list(req: Request, res: Response) {
-
         const user = req.user!;
         const accessFilter = req.accessFilter!;
 
-        // Desestruturação da requisiçao
         const {
-            q,
             tec_ref,
             filtro,
             valor,
@@ -39,6 +36,17 @@ export class CasosCrontroller {
             socioeducacao,
             mes
         } = req.query;
+
+        console.log('REQ.QUERY, REQ.QUERY')
+        console.log({
+            tec_ref,
+            filtro,
+            valor,
+            status,
+            confirmedViolence,
+            socioeducacao,
+            mes
+        } )
 
         try {
 
@@ -58,9 +66,10 @@ export class CasosCrontroller {
                 const indexDoParametro = addParam(status);
                 whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
             }
+
             if (mes) {
-                const ph = addParam(mes);
-                whereClauses.push(`TO_CHAR(data_cad, 'YYYY-MM') = ${ph}::VARCHAR`);
+                const indexDoParametro = addParam(mes);
+                whereClauses.push(`TO_CHAR(data_cad, 'YYYY-MM') = ${indexDoParametro}::VARCHAR`);
             }
 
             // 2. FILTRO DE BUSCA (geral ou por tec_ref/filtro)
@@ -79,7 +88,7 @@ export class CasosCrontroller {
                dados_completos->>'cpf' ILIKE ${p4})
             `));
             }
-            // ⭐️ TRATAMENTO ROBUSTO PARA FILTROS DE CARD/GRÁFICO
+            
             else if (filtro && valor && filtro !== 'q') {
 
                 const jsonKey = filtro;
@@ -123,19 +132,18 @@ export class CasosCrontroller {
             if (socioeducacao === 'true') whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
 
             // 4. FILTRO DE ACESSO POR UNIDADE (Visibilidade restaurada e Estabilidade)
-            if (accessFilter.whereClause !== 'TRUE') {
-                // cria placeholders sequenciais e adiciona os valores aos params com addParam
-                const unitPlaceholders: string[] = accessFilter.params.map((p: any) => `${addParam(p)}::INTEGER`);
+            const reqParams = accessFilter.params; 
+            console.log(reqParams)
+            
+            if (reqParams.length !== 0) {
+                
+                if(reqParams.length == 1){
+                    const indexDoParametro = addParam(reqParams[0]);
+                    const unitWhere = accessFilter.whereClause;
+                    whereClauses.push(`${unitWhere} = ${indexDoParametro}`);
+                } else { //TODO: adaptar else para quando os filtros forem maior que 1 (unitAcces.middleware.ts)
 
-                let unitWhere = accessFilter.whereClause;
-                // substitui tokens $X e $Y (se existirem) pelos placeholders gerados
-                if (unitPlaceholders[0]) unitWhere = unitWhere.replace(/\$X/g, unitPlaceholders[0]);
-                if (unitPlaceholders[1]) unitWhere = unitWhere.replace(/\$Y/g, unitPlaceholders[1]);
-
-                // ⭐️ REAPLICAÇÃO DA CORREÇÃO DE VISIBILIDADE: Inclui casos sem unit_id (Gestor Principal)
-                unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
-
-                whereClauses.push(unitWhere);
+                }
             }
 
             // Montagem final da query
@@ -143,8 +151,8 @@ export class CasosCrontroller {
             query += ` ORDER BY data_cad DESC`;
 
             // Debug: verifique se placeholders e params estão sincronizados
-            console.log("DEBUG: FINAL QUERY:", CASOS_SQL.CLEAN(query));
-            console.log("DEBUG: FINAL PARAMS:", params);
+            //console.log("DEBUG: FINAL QUERY:", CASOS_SQL.CLEAN(query));
+            // console.log("DEBUG: FINAL PARAMS:", params);
 
             // Execução
             const result = await pool.query(CASOS_SQL.CLEAN(query), params);
@@ -243,31 +251,54 @@ export class CasosCrontroller {
         const { id } = req.params;
         const user = req.user!;
         const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
+        const reqParams = accessFilter.params
+        const params: any[] = [];
+        const whereClauses: string[] = [];
+        
+        const addParam = (val: any) => {
+            params.push(val);
+            return `$${params.length}`;
+        };
 
-        // 1. Resolvendo a Cláusula WHERE de Acesso
+        //     const indexDoParametro = addParam(status);
+        //     whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
+        
+        let indexHelper = addParam(id)
+        whereClauses.push(`id = ${indexHelper}`)
+        
         const unitParams: (string | number)[] = [id]; // ID do Caso é o $1
         let unitWhere = accessFilter.whereClause;
 
         if (accessFilter.params.length === 1) {
-            unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
-            unitParams.push(accessFilter.params[0]);
+            const indexDoParametro = addParam(reqParams[0]);
+            const unitWhere = accessFilter.whereClause;
+            whereClauses.push(`${unitWhere} = ${indexDoParametro}`);
+
         } else if (accessFilter.params.length === 2) {
             unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
             unitParams.push(accessFilter.params[0], accessFilter.params[1]);
         }
 
+        
         // 2. Montando a Query Segura
         // ⭐️ Adiciona OR casos.unit_id IS NULL para Gestor Principal
         const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
 
-        const checkQuery = CASOS_SQL.CLEAN(`SELECT * FROM casos WHERE id = $1 AND ${finalUnitWhere}`);
-
+        const checkQuery = CASOS_SQL.CLEAN(`SELECT * FROM casos`);
+        
         try {
-            // EXECUTA A CHECAGEM E BUSCA AO MESMO TEMPO
-            const casoResult = await pool.query(checkQuery, unitParams);
+            let query = CASOS_SQL.SELECT_BY_ID
 
-            if (casoResult.rowCount === 0) {
-                // Se não encontrou ou não tem permissão
+            if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
+
+            //confere se query ta ok
+            //console.log("DEBUG: FINAL QUERY (casoby id):\n", CASOS_SQL.CLEAN(query));
+            //console.log("DEBUG: FINAL PARAMS:\n", params);
+            
+           
+            const casoResult = await pool.query(CASOS_SQL.CLEAN(query), params);
+
+            if (casoResult.rowCount === 0) { // se db não retorna nada
                 return res.status(404).json({ message: "Caso não encontrado ou acesso restrito." });
             }
 

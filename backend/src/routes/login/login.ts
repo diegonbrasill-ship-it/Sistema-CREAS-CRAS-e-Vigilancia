@@ -35,10 +35,7 @@ router.post("/", async (req, res) => {
                         GROUP BY u.id, r.name;
                 `
                 const result = await pool.query(query,[username]);
-                
-                const oldquery = await pool.query(  // seleciona todos os campos necessários
-                        'SELECT id, username, role, role_id, password_hash, is_active, unit_id, nome_completo, cargo FROM users WHERE username = $1', [username]);
-                
+
                 if (result.rowCount === 0) { //verifica se a query ao banco retornou algo
                         await logAction({ username, action: 'LOGIN_FAILURE', details: { reason: 'User not found' } });
                         return res.status(401).json({ message: "Usuário ou senha inválidos." });
@@ -78,8 +75,10 @@ router.post("/", async (req, res) => {
                         is_active: user.is_active,
                         unit_id: user.unit_id,
                         permissions: user.permissions,
+                        role_id: user.role_id
                 };
-
+                console.log('usuario que na teoria foi enviado ao fornt pormeio do token')
+                console.log(tokenPayload)
                 const token = jwt.sign( // monta o token (código) JWT fornecido ao front 
                         tokenPayload,
                         process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes',
@@ -97,6 +96,7 @@ router.post("/", async (req, res) => {
                                 cargo: user.cargo,
                                 is_active: user.is_active,
                                 unit_id: user.unit_id,
+                                role_id: user.role_id,
                                 permissions: user.permissions,
                         }
                 }
