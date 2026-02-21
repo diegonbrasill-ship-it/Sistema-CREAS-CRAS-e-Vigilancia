@@ -4,13 +4,9 @@ import express, { Router, Request, Response } from "express";
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
-// Importar tipos auxiliares, se necessário
-// import { anonimizarDadosSeNecessario } from './casos'; 
+import { cleanSqlString } from "../utils/sqlUtils";
 
 const router = express.Router();
-
-// Função de Limpeza SQL (Importada ou definida localmente)
-const cleanSqlString = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 
 // Aplicamos o filtro de unidade para todas as rotas do CRAS
 // 'casos' é a tabela base, 'unit_id' é a coluna de filtro

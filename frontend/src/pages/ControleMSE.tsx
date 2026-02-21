@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge'; 
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import MseRegistroModal from '@/components/mse/MseRegistroModal';
 import { getMseRegistros, MseRegistroResumido } from '../services/api'; 

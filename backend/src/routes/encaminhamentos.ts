@@ -6,13 +6,9 @@ import { authMiddleware } from '../middleware/auth/auth';
 import { logAction } from '../services/logger';
 import { unitAccessMiddleware } from '../middleware/unitAccess.middleware';
 import { checkCaseAccess, checkItemAccessByParentCase } from '../middleware/caseAccess.middleware'; // Importações das checagens centralizadas
+import { cleanSqlString } from '../utils/sqlUtils';
 
 const router = express.Router();
-
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Essencial para remover o erro 'syntax error at or near " "'
-const cleanSqlString = (sql: string): string => {
-  return sql.replace(/\s+/g, ' ').trim();
-};
 
 
 // Aplicação do middleware de segurança e filtro de unidade em todas as rotas

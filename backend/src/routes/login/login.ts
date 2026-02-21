@@ -77,8 +77,7 @@ router.post("/", async (req, res) => {
                         permissions: user.permissions,
                         role_id: user.role_id
                 };
-                console.log('usuario que na teoria foi enviado ao fornt pormeio do token')
-                console.log(tokenPayload)
+                
                 const token = jwt.sign( // monta o token (código) JWT fornecido ao front 
                         tokenPayload,
                         process.env.JWT_SECRET || 'seu_segredo_padrao_para_testes',

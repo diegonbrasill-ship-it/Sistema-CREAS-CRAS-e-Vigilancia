@@ -9,13 +9,9 @@ import { unitAccessMiddleware } from '../middleware/unitAccess.middleware';
 import { checkCaseAccess } from '../middleware/caseAccess.middleware';
 import path from 'path';
 import fs from 'fs';
+import { cleanSqlString } from '../utils/sqlUtils';
 
 const router = express.Router();
-
-// FUNÇÃO UTILITÁRIA: Limpeza de strings SQL
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
 
 // Middleware auxiliar para checar acesso por anexo ID (usa o cleanSqlString)
 async function checkAnexoAccess(req: Request, res: Response, next: express.NextFunction) {

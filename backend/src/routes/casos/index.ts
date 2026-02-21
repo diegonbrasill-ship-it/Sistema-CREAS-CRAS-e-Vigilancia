@@ -11,29 +11,15 @@ import { CasosCrontroller } from "./casos.controller";
 
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
 
-// ROTA POST /casos - CRIAR NOVO CASO
-router.post("/", CasosCrontroller.create);
 
-// ROTA GET /casos - LISTAR CASOS (CORREÇÃO DE TIPAGEM E BPC)
-router.get("/", CasosCrontroller.list);
-
-// ROTA PUT /casos/:id - ATUALIZAR CASO
-router.put("/:id", checkCaseAccess('params', 'id'), CasosCrontroller.update);
-
-// PATCH /casos/:id/status 
-router.patch("/:id/status", checkCaseAccess('params', 'id'), CasosCrontroller.patch);
-
-// DELETE /casos/:id
-router.delete("/:id", checkCaseAccess('params', 'id'), CasosCrontroller.delete);
-
-// GET /casos/:id - DETALHES DO CASO 
-router.get("/:id", CasosCrontroller.getCaso);
-
-// GET /casos/:casoId/encaminhamentos
-router.get("/:casoId/encaminhamentos", CasosCrontroller.getEncaminhamentos);
-
-// ROTA GET /casos/busca-rapida - BUSCA RÁPIDA PARA ASSOCIAÇÃO DE DEMANDAS
-router.get("/busca-rapida", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), CasosCrontroller.getFast);
+router.post("/", CasosCrontroller.create); //create new case
+router.get("/", CasosCrontroller.list); //list 
+router.put("/:id", checkCaseAccess('params', 'id'), CasosCrontroller.update); //atualizar caso
+router.patch("/:id/status", checkCaseAccess('params', 'id'), CasosCrontroller.patch); //atualiza o atributo status
+router.delete("/:id", checkCaseAccess('params', 'id'), CasosCrontroller.delete); // deleta um caso
+router.get("/:id", CasosCrontroller.getCaso); //lista 1 caso por id
+router.get("/:casoId/encaminhamentos", CasosCrontroller.getEncaminhamentos); // lista os encaminhamentos de um caso especifico
+router.get("/busca-rapida", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), CasosCrontroller.getFast); // algo relacionado a demandas??
 
 export default router;
 

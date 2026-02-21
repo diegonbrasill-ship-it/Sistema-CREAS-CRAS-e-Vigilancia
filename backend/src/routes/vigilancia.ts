@@ -4,15 +4,9 @@ import express, { Router, Request, Response, NextFunction } from "express";
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
+import { cleanSqlString } from "../utils/sqlUtils";
 
 const router = express.Router();
-
-/**
- * Função de Limpeza SQL Extrema: Remove quebras de linha e múltiplos espaços.
- */
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
 
 /**
  * Função utilitária para gerar o filtro WHERE de acesso (unidade e visibilidade).

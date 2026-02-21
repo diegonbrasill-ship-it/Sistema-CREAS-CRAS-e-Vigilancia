@@ -53,9 +53,12 @@ export class CasosService {
         return novoCaso;
     }
 
+    static async getCasoById() { }
+    
     static async list() {
     }
 
     static async update() { }
+
 
 }

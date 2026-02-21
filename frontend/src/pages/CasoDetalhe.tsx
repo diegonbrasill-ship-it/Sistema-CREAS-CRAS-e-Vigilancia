@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissoesSUAS } from "@/hooks/usePermissoesSUAS";
 
 // Importações dos serviços da API, agora com os tipos corretos
 import {
@@ -41,12 +42,33 @@ interface Encaminhamento { id: number; servicoDestino: string; dataEncaminhament
 // interface Anexo { id: number; nomeOriginal: string; tamanhoArquivo: number; dataUpload: string; descricao: string; uploadedBy: string; } 
 
 
+// Labels técnicos/internos que não devem ser exibidos ao usuário
+const LABELS_OCULTOS = new Set([
+    'id', 'status', 'unit_id', 'user_id',
+    'created_at', 'updated_at', 'deleted_at',
+    'dados_completos', 'demandasVinculadas', 'demandas_vinculadas',
+]);
+
 // Componente auxiliar
 function DataItem({ label, value }: { label: string; value: any }) {
-    if (value === null || value === undefined || value === "" || label === 'status' || label === 'demandasVinculadas' || label === 'unit_id') return null;
+    // Ignorar campos nulos, vazios, técnicos ou de tipo complexo (objetos/arrays)
+    if (
+        value === null || value === undefined || value === "" ||
+        LABELS_OCULTOS.has(label) ||
+        typeof value === 'object'
+    ) {
+        return null;
+    }
+
+    // Formatar label: snake_case → espaços, camelCase → espaços
+    const labelFormatado = label
+        .replace(/_/g, " ")
+        .replace(/([A-Z])/g, " $1")
+        .trim();
+
     return (
         <div className="py-2">
-            <p className="text-sm font-medium text-slate-500 capitalize">{label.replace(/([A-Z])/g, " $1")}</p>
+            <p className="text-sm font-medium text-slate-500 capitalize">{labelFormatado}</p>
             <p className="text-base text-slate-900 break-words">{String(value)}</p>
         </div>
     );
@@ -61,16 +83,13 @@ export default function CasoDetalhe() {
 
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { canEditCasos, canDeleteCasos } = usePermissoesSUAS();
 
-    // REGRA CORRIGIDA: Todos os perfis operacionais têm autonomia sobre o prontuário.
-    // ⭐️ CORREÇÃO AQUI: Garante que userRole é uma string vazia se for null/undefined
-    const userRole = user?.role || '';
+    // Verificação de permissões baseada no hook centralizado
+    const isOperacional = canEditCasos;
+    const canDelete = canDeleteCasos;
 
-    const isOperacional = userRole.includes('gestor') || userRole.includes('coordenador') ||
-        userRole.includes('tecnico') || userRole.includes('vigilancia');
-    const canDelete = isOperacional;
-
-    const [caso, setCaso] = useState<CasoDetalhado | null>(null);
+    const [currentCaso, setCaso] = useState<CasoDetalhado | null>(null);
     const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
     const [novoAcompanhamento, setNovoAcompanhamento] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -89,7 +108,7 @@ export default function CasoDetalhe() {
     const [isActionLoading, setIsActionLoading] = useState(false);
 
     // O useCallback garante que a função de busca não mude, o que é importante para o useEffect.
-    const fetchData = useCallback(async () => {
+    const   fetchData = useCallback(async () => {
         // Usa o ID extraído
         if (!id) return;
         try {
@@ -101,6 +120,7 @@ export default function CasoDetalhe() {
                     getEncaminhamentos(id),
                     getAnexosByCasoId(id),
                 ]);
+            console.log(casoData)
             setCaso(casoData);
             setAcompanhamentos(acompanhamentosData);
             setEncaminhamentos(encaminhamentosData);
@@ -294,12 +314,24 @@ export default function CasoDetalhe() {
         } finally {
             setIsActionLoading(false);
         }
+    };    if (isLoading) { return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>; }
+    if (!currentCaso) { return <div className="text-center p-10">Não foi possível carregar os dados do caso. Tente novamente mais tarde.</div>; }
+
+    // Fallbacks snake_case/camelCase para compatibilidade com API
+    const dataCadRaw = currentCaso.data_cad;
+    const dataCadastroFormatada = dataCadRaw
+        ? new Date(dataCadRaw).toLocaleDateString("pt-BR", { timeZone: "UTC" })
+        : "Data não informada";
+    const tecnicoRef = currentCaso.tec_ref;
+    const demandasVinculadas: any[] = currentCaso.demandas_vinculadas;
+
+    // Achatar dados_completos para exibir campos do prontuário junto com os de nível superior
+    const dadosParaExibir = {
+        ...currentCaso,
+        ...(typeof currentCaso.dados_completos === 'object' && currentCaso.dados_completos !== null
+            ? currentCaso.dados_completos
+            : {}),
     };
-
-    if (isLoading) { return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>; }
-    if (!caso) { return <div className="text-center p-10">Não foi possível carregar os dados do caso. Tente novamente mais tarde.</div>; }
-
-    const dataCadastroFormatada = new Date(caso.dataCad).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 
     return (
         <div className="space-y-6">
@@ -314,7 +346,7 @@ export default function CasoDetalhe() {
                         <>
                             <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4" />Editar Dados</Button>
 
-                            {caso.status === 'Ativo' ? (
+                            {currentCaso.status === 'Ativo' ? (
                                 <Button variant="outline" size="sm" onClick={handleDesligarCaso} disabled={isActionLoading}><PowerOff className="mr-2 h-4 w-4" />Desligar Caso</Button>
                             ) : (
                                 <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4" />Reativar Caso</Button>
@@ -330,16 +362,16 @@ export default function CasoDetalhe() {
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-2xl">{caso.nome || "[Caso sem nome]"}</CardTitle>
-                        {caso.status !== 'Ativo' && (<Badge variant="destructive" className="text-sm">{`Status: ${caso.status}`}</Badge>)}
+                        <CardTitle className="text-2xl">{currentCaso.nome || "[Caso sem nome]"}</CardTitle>
+                        {currentCaso.status !== 'Ativo' && (<Badge variant="destructive" className="text-sm">{`Status: ${currentCaso
+                            .status}`}</Badge>)}
                     </div>
-                    <CardDescription>Prontuário de Atendimento | Cadastrado em: {dataCadastroFormatada} por {caso.tecRef}</CardDescription>
+                    <CardDescription>Prontuário de Atendimento | Cadastrado em: {dataCadastroFormatada} por {tecnicoRef}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="border-t pt-4">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-2">Informações Cadastrais</h3>
-                        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-x-6">
-                            {Object.entries(caso).map(([key, value]) => (<DataItem key={key} label={key} value={value} />))}
+                        <h3 className="text-lg font-semibold text-slate-800 mb-2">Informações Cadastrais</h3>                        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-x-6">
+                            {Object.entries(dadosParaExibir).map(([key, value]) => (<DataItem key={key} label={key} value={value} />))}
                         </div>
                     </div>
                 </CardContent>
@@ -349,14 +381,14 @@ export default function CasoDetalhe() {
             {isOperacional && (
                 <div className="space-y-6">
 
-                    {caso.demandasVinculadas && caso.demandasVinculadas.length > 0 && (
+                    {currentCaso.demandasVinculadas && currentCaso.demandasVinculadas.length > 0 && (
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center"><Inbox className="mr-2 h-5 w-5 text-slate-600" />Demandas Externas Vinculadas</CardTitle>
                                 <CardDescription>Histórico de ofícios e solicitações formais associadas a este caso.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {caso.demandasVinculadas.map((demanda: DemandaResumida) => (
+                                {currentCaso.demandasVinculadas.map((demanda: DemandaResumida) => (
                                     <div key={demanda.id} className="flex items-center justify-between border p-3 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors">
                                         <div>
                                             <p className="font-semibold text-slate-800">{demanda.tipo_documento} - {demanda.instituicao_origem}</p>

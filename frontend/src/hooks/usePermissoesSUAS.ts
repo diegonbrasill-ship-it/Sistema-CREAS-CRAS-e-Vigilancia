@@ -35,6 +35,11 @@ interface PermissoesSUAS { //tipo do retorno
   canManageDemandas: boolean;
   canManageAnexos: boolean;
   canManageEncaminhamentos: boolean;
+  //permissões granulares de casos
+  canReadCasos: boolean;
+  canEditCasos: boolean;
+  canDeleteCasos: boolean;
+  canCreateCasos: boolean;
   //telas
   canAccessDashboardScreen: boolean;
   canAccessVigilanciaScreen: boolean;
@@ -80,8 +85,6 @@ export function usePermissoesSUAS(): PermissoesSUAS {
   // Regras legadas
   // --------------------------------------------------------
 
-  
-
   //entity control by permissions
   const canManageUsers = hasAllPermissions(entityPermissions.users);
   const canManageUnits = hasAllPermissions(entityPermissions.units);
@@ -90,13 +93,18 @@ export function usePermissoesSUAS(): PermissoesSUAS {
   const canManageDemandas = hasAllPermissions(entityPermissions.demandas);
   const canManageAnexos = hasAllPermissions(entityPermissions.anexos);
   const canManageEncaminhamentos = hasAllPermissions(entityPermissions.encaminhamentos);
-
   //screen access
   const canAccessDashboardScreen = hasPermission("screen.dashboard.access");
   const canAccessVigilanciaScreen = hasPermission("screen.vigilancia.access");
   const canAccessIntegrationsScreen = hasPermission("screen.integrations.access");
   const canAccessRelatoriosScreen = hasPermission("screen.relatorios.access");
   
+  // Permissões granulares de casos
+  const canReadCasos = hasPermission("casos.read");
+  const canEditCasos = hasPermission("casos.edit");
+  const canDeleteCasos = hasPermission("casos.delete");
+  const canCreateCasos = hasPermission("casos.create");
+
   //legacy updated rules
   const canViewCreasOperacional = canManageCasos && canManageMse && canManageDemandas;
 
@@ -113,7 +121,6 @@ export function usePermissoesSUAS(): PermissoesSUAS {
   } else if (isLotadoNoCRAS && userCrasUnit) {
     dashboardFilterUnits = [userCrasUnit.id];
   }
-
   return {
     unitId: userUnitId,
     dashboardFilterUnits,
@@ -133,6 +140,12 @@ export function usePermissoesSUAS(): PermissoesSUAS {
     canManageDemandas,
     canManageAnexos,
     canManageEncaminhamentos,
+
+    // permissões granulares de casos
+    canReadCasos,
+    canEditCasos,
+    canDeleteCasos,
+    canCreateCasos,
 
     // screens
     canAccessDashboardScreen,

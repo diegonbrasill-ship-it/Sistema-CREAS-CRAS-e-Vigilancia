@@ -1,84 +1,18 @@
 // backend/src/routes/dashboard.ts
 
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import pool from "../db";
 import { authMiddleware } from "../middleware/auth/auth";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { QueryResult } from "pg";
+import { cleanSqlString } from "../utils/sqlUtils";
+import { QueryBuilder } from "../utils/query-builder";
 
 const router = Router();
-
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA: Remove quebras de linha e múltiplos espaços.
-const cleanSqlString = (sql: string): string => {
-    // Essencial para remover caracteres invisíveis que causam o erro 42601
-    return sql.replace(/\s+/g, ' ').trim();
-};
-
-/**
- * Função utilitária para gerar o filtro WHERE e sincronizar os parâmetros.
- * Retorna APENAS O CONTEÚDO do WHERE, limpo.
- */
-const buildFullWhereClauseContent = (
-    filters: { mes?: string, tec_ref?: string, bairro?: string },
-    accessFilter: { whereClause: string, params: any[] },
-    startParamIndex: number
-): [string, any[]] => {
-
-    const whereClauses: string[] = [];
-    let params: any[] = [];
-    let paramIndex = startParamIndex;
-
-    // 1. Adicionar filtros existentes (mes, tec_ref, bairro)
-    if (filters.mes) {
-        params.push(filters.mes);
-        whereClauses.push(`TO_CHAR(casos.data_cad, 'YYYY-MM') = $${paramIndex++}`);
-    }
-    if (filters.tec_ref) {
-        params.push(filters.tec_ref);
-        whereClauses.push(`casos.tec_ref ILIKE $${paramIndex++}`);
-    }
-    if (filters.bairro) {
-        params.push(filters.bairro);
-        whereClauses.push(`LOWER(casos.dados_completos->>'bairro') = LOWER($${paramIndex++})`);
-    }
-
-    // 2. Adicionar filtro de Unidade (CORREÇÃO DE VISIBILIDADE)
-    let unitWhere = accessFilter.whereClause;
-
-    // Substituir placeholders do unitAccessMiddleware ($X, $Y) por números reais ($N, $N+1...)
-    if (accessFilter.params.length === 1) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`);
-    } else if (accessFilter.params.length === 2) {
-        unitWhere = unitWhere.replace('$X', `$${paramIndex++}`).replace('$Y', `$${paramIndex++}`);
-    }
-
-    // Adicionar os parâmetros da unidade à lista principal de parâmetros
-    params = params.concat(accessFilter.params);
-
-    // ⭐️ CORREÇÃO ESSENCIAL: Inclui casos onde unit_id é NULL, se não for TRUE (Gestor Geral)
-    if (unitWhere !== 'TRUE') {
-        unitWhere = `(${unitWhere} OR casos.unit_id IS NULL)`;
-    }
-
-    // Adicionar a cláusula de unidade ao conjunto de cláusulas WHERE
-    whereClauses.push(unitWhere);
-
-
-    if (whereClauses.length === 0) {
-        return ['', []];
-    }
-
-    // Retorna APENAS O CONTEÚDO do WHERE, limpo.
-    return [whereClauses.join(' AND ').trim(), params];
-};
-
-
 // =======================================================================
 // 📌 APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
 // =======================================================================
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
-
-
 // =======================================================================
 // ROTA PRINCIPAL: GET / (Busca Dados do Dashboard)
 // =======================================================================
@@ -88,24 +22,18 @@ router.get("/", async (req: Request, res: Response) => {
 
         const { mes, tec_ref, bairro } = req.query as { mes?: string, tec_ref?: string, bairro?: string };
 
-        // 1. Gera o conteúdo e os parâmetros (Inicia a contagem em $1)
-        const [whereContent, params] = buildFullWhereClauseContent({ mes, tec_ref, bairro }, accessFilter, 1);
+        // 1. Monta os filtros com QueryBuilder
+        const qb = new QueryBuilder("SELECT")
+            .whereIf(mes, (ph) => `TO_CHAR(casos.data_cad, 'YYYY-MM') = ${ph}`)
+            .whereIf(tec_ref, (ph) => `casos.tec_ref ILIKE ${ph}`)
+            .whereIf(bairro, (ph) => `LOWER(casos.dados_completos->>'bairro') = LOWER(${ph})`)
+            .applyAccessFilter(accessFilter);
 
         // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
-        const whereClause = whereContent.length > 0 ? ` WHERE ${whereContent}` : '';
-        const andClause = whereContent.length > 0 ? ` AND ${whereContent}` : '';
-
-        // Lógica para excluir valores nulos/vazios/sem rótulo nos agrupamentos
-        const appendNonNullFilter = (jsonbKey: string): string => {
-            const jsonbField = `dados_completos->>'${jsonbKey}'`;
-            const baseClause = whereContent.length > 0 ? andClause : ' WHERE TRUE ';
-
-            // Filtro rigoroso: exclui NULL, espaços em branco e valores comuns de fallback.
-            return ` ${baseClause} 
-                     AND ${jsonbField} IS NOT NULL 
-                     AND TRIM(${jsonbField}) <> '' 
-                     AND LOWER(TRIM(${jsonbField})) NOT IN ('n/i', 'não informado', 'null', 'undefined') `;
-        }
+        const whereClause = qb.getWhereClause() ? ` ${qb.getWhereClause()}` : '';
+        const andClause = qb.getAndClause() ? ` ${qb.getAndClause()}` : '';        // whereTrue: ancora segura para queries que precisam de WHERE + AND adicionais
+        const whereTrue = andClause.length > 0 ? andClause : ' WHERE TRUE';
+        const params = qb.getParams();
 
         // Função para garantir que campos que seriam NULOS tenham o rótulo "Não Informado"
         const getGroupedFieldName = (jsonbKey: string): string => {
@@ -143,15 +71,14 @@ router.get("/", async (req: Request, res: Response) => {
             pool.query(cleanSqlString(`SELECT
                 COUNT(*) FILTER (WHERE dados_completos->>'dependeFinanceiro' = 'Sim') AS "dependenciaFinanceira",
                 COUNT(*) FILTER (WHERE dados_completos->>'vitimaPCD' = 'Sim') AS "vitimaPCD",
-                COUNT(*) FILTER (WHERE dados_completos->>'membroCarcerario' = 'Sim') AS "membroCarcerario",
-                COUNT(*) FILTER (WHERE dados_completos->>'membroSocioeducacao' = 'Sim') AS "membroSocioeducacao"
-                FROM casos ${whereClause}`), params),
+                COUNT(*) FILTER (WHERE dados_completos->>'membroCarcerario' = 'Sim') AS "membroCarcerario",                COUNT(*) FILTER (WHERE dados_completos->>'membroSocioeducacao' = 'Sim') AS "membroSocioeducacao"
+                FROM casos ${whereClause}`), params),
 
             // 9 - 12 (Principais: Reforçando checagem TRIM() )
-            pool.query(cleanSqlString(`SELECT dados_completos->>'tipoMoradia' AS name FROM casos ${whereClause} AND dados_completos->>'tipoMoradia' IS NOT NULL AND TRIM(dados_completos->>'tipoMoradia') <> '' GROUP BY dados_completos->>'tipoMoradia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
-            pool.query(cleanSqlString(`SELECT dados_completos->>'escolaridade' AS name FROM casos ${whereClause} AND dados_completos->>'escolaridade' IS NOT NULL AND TRIM(dados_completos->>'escolaridade') <> '' GROUP BY dados_completos->>'escolaridade' ORDER BY COUNT(*) DESC LIMIT 1`), params),
-            pool.query(cleanSqlString(`SELECT dados_completos->>'tipoViolencia' AS name FROM casos ${whereClause} AND dados_completos->>'tipoViolencia' IS NOT NULL AND TRIM(dados_completos->>'tipoViolencia') <> '' GROUP BY dados_completos->>'tipoViolencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
-            pool.query(cleanSqlString(`SELECT dados_completos->>'localOcorrencia' AS name FROM casos ${whereClause} AND dados_completos->>'localOcorrencia' IS NOT NULL AND TRIM(dados_completos->>'localOcorrencia') <> '' GROUP BY dados_completos->>'localOcorrencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
+            pool.query(cleanSqlString(`SELECT dados_completos->>'tipoMoradia' AS name FROM casos ${whereTrue} AND dados_completos->>'tipoMoradia' IS NOT NULL AND TRIM(dados_completos->>'tipoMoradia') <> '' GROUP BY dados_completos->>'tipoMoradia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
+            pool.query(cleanSqlString(`SELECT dados_completos->>'escolaridade' AS name FROM casos ${whereTrue} AND dados_completos->>'escolaridade' IS NOT NULL AND TRIM(dados_completos->>'escolaridade') <> '' GROUP BY dados_completos->>'escolaridade' ORDER BY COUNT(*) DESC LIMIT 1`), params),
+            pool.query(cleanSqlString(`SELECT dados_completos->>'tipoViolencia' AS name FROM casos ${whereTrue} AND dados_completos->>'tipoViolencia' IS NOT NULL AND TRIM(dados_completos->>'tipoViolencia') <> '' GROUP BY dados_completos->>'tipoViolencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
+            pool.query(cleanSqlString(`SELECT dados_completos->>'localOcorrencia' AS name FROM casos ${whereTrue} AND dados_completos->>'localOcorrencia' IS NOT NULL AND TRIM(dados_completos->>'localOcorrencia') <> '' GROUP BY dados_completos->>'localOcorrencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
 
             // 13 a 19 - Gráficos (USANDO A FUNÇÃO getGroupedFieldName)
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('bairro')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC LIMIT 5`), params),
@@ -160,13 +87,14 @@ router.get("/", async (req: Request, res: Response) => {
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('sexo')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('canalDenuncia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('corEtnia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
+
             // Faixa Etária (Tratamento especial no agrupamento)
-            pool.query(cleanSqlString(`SELECT CASE WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' ELSE 'Não informado' END as name, COUNT(*) as value FROM casos ${whereClause} AND dados_completos->>'idade' IS NOT NULL AND TRIM(dados_completos->>'idade') <> '' GROUP BY name ORDER BY value DESC`), params),
+            pool.query(cleanSqlString(`SELECT CASE WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' ELSE 'Não informado' END as name, COUNT(*) as value FROM casos ${whereTrue} AND dados_completos->>'idade' IS NOT NULL AND TRIM(dados_completos->>'idade') <> '' GROUP BY name ORDER BY value DESC`), params),
 
             // 20, 21, 22 - Opções para os Filtros (Reforçando checagem TRIM() )
-            pool.query(cleanSqlString(`SELECT DISTINCT TO_CHAR(data_cad, 'YYYY-MM') AS mes FROM casos ${whereClause} AND data_cad IS NOT NULL GROUP BY mes ORDER BY mes DESC`), params),
-            pool.query(cleanSqlString(`SELECT DISTINCT tec_ref FROM casos ${whereClause} AND tec_ref IS NOT NULL GROUP BY tec_ref ORDER BY tec_ref ASC`), params),
-            pool.query(cleanSqlString(`SELECT DISTINCT dados_completos->>'bairro' AS bairro FROM casos ${whereClause} AND dados_completos->>'bairro' IS NOT NULL AND TRIM(dados_completos->>'bairro') <> '' GROUP BY bairro ORDER BY bairro ASC`), params)
+            pool.query(cleanSqlString(`SELECT DISTINCT TO_CHAR(data_cad, 'YYYY-MM') AS mes FROM casos ${whereTrue} AND data_cad IS NOT NULL GROUP BY mes ORDER BY mes DESC`), params),
+            pool.query(cleanSqlString(`SELECT DISTINCT tec_ref FROM casos ${whereTrue} AND tec_ref IS NOT NULL GROUP BY tec_ref ORDER BY tec_ref ASC`), params),
+            pool.query(cleanSqlString(`SELECT DISTINCT dados_completos->>'bairro' AS bairro FROM casos ${whereTrue} AND dados_completos->>'bairro' IS NOT NULL AND TRIM(dados_completos->>'bairro') <> '' GROUP BY bairro ORDER BY bairro ASC`), params)
         ];
 
         const results: QueryResult[] = await Promise.all(queries);

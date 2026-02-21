@@ -5,12 +5,9 @@ import { logAction } from "../../services/logger";
 import { CasosService } from "./casos.service";
 import { anonimizarDadosSeNecessario } from "./casos.middleware";
 
-
-
 export class CasosCrontroller {
 
     static async create(req: Request, res: Response) {
-
         // necessidade de definir mais os erros de rotas?
         try {
             const novoCaso = await CasosService.createCaso(req.body, req.user)
@@ -20,7 +17,6 @@ export class CasosCrontroller {
             console.error("Erro ao criar caso:", err.message);
             res.status(500).json({ message: "Erro ao criar caso." });
         }
-
     }
 
     static async list(req: Request, res: Response) {
@@ -181,7 +177,7 @@ export class CasosCrontroller {
             const dataBaseSelectResponse = await pool.query(CASOS_SQL.CLEAN(CASOS_SQL.SELECT_BY_ID), [id]);
             if (dataBaseSelectResponse.rowCount === 0) return res.status(404).json({ message: "Caso não encontrado." });
             const casoAtual = dataBaseSelectResponse.rows[0];
-            // junção de dados bem porca
+            // junção de dados
             const dadosMesclados = {
                 ...casoAtual.dados_completos,
                 ...casoUpdate
@@ -224,6 +220,7 @@ export class CasosCrontroller {
 
             await logAction({ user_id, username, action: 'UPDATE_CASE_STATUS', details: { casoId: id, nomeVitima: result.rows[0].nome, novoStatus: status } });
             res.status(200).json({ message: `Caso ${id} atualizado para '${status}' com sucesso.` });
+
         } catch (err: any) {
             console.error(`Erro ao atualizar status do caso ${id}:`, err.message);
             res.status(500).json({ message: "Erro interno ao atualizar o status do caso." });
@@ -247,62 +244,21 @@ export class CasosCrontroller {
     }
 
     static async getCaso(req: Request, res: Response) {
-
-        const { id } = req.params;
+        //usuario solicita caso por id
+        //verifico se foi ele que criou
+        const { id} = req.params;
         const user = req.user!;
-        const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
-        const reqParams = accessFilter.params
-        const params: any[] = [];
-        const whereClauses: string[] = [];
-        
-        const addParam = (val: any) => {
-            params.push(val);
-            return `$${params.length}`;
-        };
-
-        //     const indexDoParametro = addParam(status);
-        //     whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
-        
-        let indexHelper = addParam(id)
-        whereClauses.push(`id = ${indexHelper}`)
-        
-        const unitParams: (string | number)[] = [id]; // ID do Caso é o $1
-        let unitWhere = accessFilter.whereClause;
-
-        if (accessFilter.params.length === 1) {
-            const indexDoParametro = addParam(reqParams[0]);
-            const unitWhere = accessFilter.whereClause;
-            whereClauses.push(`${unitWhere} = ${indexDoParametro}`);
-
-        } else if (accessFilter.params.length === 2) {
-            unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
-            unitParams.push(accessFilter.params[0], accessFilter.params[1]);
-        }
-
-        
-        // 2. Montando a Query Segura
-        // ⭐️ Adiciona OR casos.unit_id IS NULL para Gestor Principal
-        const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere} OR casos.unit_id IS NULL)`;
-
-        const checkQuery = CASOS_SQL.CLEAN(`SELECT * FROM casos`);
-        
         try {
             let query = CASOS_SQL.SELECT_BY_ID
+            const response = await pool.query(CASOS_SQL.CLEAN(query), [id]);
+            console.log(response.rows)
 
-            if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
-
-            //confere se query ta ok
-            //console.log("DEBUG: FINAL QUERY (casoby id):\n", CASOS_SQL.CLEAN(query));
-            //console.log("DEBUG: FINAL PARAMS:\n", params);
+            if (response.rowCount === 0){ return res.status(404).json({ message: "Caso não encontrado." }); } 
             
-           
-            const casoResult = await pool.query(CASOS_SQL.CLEAN(query), params);
+            const casoConsultado = response.rows[0];
+            let nomeToSendInPayload = casoConsultado.nome;
 
-            if (casoResult.rowCount === 0) { // se db não retorna nada
-                return res.status(404).json({ message: "Caso não encontrado ou acesso restrito." });
-            }
-
-            const casoBase = casoResult.rows[0];
+            if(casoConsultado.user_id !== user.id) { nomeToSendInPayload = "NOME EM SIGILO" }
 
             const demandasQuery = CASOS_SQL.CLEAN(`
                 SELECT id, tipo_documento, instituicao_origem, data_recebimento, status
@@ -310,23 +266,25 @@ export class CasosCrontroller {
                 WHERE caso_associado_id = $1
                 ORDER BY data_recebimento DESC
             `);
+
             const demandasResult = await pool.query(demandasQuery, [id]);
 
-            const casoCompleto = {
-                ...casoBase.dados_completos,
-                id: casoBase.id,
-                data_cad: casoBase.data_cad,
-                tec_ref: casoBase.tec_ref,
-                nome: casoBase.nome,
-                user_id: casoBase.user_id,
-                status: casoBase.status,
-                unit_id: casoBase.unit_id,
-                demandasVinculadas: demandasResult.rows
+            const payloadCasoCompleto = {
+                ...casoConsultado.dados_completos,
+                id: casoConsultado.id,
+                data_cad: casoConsultado.data_cad,
+                tec_ref: casoConsultado.tec_ref,
+                nome: nomeToSendInPayload,
+                status: casoConsultado.status,
+                unit_id: casoConsultado.unit_id,
+                demandas_vinculadas: demandasResult.rows
             };
 
-            const dadosProcessados = anonimizarDadosSeNecessario(user, casoCompleto);
+            const dadosProcessados = anonimizarDadosSeNecessario(user, payloadCasoCompleto);
             res.status(200).json(dadosProcessados);
+
         } catch (err: any) {
+
             console.error(`Erro ao buscar detalhes do caso ${id}:`, err.message);
             res.status(500).json({ message: "Erro ao buscar detalhes do caso." });
         }

@@ -118,9 +118,15 @@ export interface DemandaResumida {
 }
 
 export interface CasoDetalhado {
-    id: number; nome: string; dataCad: string; tecRef: string; status: string;
+    id: number; 
+    nome: string; 
+    data_cad: string; 
+    tec_ref: string; 
+    status: string;
+    unit_id: number,
+    //dados_completos: ,
     [key: string]: any;
-    demandasVinculadas: DemandaResumida[];
+    demandas_vinculadas: DemandaResumida[];
 }
 export interface Demanda {
     id: number; tipo_documento: string; instituicao_origem: string; data_recebimento: string; prazo_resposta?: string;

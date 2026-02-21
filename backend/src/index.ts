@@ -26,8 +26,6 @@ import demandasRoutes from "./routes/demandas";
 const app = express();
 
 // Configuração de CORS e outros middlewares
-
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());

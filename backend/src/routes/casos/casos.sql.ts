@@ -17,7 +17,7 @@ export const CASOS_SQL = {
       FROM casos
     `,
   SELECT_BY_ID: `
-      SELECT * FROM casos
+      SELECT * FROM casos WHERE id = $1
     `,
   UPDATE: `
       UPDATE casos SET data_cad=$1, tec_ref=$2, nome=$3, dados_completos=$4 WHERE id=$5

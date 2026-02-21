@@ -7,13 +7,9 @@ import { authMiddleware } from "../middleware/auth/auth";
 import { UNIT_ID_CREAS } from "../utils/constants";
 import { QueryResult } from "pg";
 import { authorizeCreasOnly } from "../middleware/auth/autorized.creas.only"
+import { cleanSqlString } from "../utils/sqlUtils";
 
 const router = Router();
-
-// SOLUÇÃO DE LIMPEZA EXTREMA
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
 
 // Interface de tipos para a nova rota
 interface MseRegistroBody {

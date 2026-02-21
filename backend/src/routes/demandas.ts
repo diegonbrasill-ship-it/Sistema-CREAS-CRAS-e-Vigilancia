@@ -8,13 +8,9 @@ import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants";
 import { checkCaseAccess } from "../middleware/caseAccess.middleware";
 import { AuthenticatedUser } from '../middleware/auth/authenticated.user';
+import { cleanSqlString } from '../utils/sqlUtils';
 
 const router = Router();
-
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
 
 // =======================================================================
 // 📌 MÓDULO CRÍTICO: ANONIMIZAÇÃO (Tipagem Corrigida)

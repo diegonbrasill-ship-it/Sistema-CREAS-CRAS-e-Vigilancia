@@ -6,13 +6,9 @@ import { authMiddleware } from "../middleware/auth/auth";
 import { logAction } from "../services/logger";
 import { unitAccessMiddleware } from "../middleware/unitAccess.middleware";
 import { checkCaseAccess } from "../middleware/caseAccess.middleware";
+import { cleanSqlString } from "../utils/sqlUtils";
 
 const router = Router();
-
-// 📌 SOLUÇÃO DE LIMPEZA EXTREMA
-const cleanSqlString = (sql: string): string => {
-    return sql.replace(/\s+/g, ' ').trim();
-};
 
 
 // Aplica a checagem de unidade para todas as rotas que dependem do casoId

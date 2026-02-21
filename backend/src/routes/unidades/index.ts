@@ -1,13 +1,7 @@
 import { Request, Response } from "express";
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth/auth';
-import { checkRole } from '../../middleware/auth/check.role';
-import { unitAccessMiddleware } from '../../middleware/unitAccess.middleware';
 import pool from "../../db";
-import bcrypt from "bcryptjs";
-import { logAction } from '../../services/logger';
-import { QueryResult } from 'pg';
-
 
 const router = Router();
 
