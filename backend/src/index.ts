@@ -7,6 +7,7 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { initDb } from "./db";
+import { generateCasosMock } from "./seed_casos" 
 
 // Importações das Rotas
 import loginRoutes from "./routes/login/login";
@@ -36,7 +37,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 (async function start() {
   try {
     await initDb();
-
+    
     app.use("/api/login", loginRoutes);
     app.use("/api/users", usersRoutes);
     app.use("/api/mse", mseRoutes);

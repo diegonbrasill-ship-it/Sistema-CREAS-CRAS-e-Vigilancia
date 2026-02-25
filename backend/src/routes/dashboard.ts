@@ -9,10 +9,9 @@ import { cleanSqlString } from "../utils/sqlUtils";
 import { QueryBuilder } from "../utils/query-builder";
 
 const router = Router();
-// =======================================================================
-// 📌 APLICAÇÃO GERAL DOS MIDDLEWARES DE SEGURANÇA NA ROTA
-// =======================================================================
+
 router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
+
 // =======================================================================
 // ROTA PRINCIPAL: GET / (Busca Dados do Dashboard)
 // =======================================================================
@@ -27,13 +26,28 @@ router.get("/", async (req: Request, res: Response) => {
             .whereIf(mes, (ph) => `TO_CHAR(casos.data_cad, 'YYYY-MM') = ${ph}`)
             .whereIf(tec_ref, (ph) => `casos.tec_ref ILIKE ${ph}`)
             .whereIf(bairro, (ph) => `LOWER(casos.dados_completos->>'bairro') = LOWER(${ph})`)
-            .applyAccessFilter(accessFilter);
-
-        // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
+            .applyAccessFilter(accessFilter);        // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
         const whereClause = qb.getWhereClause() ? ` ${qb.getWhereClause()}` : '';
-        const andClause = qb.getAndClause() ? ` ${qb.getAndClause()}` : '';        // whereTrue: ancora segura para queries que precisam de WHERE + AND adicionais
-        const whereTrue = andClause.length > 0 ? andClause : ' WHERE TRUE';
+        const andClause = qb.getAndClause() ? ` ${qb.getAndClause()}` : '';
+        // whereTrue: âncora segura para queries que NÃO têm WHERE fixo mas precisam
+        // de WHERE + AND adicionais (ex: queries 9-12, 19-22).
+        // Sempre começa com WHERE — quando há filtros usa "WHERE <filtros>",
+        // quando não há filtros usa "WHERE TRUE" como fallback.
+        const whereTrue = whereClause.length > 0 ? ` ${qb.getWhereClause()}` : ' WHERE TRUE';
         const params = qb.getParams();
+
+        console.log('rota dashboard')
+        console.log('whereClause')
+        console.log(whereClause ?? "vazia")
+        console.log('andClause')
+        console.log(andClause ?? "vazia")
+        console.log('whereTRUE')
+        console.log(whereTrue ?? "vazia")
+        console.log('params')
+        console.log(params ?? "vazios")
+        
+        
+
 
         // Função para garantir que campos que seriam NULOS tenham o rótulo "Não Informado"
         const getGroupedFieldName = (jsonbKey: string): string => {
@@ -71,18 +85,19 @@ router.get("/", async (req: Request, res: Response) => {
             pool.query(cleanSqlString(`SELECT
                 COUNT(*) FILTER (WHERE dados_completos->>'dependeFinanceiro' = 'Sim') AS "dependenciaFinanceira",
                 COUNT(*) FILTER (WHERE dados_completos->>'vitimaPCD' = 'Sim') AS "vitimaPCD",
-                COUNT(*) FILTER (WHERE dados_completos->>'membroCarcerario' = 'Sim') AS "membroCarcerario",                COUNT(*) FILTER (WHERE dados_completos->>'membroSocioeducacao' = 'Sim') AS "membroSocioeducacao"
+                COUNT(*) FILTER (WHERE dados_completos->>'membroCarcerario' = 'Sim') AS "membroCarcerario",                
+                COUNT(*) FILTER (WHERE dados_completos->>'membroSocioeducacao' = 'Sim') AS "membroSocioeducacao"
                 FROM casos ${whereClause}`), params),
 
             // 9 - 12 (Principais: Reforçando checagem TRIM() )
             pool.query(cleanSqlString(`SELECT dados_completos->>'tipoMoradia' AS name FROM casos ${whereTrue} AND dados_completos->>'tipoMoradia' IS NOT NULL AND TRIM(dados_completos->>'tipoMoradia') <> '' GROUP BY dados_completos->>'tipoMoradia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
             pool.query(cleanSqlString(`SELECT dados_completos->>'escolaridade' AS name FROM casos ${whereTrue} AND dados_completos->>'escolaridade' IS NOT NULL AND TRIM(dados_completos->>'escolaridade') <> '' GROUP BY dados_completos->>'escolaridade' ORDER BY COUNT(*) DESC LIMIT 1`), params),
-            pool.query(cleanSqlString(`SELECT dados_completos->>'tipoViolencia' AS name FROM casos ${whereTrue} AND dados_completos->>'tipoViolencia' IS NOT NULL AND TRIM(dados_completos->>'tipoViolencia') <> '' GROUP BY dados_completos->>'tipoViolencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
+            pool.query(cleanSqlString(`SELECT dados_completos->>'tipo_violencia' AS name FROM casos ${whereTrue} AND dados_completos->>'tipo_violencia' IS NOT NULL AND TRIM(dados_completos->>'tipo_violencia') <> '' GROUP BY dados_completos->>'tipo_violencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
             pool.query(cleanSqlString(`SELECT dados_completos->>'localOcorrencia' AS name FROM casos ${whereTrue} AND dados_completos->>'localOcorrencia' IS NOT NULL AND TRIM(dados_completos->>'localOcorrencia') <> '' GROUP BY dados_completos->>'localOcorrencia' ORDER BY COUNT(*) DESC LIMIT 1`), params),
 
             // 13 a 19 - Gráficos (USANDO A FUNÇÃO getGroupedFieldName)
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('bairro')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC LIMIT 5`), params),
-            pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('tipoViolencia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
+            pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('tipo_violencia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('encaminhamentoDetalhe')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC LIMIT 5`), params),
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('sexo')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),
             pool.query(cleanSqlString(`SELECT ${getGroupedFieldName('canalDenuncia')} as name, COUNT(*) as value FROM casos ${whereClause} GROUP BY name ORDER BY value DESC`), params),

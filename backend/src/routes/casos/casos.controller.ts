@@ -33,7 +33,7 @@ export class CasosCrontroller {
             mes
         } = req.query;
 
-        console.log('REQ.QUERY, REQ.QUERY')
+        console.log('listar casos: dados vindo do front')
         console.log({
             tec_ref,
             filtro,
@@ -95,7 +95,7 @@ export class CasosCrontroller {
                     whereClauses.push(`LOWER(dados_completos->>'bairro') = LOWER(${phValor}::TEXT)`);
                 } else if (jsonKey === 'por_violencia') {
                     // Lógica de Tipo de Violência (busca parcial - ILIKE)
-                    whereClauses.push(`dados_completos->>'tipoViolencia' ILIKE ${phValor}`);
+                    whereClauses.push(`dados_completos->>'tipo_violencia' ILIKE ${phValor}`);
                 } else if (jsonKey === 'por_faixa_etaria') {
                     // Lógica de Faixa Etária (filtro complexo no frontend, tratamento especial no backend)
                     whereClauses.push(CASOS_SQL.CLEAN(`
