@@ -84,8 +84,9 @@ screen.dashboard.access     → Acesso ao Dashboard PAEFI
 screen.vigilancia.access    → Acesso ao Painel de Vigilância
 screen.relatorios.access    → Acesso ao Módulo de Relatórios
 screen.integrations.access  → Acesso à tela de Integrações
-screen.dashbord.access      → (typo legado) Acesso ao Painel de Vigilância (alias)
 ```
+
+> **Nota:** As strings de permissão de tela estão centralizadas na constante `SCREEN_PERMISSIONS` em `src/utils/constants.ts`.
 
 ### 4.2 Hook Central: `usePermissoesSUAS`
 
@@ -112,6 +113,10 @@ O hook centraliza **toda** a lógica de permissões do frontend. Retorna:
 | `canAccessVigilanciaScreen`   | `boolean`        | Permissão de tela: vigilância                  |
 | `canAccessIntegrationsScreen` | `boolean`        | Permissão de tela: integrações                 |
 | `canAccessRelatoriosScreen`   | `boolean`        | Permissão de tela: relatórios                  |
+| `canReadCasos`                | `boolean`        | Permissão granular: `casos.read`               |
+| `canEditCasos`                | `boolean`        | Permissão granular: `casos.edit`               |
+| `canDeleteCasos`              | `boolean`        | Permissão granular: `casos.delete`             |
+| `canCreateCasos`              | `boolean`        | Permissão granular: `casos.create`             |
 
 ### 4.3 Componente `ProtectedRoute`
 
@@ -522,7 +527,7 @@ Módulo paralelo ao CREAS para as unidades CRAS. Usa os mesmos endpoints de caso
 | Mapas          | Leaflet + React-Leaflet                                                            |
 | Notificações   | react-toastify (configurado em `main.tsx` com `theme="colored"`, `autoClose=5000`) |
 | Ícones         | Lucide React                                                                       |
-| HTTP           | fetch nativo (função `fetchWithAuth`) — axios instalado mas não utilizado          |
+| HTTP           | fetch nativo (função `fetchWithAuth`)                                              |
 | Utilitário CSS | `cn()` em `src/lib/utils.ts` (combina `clsx` + `tailwind-merge`)                   |
 
 ### Proxy de Desenvolvimento (Vite)
@@ -561,11 +566,11 @@ src/
 ├── services/
 │   └── api.ts               # Todas as chamadas HTTP + interfaces de tipos
 ├── utils/
-│   ├── constants.ts          # Units, Roles, entityPermissions
+│   ├── constants.ts          # Units, Roles, entityPermissions, SCREEN_PERMISSIONS
 │   ├── roles.ts              # UserRole type + PROFILE_OPTIONS + PROFILE_LABELS
 │   ├── apiNormalizer.ts      # normalizeListResponse (normaliza respostas de array)
 │   ├── dateUtils.ts          # calculateAge, addMonthsToDate, formatDateForInput
-│   └── permissionHelpers.ts  # (vazio — reservado para helpers futuros)
+│   └── masks.ts              # maskCPF, maskNIS, unmask (máscaras de formulário)
 ├── pages/
 │   ├── Login.tsx
 │   ├── Dashboard.tsx         # Dashboard PAEFI com drill-down
@@ -586,7 +591,6 @@ src/
 └── components/
     ├── Layout.tsx            # ✅ Shell ATIVO: sidebar inline + cabeçalho (usado em App.tsx)
     ├── Header.tsx            # Cabeçalho standalone (usado dentro de Layout.tsx)
-    ├── Sidebar.tsx           # ⚠️ Componente LEGADO — não é referenciado em App.tsx
     ├── DrillDown/
     │   └── ListaCasosModal.tsx  # Modal reutilizável de drill-down (z-index: 2000)
     ├── demandas/
@@ -608,15 +612,14 @@ src/
         ├── select.tsx, table.tsx, tabs.tsx, textarea.tsx
 ```
 
-> **Nota sobre sidebars:** Existem dois componentes de navegação lateral. `Layout.tsx` contém a sidebar **embutida inline** (código JSX diretamente no componente) e é o shell real da aplicação — todas as rotas protegidas são envolvidas por ele. O arquivo `Sidebar.tsx` é um componente separado que **não está sendo importado** em nenhum ponto ativo da aplicação (legado ou refatoração inacabada).
-
 ### Padrões de Formulários
 
 - **React Hook Form + Zod** para validação.
 - `zodResolver` conecta o schema ao form.
+- Campos obrigatórios na Tab 1 (Atendimento): `data_cad`, `tec_ref`, `tipo_violencia`, `local_ocorrencia`.
 - Campos nullable: `z.string().optional().nullable()`.
-- CPF e NIS têm validações customizadas (`refine`).
-- `Controller` do RHF é usado para componentes de Select (Radix).
+- CPF e NIS têm validações customizadas (`refine`) e **máscaras visuais** via `maskCPF` / `maskNIS` (`src/utils/masks.ts`).
+- `Controller` do RHF é usado para componentes de Select (Radix) e campos com máscara.
 - No modo edição, apenas `dirtyFields` são enviados ao backend.
 
 ### Padrões de Estado
@@ -659,14 +662,17 @@ VITE_API_BASE_URL=http://localhost:4000   # URL base da API backend
 ## 16. ITENS PENDENTES / DÍVIDAS TÉCNICAS
 
 1. **Módulo CRAS incompleto:** `CrasConsulta` é placeholder. As rotas CRAS não têm `ProtectedRoute`.
-2. **Código de debug na sidebar:** Bloco de diagnóstico (`ROLE`, `UNIT ID`, permissões) visível em produção.
+2. ~~**Código de debug na sidebar:** Bloco de diagnóstico visível em produção.~~ ✅ Resolvido — protegido por `import.meta.env.DEV`.
 3. **MSE sem edição:** `updateMseRegistro` não está implementado (TODO no modal).
-4. **Typo em permissão:** `"screen.dashbord.access"` (falta o 'a' em dashboard) — duplicata de `"screen.vigilancia.access"`.
+4. ~~**Typo em permissão:** `"screen.dashbord.access"`.~~ ✅ Resolvido — corrigido e centralizado em `SCREEN_PERMISSIONS`.
 5. **unit_id no createMseRegistro:** Lê do `localStorage` diretamente em vez de usar o contexto de Auth.
 6. **`role_id` sem fallback:** Comentário `//todo: se for nulo é para dar erro` no AuthContext sem tratamento.
 7. **Filtro `unidades`** no dashboard ainda não totalmente integrado (lógica `dashboardFilterUnits` preparada mas não enviada automaticamente).
 8. **`useUnidades`** importa `getUnidades` e `Unidades` do `api.ts`, mas essas funções/tipos não estão declaradas no `api.ts` atual (possível erro de compilação).
-9. **`string` importado de `zod`** no `App.tsx` sem uso.
+9. ~~**`string` importado de `zod`** no `App.tsx` sem uso.~~ ✅ Resolvido — import removido.
+10. ~~**`Sidebar.tsx` legado** não referenciado.~~ ✅ Resolvido — arquivo deletado.
+11. ~~**`permissionHelpers.ts` vazio.**~~ ✅ Resolvido — arquivo deletado.
+12. ~~**`axios` instalado mas não utilizado.**~~ ✅ Resolvido — desinstalado do projeto.
 
 ---
 

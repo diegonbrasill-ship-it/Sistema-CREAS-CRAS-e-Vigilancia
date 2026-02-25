@@ -16,7 +16,6 @@ import { toast } from "react-toastify";
 import { Loader2 } from "lucide-react";
 import './Dashboard.css';
 
-type ChartData = { name: string; value: number; };
 interface CasoParaLista { id: number; nome?: string; tecRef: string; dataCad: string; bairro?: string; }
 
 const COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#dc2626", "#0ea5e9", "#64748b"];

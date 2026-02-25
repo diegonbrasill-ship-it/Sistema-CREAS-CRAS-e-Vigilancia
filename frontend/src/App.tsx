@@ -19,7 +19,7 @@ import DemandaDetalhe from "./pages/DemandaDetalhe";
 import CrasProntuario from "./pages/Cras/CrasProntuario";
 import CrasConsulta from "./pages/Cras/CrasConsulta";
 import { usePermissoesSUAS } from "./hooks/usePermissoesSUAS";
-import { entityPermissions } from "./utils/constants";
+import { entityPermissions, SCREEN_PERMISSIONS } from "./utils/constants";
 import 'leaflet/dist/leaflet.css';
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
@@ -40,13 +40,11 @@ export default function App() {
 
                     <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
 
-                        <Route index element={<Navigate to="/dashboard" />} />
-
-                        {/* 🛑 ROTAS DE ANÁLISE E GESTÃO (Protegidas) 🛑 */}
-                        <Route path="dashboard" element={<ProtectedRoute element={<Dashboard />} requiredPermissions={["screen.dashboard.access"]} />}/>
-                        <Route path="painel-vigilancia" element={<ProtectedRoute element={<PainelVigilancia />} requiredPermissions={["screen.dashbord.access"]} />} />
-                        <Route path="relatorios" element={<ProtectedRoute element={<Relatorios />} requiredPermissions={["screen.relatorios.access"]} />} />
-                        <Route path="integracoes" element={<ProtectedRoute element={<Integracoes />} requiredPermissions={["screen.integrations.access"]} />} />                        {/* rotas de caso */}
+                        <Route index element={<Navigate to="/dashboard" />} />                        {/* 🛑 ROTAS DE ANÁLISE E GESTÃO (Protegidas) 🛑 */}
+                        <Route path="dashboard" element={<ProtectedRoute element={<Dashboard />} requiredPermissions={[SCREEN_PERMISSIONS.dashboard]} />}/>
+                        <Route path="painel-vigilancia" element={<ProtectedRoute element={<PainelVigilancia />} requiredPermissions={[SCREEN_PERMISSIONS.vigilancia]} />} />
+                        <Route path="relatorios" element={<ProtectedRoute element={<Relatorios />} requiredPermissions={[SCREEN_PERMISSIONS.relatorios]} />} />
+                        <Route path="integracoes" element={<ProtectedRoute element={<Integracoes />} requiredPermissions={[SCREEN_PERMISSIONS.integracoes]} />} />{/* rotas de caso */}
                         <Route path="cadastro" element={<ProtectedRoute element={<Cadastro />} requiredPermissions={["casos.create"]} />} />
                         <Route path="cadastro/:id" element={<ProtectedRoute element={<Cadastro />} requiredPermissions={["casos.edit"]} />} />
                         <Route path="consulta" element={<ProtectedRoute element={<Consulta />} requiredPermissions={["casos.read"]} />} />
@@ -60,7 +58,8 @@ export default function App() {
                         {/* rotas cras em desenvolvimento */}
                         <Route path="cras/cadastro" element={<CrasProntuario/>} />
                         <Route path="cras/cadastro/:id" element={<CrasProntuario/>} />
-                        <Route path="cras/consulta" element={<CrasConsulta/>} />                        {/* 🛑 ROTAS DE ADMINISTRAÇÃO 🛑 */}
+                        <Route path="cras/consulta" element={<CrasConsulta/>} />                        
+                        {/* 🛑 ROTAS DE ADMINISTRAÇÃO 🛑 */}
                         <Route path="gerenciar-usuarios" element={<ProtectedRoute element={<GerenciarUsuarios />} requiredPermissions={["users.read"]}/>} />
                     </Route>
 

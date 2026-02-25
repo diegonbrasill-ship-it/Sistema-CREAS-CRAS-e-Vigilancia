@@ -167,8 +167,8 @@ export default function Layout() {
         </div>
         
         <nav className="flex-1 p-2 space-y-4">
-            
-            {/* 🛑 BLOCO DE DIAGNÓSTICO (Para fins de teste) - AJUSTADO PARA O HOOK 🛑 */}
+              {/* 🛑 BLOCO DE DIAGNÓSTICO — visível apenas em desenvolvimento 🛑 */}
+            {import.meta.env.DEV && (
             <div className="text-xs p-2 bg-yellow-100 border border-yellow-300 rounded">
                 <p>ROLE: <strong>{userRole || 'VAZIO'}</strong></p>
                 <p>UNIT ID: <strong>{String(userUnitId) || 'VAZIO'}</strong></p>
@@ -179,7 +179,7 @@ export default function Layout() {
                 <p>manage demandas?: <strong>{canManageDemandas ? 'SIM' : 'NÃO'}</strong></p>
                 <p>manage users?: <strong>{canManageUsers ? 'SIM' : 'NÃO'}</strong></p>
             </div>
-            {/* 🛑 FIM DO CÓDIGO DE DEBUG 🛑 */}
+            )}
 
 
             {/* ⭐️ RENDERIZAÇÃO DINÂMICA DO MENU ⭐️ */}

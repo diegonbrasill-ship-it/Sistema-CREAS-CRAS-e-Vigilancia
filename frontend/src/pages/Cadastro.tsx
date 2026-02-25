@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
 import { Loader2, Eraser } from "lucide-react";
 import { createCase, updateCase, getCasoById } from "../services/api";
+import { maskCPF, maskNIS } from "@/utils/masks";
 
 const validateCPF = (cpf: string | undefined | null): boolean => {
         if (!cpf || cpf.trim() === "") return true;
@@ -31,9 +32,9 @@ const validateNIS = (nis: string | undefined | null): boolean => {
 
 const formSchema = z.object({
         data_cad: z.string().min(1, "A data do cadastro é obrigatória."),
-        tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
-        tipo_violencia: z.string().optional().nullable(),
-        local_ocorrencia: z.string().optional().nullable(),
+        tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),        
+        tipo_violencia: z.string().min(1, "O tipo de violência é obrigatório."),
+        local_ocorrencia: z.string().min(1, "O local da ocorrência é obrigatório."),
         nome: z.string().optional().nullable(),
         cpf: z.string().optional().nullable().refine(validateCPF, { message: "CPF inválido." }),
         nis: z.string().optional().nullable().refine(validateNIS, { message: "NIS deve conter 11 dígitos." }),
@@ -83,10 +84,11 @@ export default function Cadastro() {
                 formState: { errors, isSubmitting, dirtyFields },
                 reset, watch, getValues, setValue,
         } = useForm<CasoForm>({
-                resolver: zodResolver(formSchema),
-                defaultValues: {
+                resolver: zodResolver(formSchema),                defaultValues: {
                         data_cad: new Date().toISOString().split('T')[0],
                         tec_ref: "",
+                        tipo_violencia: "",
+                        local_ocorrencia: "",
                 },
         });
 
@@ -281,12 +283,16 @@ export default function Cadastro() {
                                                                                 <Input id="tec_ref" placeholder="Nome do técnico - Cargo" {...register("tec_ref")} disabled={isEditMode} />
                                                                                 <p className="text-sm text-red-500 mt-1 h-4">{errors.tec_ref?.message}</p>
                                                                         </div>
-                                                                </div>
-                                                                <div className="grid md:grid-cols-3 gap-4">
-                                                                        <div className="space-y-2"><Label>Tipo de Violência</Label><Controller control={control} name="tipo_violencia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Física">Física</SelectItem><SelectItem value="Psicológica">Psicológica</SelectItem><SelectItem value="Sexual">Sexual</SelectItem></SelectContent></Select>)} /></div>
+                                                                </div>                                                                <div className="grid md:grid-cols-3 gap-4">
+                                                                        <div className="space-y-2">
+                                                                                <Label>Tipo de Violência</Label>
+                                                                                <Controller control={control} name="tipo_violencia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Física">Física</SelectItem><SelectItem value="Psicológica">Psicológica</SelectItem><SelectItem value="Sexual">Sexual</SelectItem></SelectContent></Select>)} />
+                                                                                <p className="text-sm text-red-500 mt-1 h-4">{errors.tipo_violencia?.message}</p>
+                                                                        </div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="local_ocorrencia">Local da Ocorrência</Label>
                                                                                 <Controller name="local_ocorrencia" control={control} render={({ field }) => (<Input id="local_ocorrencia" {...field} value={field.value ?? ''} />)} />
+                                                                                <p className="text-sm text-red-500 mt-1 h-4">{errors.local_ocorrencia?.message}</p>
                                                                         </div>
                                                                 </div>
                                                         </TabsContent>
@@ -298,15 +304,34 @@ export default function Cadastro() {
                                                                                 <Label htmlFor="nome">Nome Completo</Label>
                                                                                 <Controller name="nome" control={control} render={({ field }) => (<Input id="nome" {...field} value={field.value ?? ''} />)} />
                                                                                 <p className="text-sm text-red-500 mt-1 h-4">{errors.nome?.message}</p>
-                                                                        </div>
-                                                                        <div className="space-y-2">
+                                                                        </div>                                                                        <div className="space-y-2">
                                                                                 <Label htmlFor="cpf">CPF</Label>
-                                                                                <Controller name="cpf" control={control} render={({ field }) => (<Input id="cpf" {...field} value={field.value ?? ''} />)} />
+                                                                                <Controller name="cpf" control={control} render={({ field }) => (
+                                                                                        <Input
+                                                                                                id="cpf"
+                                                                                                placeholder="000.000.000-00"
+                                                                                                maxLength={14}
+                                                                                                value={field.value ? maskCPF(field.value) : ''}
+                                                                                                onChange={(e) => field.onChange(maskCPF(e.target.value))}
+                                                                                                onBlur={field.onBlur}
+                                                                                                ref={field.ref}
+                                                                                        />
+                                                                                )} />
                                                                                 <p className="text-sm text-red-500 mt-1 h-4">{errors.cpf?.message}</p>
                                                                         </div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="nis">NIS</Label>
-                                                                                <Controller name="nis" control={control} render={({ field }) => (<Input id="nis" {...field} value={field.value ?? ''} />)} />
+                                                                                <Controller name="nis" control={control} render={({ field }) => (
+                                                                                        <Input
+                                                                                                id="nis"
+                                                                                                placeholder="000.00000.00-0"
+                                                                                                maxLength={14}
+                                                                                                value={field.value ? maskNIS(field.value) : ''}
+                                                                                                onChange={(e) => field.onChange(maskNIS(e.target.value))}
+                                                                                                onBlur={field.onBlur}
+                                                                                                ref={field.ref}
+                                                                                        />
+                                                                                )} />
                                                                                 <p className="text-sm text-red-500 mt-1 h-4">{errors.nis?.message}</p>
                                                                         </div>
                                                                         <div className="space-y-2">

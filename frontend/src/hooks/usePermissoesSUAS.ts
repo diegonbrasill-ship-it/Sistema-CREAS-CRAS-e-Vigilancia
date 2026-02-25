@@ -1,7 +1,7 @@
 // frontend/src/hooks/usePermissoesSUAS.ts
 
 import { useAuth } from "@/contexts/AuthContext";
-import { entityPermissions, UNIT_OPTIONS } from "@/utils/constants";
+import { entityPermissions, UNIT_OPTIONS, SCREEN_PERMISSIONS } from "@/utils/constants";
 
 // =========================================================
 // CONSTANTES DO PROJETO
@@ -92,12 +92,11 @@ export function usePermissoesSUAS(): PermissoesSUAS {
   const canManageMse = hasAllPermissions(entityPermissions.mse);
   const canManageDemandas = hasAllPermissions(entityPermissions.demandas);
   const canManageAnexos = hasAllPermissions(entityPermissions.anexos);
-  const canManageEncaminhamentos = hasAllPermissions(entityPermissions.encaminhamentos);
-  //screen access
-  const canAccessDashboardScreen = hasPermission("screen.dashboard.access");
-  const canAccessVigilanciaScreen = hasPermission("screen.vigilancia.access");
-  const canAccessIntegrationsScreen = hasPermission("screen.integrations.access");
-  const canAccessRelatoriosScreen = hasPermission("screen.relatorios.access");
+  const canManageEncaminhamentos = hasAllPermissions(entityPermissions.encaminhamentos);  //screen access
+  const canAccessDashboardScreen = hasPermission(SCREEN_PERMISSIONS.dashboard);
+  const canAccessVigilanciaScreen = hasPermission(SCREEN_PERMISSIONS.vigilancia);
+  const canAccessIntegrationsScreen = hasPermission(SCREEN_PERMISSIONS.integracoes);
+  const canAccessRelatoriosScreen = hasPermission(SCREEN_PERMISSIONS.relatorios);
   
   // Permissões granulares de casos
   const canReadCasos = hasPermission("casos.read");

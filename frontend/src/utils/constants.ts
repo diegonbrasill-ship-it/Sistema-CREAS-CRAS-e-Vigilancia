@@ -88,3 +88,10 @@ export const entityPermissions = {
     ],
   };
 
+export const SCREEN_PERMISSIONS = {
+  dashboard: "screen.dashboard.access",
+  vigilancia: "screen.vigilancia.access",
+  relatorios: "screen.relatorios.access",
+  integracoes: "screen.integrations.access",
+} as const;
+

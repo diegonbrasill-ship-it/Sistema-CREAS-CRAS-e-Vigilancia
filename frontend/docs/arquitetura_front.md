@@ -81,13 +81,12 @@
 
 ### 2.4 Dados e Visualização
 
-| Biblioteca                  | Versão          | Papel                                             |
-| --------------------------- | --------------- | ------------------------------------------------- |
-| `recharts`                  | ^3.2.0          | Gráficos (Bar, Pie)                               |
-| `leaflet` + `react-leaflet` | ^1.9.4 / ^4.2.1 | Mapas interativos                                 |
-| `react-toastify`            | ^11.0.5         | Notificações toast                                |
-| `axios`                     | ^1.12.2         | (Instalado, mas não usado — fetch nativo é usado) |
-| `jspdf` + `jspdf-autotable` | ^3.0.2 / ^5.0.2 | Geração de PDF client-side                        |
+| Biblioteca                  | Versão          | Papel                      |
+| --------------------------- | --------------- | -------------------------- |
+| `recharts`                  | ^3.2.0          | Gráficos (Bar, Pie)        |
+| `leaflet` + `react-leaflet` | ^1.9.4 / ^4.2.1 | Mapas interativos          |
+| `react-toastify`            | ^11.0.5         | Notificações toast         |
+| `jspdf` + `jspdf-autotable` | ^3.0.2 / ^5.0.2 | Geração de PDF client-side |
 
 ---
 
@@ -134,12 +133,11 @@ frontend/
     ├── services/
     │   └── api.ts                # Camada de acesso à API (ÚNICO arquivo de chamadas HTTP)
     │
-    ├── utils/
-    │   ├── constants.ts          # Units, Roles, entityPermissions (dados estáticos)
+    ├── utils/    │   ├── constants.ts          # Units, Roles, entityPermissions, SCREEN_PERMISSIONS
     │   ├── roles.ts              # UserRole type + labels de perfil
     │   ├── apiNormalizer.ts      # Normalização de respostas de lista
     │   ├── dateUtils.ts          # calculateAge, addMonthsToDate, formatDateForInput
-    │   └── permissionHelpers.ts  # (reservado/vazio)
+    │   └── masks.ts              # Máscaras de CPF e NIS para formulários
     │
     ├── lib/
     │   └── utils.ts              # cn() — merge de classes Tailwind
@@ -162,11 +160,9 @@ frontend/
     │   └── Cras/
     │       ├── CrasProntuario.tsx
     │       └── CrasConsulta.tsx  (placeholder)
-    │
-    └── components/
+    │    └── components/
         ├── Layout.tsx             # Shell principal (Sidebar + Outlet)
         ├── Header.tsx
-        ├── Sidebar.tsx
         ├── DrillDown/
         │   └── ListaCasosModal.tsx
         ├── demandas/
@@ -207,26 +203,26 @@ frontend/
 /                               → <PrivateRoute>  →  <Layout />
   /                             → redirect → /dashboard
 
-  /dashboard                    → <ProtectedRoute permissions=["screen.dashboard.access"]>
-  /painel-vigilancia            → <ProtectedRoute permissions=["screen.dashbord.access"]>
-  /relatorios                   → <ProtectedRoute permissions=["screen.relatorios.access"]>
-  /integracoes                  → <ProtectedRoute permissions=["screen.integrations.access"]>
+  /dashboard                    → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.dashboard]>
+  /painel-vigilancia            → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.vigilancia]>
+  /relatorios                   → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.relatorios]>
+  /integracoes                  → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.integracoes]>
 
-  /cadastro                     → <ProtectedRoute permissions=[entityPermissions.casos]>
-  /cadastro/:id                 → <ProtectedRoute permissions=[entityPermissions.casos]>
-  /consulta                     → <ProtectedRoute permissions=[entityPermissions.casos]>
-  /caso/:id                     → <ProtectedRoute permissions=[entityPermissions.casos]>
+  /cadastro                     → <ProtectedRoute permissions=["casos.create"]>
+  /cadastro/:id                 → <ProtectedRoute permissions=["casos.edit"]>
+  /consulta                     → <ProtectedRoute permissions=["casos.read"]>
+  /caso/:id                     → <ProtectedRoute permissions=["casos.read"]>
 
-  /demandas                     → <ProtectedRoute permissions=[entityPermissions.demandas]>
-  /demandas/:id                 → <ProtectedRoute permissions=[entityPermissions.demandas]>
+  /demandas                     → <ProtectedRoute permissions=["demandas.read"]>
+  /demandas/:id                 → <ProtectedRoute permissions=["demandas.read"]>
 
-  /controle-mse                 → <ProtectedRoute permissions=[entityPermissions.mse]>
+  /controle-mse                 → <ProtectedRoute permissions=["mse.read"]>
 
   /cras/cadastro                → <CrasProntuario />  (sem ProtectedRoute — em dev)
   /cras/cadastro/:id            → <CrasProntuario />  (sem ProtectedRoute — em dev)
   /cras/consulta                → <CrasConsulta />   (sem ProtectedRoute — em dev)
 
-  /gerenciar-usuarios           → <ProtectedRoute permissions=[entityPermissions.users]>
+  /gerenciar-usuarios           → <ProtectedRoute permissions=["users.read"]>
 
 /*                              → redirect → /login
 ```
@@ -236,8 +232,6 @@ frontend/
 **`PrivateRoute`** — Verifica apenas `isAuthenticated`. Se não autenticado, redireciona para `/login`.
 
 **`ProtectedRoute`** — Verifica `isAuthenticated` E se o usuário possui **todas** as permissões listadas. Se não autorizado, redireciona para `/dashboard` (fallback configurável).
-
-**`RouteProtegida`** (legado no App.tsx) — Guard mais simples baseado em grupos de acesso (ANALISE, CREAS_OP, ADMIN, VIGILANCIA). **Ainda presente no código mas substituído por `ProtectedRoute`.**
 
 ---
 
@@ -409,18 +403,29 @@ Controller (para componentes Radix/Select)
 
 ```typescript
 const formSchema = z.object({
-  // Campo obrigatório
+  // Campos obrigatórios (Tab 1 — Atendimento)
   data_cad: z.string().min(1, "Mensagem de erro"),
+  tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
+  tipo_violencia: z.string().min(1, "O tipo de violência é obrigatório."),
+  local_ocorrencia: z.string().min(1, "O local da ocorrência é obrigatório."),
 
   // Campo opcional (pode ser null do DB)
   nome: z.string().optional().nullable(),
 
-  // Validação customizada
+  // Validação customizada com máscara
   cpf: z
     .string()
     .optional()
     .nullable()
     .refine(validateCPF, { message: "CPF inválido." }),
+  // → Input usa maskCPF() de src/utils/masks.ts (formato: 000.000.000-00)
+
+  nis: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(validateNIS, { message: "NIS deve conter 11 dígitos." }),
+  // → Input usa maskNIS() de src/utils/masks.ts (formato: 000.0000.0000-0)
 
   // Número com coerção
   mse_duracao_meses: z.preprocess(
@@ -519,7 +524,7 @@ Modal exibe tabela com casos resultantes
 │  │  (w-64)        │  │  (flex-1, overflow-y-auto)           │  │
 │  │                │  │                                      │  │
 │  │  Logo RMSUAS   │  │  <Outlet /> ← página renderizada     │  │
-│  │  Debug Badge   │  │                                      │  │
+│  │  Debug Badge*  │  │                                      │  │
 │  │                │  └──────────────────────────────────────┘  │
 │  │  [MENU GROUPS] │                                            │
 │  │  · CRAS        │  ← isVisible: false (em dev)              │
@@ -533,6 +538,8 @@ Modal exibe tabela com casos resultantes
 │  └────────────────┘                                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+> **\*Debug Badge:** O bloco de diagnóstico (ROLE, UNIT ID, permissões) é protegido por `import.meta.env.DEV` — visível apenas em ambiente de desenvolvimento.
 
 ### 11.2 Lógica de Redirecionamento Inicial
 
@@ -725,7 +732,7 @@ Usado em: excluir caso, desligar caso, inativar servidor.
 
 ### 17.1 Por que `fetch` nativo em vez de `axios`?
 
-`axios` está instalado mas não é usado. A função `fetchWithAuth` resolve:
+A função `fetchWithAuth` resolve todas as necessidades HTTP:
 
 - Injeção automática do Bearer token
 - Tratamento de erros HTTP
@@ -760,12 +767,13 @@ O módulo CRAS foi planejado como **paralelo** ao CREAS, usando a mesma infraest
 ```
 /cadastro (modo criação)
   1. useEffect → preenche tec_ref com user.nome_completo + cargo
-  2. Tab 1 desbloqueada: data_cad + tec_ref + tipo_violencia + local_ocorrencia
+  2. Tab 1 desbloqueada: data_cad + tec_ref + tipo_violencia (obrigatório) + local_ocorrencia (obrigatório)
   3. handleSubmit → POST /api/casos → { id: N }
   4. toast.success + navigate('/cadastro/N')
   5. Agora em modo edição, todas as tabs desbloqueadas
   6. Usuário preenche tabs 2-5, clicando "Salvar Progresso" em cada
      → PUT /api/casos/N  (apenas dirtyFields)
+     → CPF e NIS aplicam máscara visual (maskCPF, maskNIS de src/utils/masks.ts)
   7. "Finalizar" → PUT + navigate('/caso/N')
 ```
 
