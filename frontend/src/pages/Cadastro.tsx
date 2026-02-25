@@ -1,7 +1,7 @@
 // frontend/src/pages/Cadastro.tsx
 
-import { useState, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useState, useEffect, useMemo } from "react";
+import { useForm, Controller, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useParams, useNavigate } from "react-router-dom";
@@ -19,18 +19,19 @@ import { createCase, updateCase, getCasoById } from "../services/api";
 import { maskCPF, maskNIS } from "@/utils/masks";
 
 const validateCPF = (cpf: string | undefined | null): boolean => {
-        if (!cpf || cpf.trim() === "") return true;
+        if (!cpf || cpf.trim() === "") return true; // min(1) already handles empty
         const cpfClean = cpf.replace(/[^\d]/g, "");
         if (cpfClean.length !== 11 || /^(\d)\1+$/.test(cpfClean)) return false;
         return true;
 };
 
 const validateNIS = (nis: string | undefined | null): boolean => {
-        if (!nis || nis.trim() === "") return true;
+        if (!nis || nis.trim() === "") return true; // min(1) already handles empty
         return /^\d{11}$/.test(nis.replace(/[^\d]/g, ""));
 };
 
-const formSchema = z.object({
+// Schema base: campos da aba Atendimento sempre obrigatórios, demais opcionais
+const baseSchema = z.object({
         data_cad: z.string().min(1, "A data do cadastro é obrigatória."),
         tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),        
         tipo_violencia: z.string().min(1, "O tipo de violência é obrigatório."),
@@ -70,21 +71,75 @@ const formSchema = z.object({
         reincidente: z.string().optional().nullable(),
 });
 
-type CasoForm = z.infer<typeof formSchema>;
+// Schema modo edição: todos os campos obrigatórios (exceto detalhes condicionais)
+// z.preprocess converte undefined/null → "" antes da validação, garantindo que .min(1) exiba a mensagem customizada
+const toStr = (v: unknown) => (v === undefined || v === null ? "" : v);
+
+const editSchema = z.object({
+        data_cad: z.preprocess(toStr, z.string().min(1, "A data do cadastro é obrigatória.")),
+        tec_ref: z.preprocess(toStr, z.string().min(3, "O nome do técnico é obrigatório.")),
+        tipo_violencia: z.preprocess(toStr, z.string().min(1, "O tipo de violência é obrigatório.")),
+        local_ocorrencia: z.preprocess(toStr, z.string().min(1, "O local da ocorrência é obrigatório.")),
+        nome: z.preprocess(toStr, z.string().min(1, "O nome completo é obrigatório.")),
+        cpf: z.preprocess(toStr, z.string().min(1, "O CPF é obrigatório.").refine(validateCPF, { message: "CPF inválido." })),
+        nis: z.preprocess(toStr, z.string().min(1, "O NIS é obrigatório.").refine(validateNIS, { message: "NIS deve conter 11 dígitos." })),
+        idade: z.preprocess(toStr, z.string().min(1, "A idade é obrigatória.")),
+        sexo: z.preprocess(toStr, z.string().min(1, "O sexo é obrigatório.")),
+        corEtnia: z.preprocess(toStr, z.string().min(1, "A cor/etnia é obrigatória.")),
+        bairro: z.preprocess(toStr, z.string().min(1, "O bairro é obrigatório.")),
+        escolaridade: z.preprocess(toStr, z.string().min(1, "A escolaridade é obrigatória.")),
+        rendaFamiliar: z.preprocess(toStr, z.string().min(1, "A renda familiar é obrigatória.")),
+        recebePBF: z.preprocess(toStr, z.string().min(1, "Informe se recebe Bolsa Família.")),
+        recebeBPC: z.preprocess(toStr, z.string().min(1, "Informe se recebe BPC.")),
+        recebeBE: z.preprocess(toStr, z.string().min(1, "Informe se recebe Benefício de Erradicação.")),
+        membrosCadUnico: z.preprocess(toStr, z.string().min(1, "Informe se possui membros no CadÚnico.")),
+        membroPAI: z.string().optional().nullable(),
+        composicaoFamiliar: z.preprocess(toStr, z.string().min(1, "A composição familiar é obrigatória.")),
+        tipoMoradia: z.preprocess(toStr, z.string().min(1, "O tipo de moradia é obrigatório.")),
+        referenciaFamiliar: z.preprocess(toStr, z.string().min(1, "A referência familiar é obrigatória.")),
+        membroCarcerario: z.preprocess(toStr, z.string().min(1, "Informe se há membro em sistema carcerário.")),
+        membroSocioeducacao: z.preprocess(toStr, z.string().min(1, "Informe se há membro em socioeducação.")),
+        vitimaPCD: z.preprocess(toStr, z.string().min(1, "Informe se a vítima é PCD.")),
+        vitimaPCDDetalhe: z.string().optional().nullable(),
+        tratamentoSaude: z.preprocess(toStr, z.string().min(1, "Informe se faz tratamento de saúde.")),
+        tratamentoSaudeDetalhe: z.string().optional().nullable(),
+        dependeFinanceiro: z.preprocess(toStr, z.string().min(1, "Informe se depende financeiramente do agressor.")),
+        encaminhamento: z.preprocess(toStr, z.string().min(1, "Informe se houve encaminhamento.")),
+        encaminhamentoDetalhe: z.string().optional().nullable(),
+        qtdAtendimentos: z.preprocess(toStr, z.string().min(1, "A quantidade de atendimentos é obrigatória.")),
+        encaminhadaSCFV: z.preprocess(toStr, z.string().min(1, "Informe se foi encaminhada ao SCFV/CDI.")),
+        inseridoPAEFI: z.preprocess(toStr, z.string().min(1, "Informe se foi inserida no PAEFI.")),
+        confirmacaoViolencia: z.preprocess(toStr, z.string().min(1, "A confirmação da violência é obrigatória.")),
+        canalDenuncia: z.preprocess(toStr, z.string().min(1, "O canal de denúncia é obrigatório.")),
+        notificacaoSINAM: z.preprocess(toStr, z.string().min(1, "Informe sobre a notificação no SINAM.")),
+        reincidente: z.preprocess(toStr, z.string().min(1, "Informe se é caso de reincidência.")),
+});
+
+// Mapeamento dos campos para suas respectivas abas
+const tabFields: Record<string, (keyof CasoForm)[]> = {
+        "1. Atendimento": ["data_cad", "tec_ref", "tipo_violencia", "local_ocorrencia"],
+        "2. Vítima": ["nome", "cpf", "nis", "idade", "sexo", "corEtnia", "bairro", "escolaridade"],
+        "3. Família": ["rendaFamiliar", "recebePBF", "recebeBPC", "recebeBE", "membrosCadUnico", "membroPAI", "composicaoFamiliar", "tipoMoradia", "referenciaFamiliar", "membroCarcerario", "membroSocioeducacao"],
+        "4. Saúde": ["vitimaPCD", "vitimaPCDDetalhe", "tratamentoSaude", "tratamentoSaudeDetalhe", "dependeFinanceiro"],
+        "5. Encaminhamentos": ["encaminhamento", "encaminhamentoDetalhe", "qtdAtendimentos", "encaminhadaSCFV", "inseridoPAEFI", "confirmacaoViolencia", "canalDenuncia", "notificacaoSINAM", "reincidente"],
+};
+
+type CasoForm = z.infer<typeof editSchema>;
 
 export default function Cadastro() {
 
         const { id } = useParams<{ id: string }>();
         const navigate = useNavigate();
         const isEditMode = !!id;
-        const { user } = useAuth();
+        const { user } = useAuth();        // Seleciona o schema baseado no modo (criação ou edição)
+        const formSchema = useMemo(() => isEditMode ? editSchema : baseSchema, [isEditMode]);
 
         const {
                 register, handleSubmit, control,
                 formState: { errors, isSubmitting, dirtyFields },
                 reset, watch, getValues, setValue,
         } = useForm<CasoForm>({
-                resolver: zodResolver(formSchema),                defaultValues: {
+                resolver: zodResolver(formSchema) as any,                defaultValues: {
                         data_cad: new Date().toISOString().split('T')[0],
                         tec_ref: "",
                         tipo_violencia: "",
@@ -92,11 +147,24 @@ export default function Cadastro() {
                 },
         });
 
+        const onInvalid = (fieldErrors: FieldErrors<CasoForm>) => {
+                if (!isEditMode) return;
+                const errorKeys = Object.keys(fieldErrors) as (keyof CasoForm)[];
+                const tabsComErro = Object.entries(tabFields)
+                        .filter(([_, fields]) => fields.some(f => errorKeys.includes(f)))
+                        .map(([tabName]) => tabName);
+
+                if (tabsComErro.length > 0) {
+                        toast.warn(
+                                `⚠️ Preencha todos os campos obrigatórios nas abas: ${tabsComErro.join(", ")}`,
+                                { autoClose: 6000 }
+                        );
+                }
+        };
 
         // 📌 Estado para controlar o carregamento na edição
         const [isDataLoading, setIsDataLoading] = useState(isEditMode);
         const [activeTab, setActiveTab] = useState("atendimento");
-
 
         useEffect(() => { //  lógica do modo edição e modo de criação
 
@@ -153,7 +221,7 @@ export default function Cadastro() {
 
                 try {
                         if (isEditMode) {
-                                console.log("esta caindo no EditModeSubmit")
+                                
                                 const dirtyData: Partial<CasoForm> = {};
                                 // mapeamento dos campos modificados (dirtyFields)
                                 (Object.keys(dirtyFields) as Array<keyof CasoForm>).forEach(key => {
@@ -227,8 +295,7 @@ export default function Cadastro() {
         const handleFinalize = async () => {
                 if (!id) return;
                 // Salva as últimas alterações e navega
-                await handleSubmit(onSubmit)();
-
+                await handleSubmit(onSubmit, onInvalid)();
         };
 
         const handleClearForm = () => {
@@ -258,7 +325,7 @@ export default function Cadastro() {
                                 </p>
                         </div>
 
-                        <form onSubmit={handleSubmit(onSubmit)}>
+                        <form onSubmit={handleSubmit(onSubmit, onInvalid)}>
                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                         <TabsList className="grid w-full grid-cols-5">
                                                 <TabsTrigger value="atendimento">1. Atendimento</TabsTrigger>
@@ -303,7 +370,7 @@ export default function Cadastro() {
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="nome">Nome Completo</Label>
                                                                                 <Controller name="nome" control={control} render={({ field }) => (<Input id="nome" {...field} value={field.value ?? ''} />)} />
-                                                                                <p className="text-sm text-red-500 mt-1 h-4">{errors.nome?.message}</p>
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.nome?.message}</p>}
                                                                         </div>                                                                        <div className="space-y-2">
                                                                                 <Label htmlFor="cpf">CPF</Label>
                                                                                 <Controller name="cpf" control={control} render={({ field }) => (
@@ -317,7 +384,7 @@ export default function Cadastro() {
                                                                                                 ref={field.ref}
                                                                                         />
                                                                                 )} />
-                                                                                <p className="text-sm text-red-500 mt-1 h-4">{errors.cpf?.message}</p>
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.cpf?.message}</p>}
                                                                         </div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="nis">NIS</Label>
@@ -332,84 +399,90 @@ export default function Cadastro() {
                                                                                                 ref={field.ref}
                                                                                         />
                                                                                 )} />
-                                                                                <p className="text-sm text-red-500 mt-1 h-4">{errors.nis?.message}</p>
-                                                                        </div>
-                                                                        <div className="space-y-2">
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.nis?.message}</p>}
+                                                                        </div>                                                                        <div className="space-y-2">
                                                                                 <Label htmlFor="idade">Idade</Label>
                                                                                 <Controller name="idade" control={control} render={({ field }) => (<Input id="idade" type="number" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.idade?.message}</p>}
                                                                         </div>
-                                                                        <div className="space-y-2"><Label>Sexo</Label><Controller control={control} name="sexo" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Masculino">Masculino</SelectItem><SelectItem value="Feminino">Feminino</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Cor/Etnia</Label><Controller control={control} name="corEtnia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Branca">Branca</SelectItem><SelectItem value="Preta">Preta</SelectItem><SelectItem value="Parda">Parda</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Escolaridade</Label><Controller control={control} name="escolaridade" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Fundamental Incompleto">Fundamental Incompleto</SelectItem><SelectItem value="Fundamental Completo">Fundamental Completo</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Sexo</Label><Controller control={control} name="sexo" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Masculino">Masculino</SelectItem><SelectItem value="Feminino">Feminino</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.sexo?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Cor/Etnia</Label><Controller control={control} name="corEtnia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Branca">Branca</SelectItem><SelectItem value="Preta">Preta</SelectItem><SelectItem value="Parda">Parda</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.corEtnia?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Escolaridade</Label><Controller control={control} name="escolaridade" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent><SelectItem value="Fundamental Incompleto">Fundamental Incompleto</SelectItem><SelectItem value="Fundamental Completo">Fundamental Completo</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.escolaridade?.message}</p>}</div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="bairro">Bairro</Label>
                                                                                 <Controller name="bairro" control={control} render={({ field }) => (<Input id="bairro" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.bairro?.message}</p>}
                                                                         </div>
                                                                 </div>
                                                         </TabsContent>
 
                                                         <TabsContent value="familia" className="space-y-6">
                                                                 <CardHeader className="-m-6 mb-0"><CardTitle>Contexto Familiar e Social</CardTitle></CardHeader>
-                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
-                                                                        <div className="space-y-2">
+                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">                                                                        <div className="space-y-2">
                                                                                 <Label htmlFor="rendaFamiliar">Renda Familiar (R$)</Label>
                                                                                 <Controller name="rendaFamiliar" control={control} render={({ field }) => (<Input id="rendaFamiliar" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.rendaFamiliar?.message}</p>}
                                                                         </div>
-                                                                        <div className="space-y-2"><Label>Recebe Bolsa Família?</Label><Controller control={control} name="recebePBF" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Recebe BPC?</Label><Controller control={control} name="recebeBPC" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Idoso">Idoso</SelectItem><SelectItem value="PCD">PCD</SelectItem><SelectItem value="NÃO">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Recebe Benefício de Erradicação?</Label><Controller control={control} name="recebeBE" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Membros no CadÚnico?</Label><Controller control={control} name="membrosCadUnico" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Recebe Bolsa Família?</Label><Controller control={control} name="recebePBF" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebePBF?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Recebe BPC?</Label><Controller control={control} name="recebeBPC" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Idoso">Idoso</SelectItem><SelectItem value="PCD">PCD</SelectItem><SelectItem value="NÃO">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBPC?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Recebe Benefício de Erradicação?</Label><Controller control={control} name="recebeBE" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBE?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Membros no CadÚnico?</Label><Controller control={control} name="membrosCadUnico" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membrosCadUnico?.message}</p>}</div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="composicaoFamiliar">Composição Familiar</Label>
                                                                                 <Controller name="composicaoFamiliar" control={control} render={({ field }) => (<Input id="composicaoFamiliar" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.composicaoFamiliar?.message}</p>}
                                                                         </div>
-                                                                        <div className="space-y-2"><Label>Tipo de Moradia</Label><Controller control={control} name="tipoMoradia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Própria">Própria</SelectItem><SelectItem value="Alugada">Alugada</SelectItem><SelectItem value="Cedida">Cedida</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Tipo de Moradia</Label><Controller control={control} name="tipoMoradia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Própria">Própria</SelectItem><SelectItem value="Alugada">Alugada</SelectItem><SelectItem value="Cedida">Cedida</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tipoMoradia?.message}</p>}</div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="referenciaFamiliar">Referência Familiar</Label>
                                                                                 <Controller name="referenciaFamiliar" control={control} render={({ field }) => (<Input id="referenciaFamiliar" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.referenciaFamiliar?.message}</p>}
                                                                         </div>
-                                                                        <div className="space-y-2"><Label>Membro em Sist. Carcerário?</Label><Controller control={control} name="membroCarcerario" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Membro em Socioeducação?</Label><Controller control={control} name="membroSocioeducacao" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Membro em Sist. Carcerário?</Label><Controller control={control} name="membroCarcerario" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membroCarcerario?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Membro em Socioeducação?</Label><Controller control={control} name="membroSocioeducacao" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membroSocioeducacao?.message}</p>}</div>
                                                                 </div>
                                                         </TabsContent>
 
                                                         <TabsContent value="saude" className="space-y-6">
                                                                 <CardHeader className="-m-6 mb-0"><CardTitle>Saúde</CardTitle></CardHeader>
-                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
-                                                                        <div className="space-y-2"><Label>Vítima é Pessoa com Deficiência?</Label><Controller control={control} name="vitimaPCD" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">                                                                        <div className="space-y-2"><Label>Vítima é Pessoa com Deficiência?</Label><Controller control={control} name="vitimaPCD" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCD?.message}</p>}</div>
                                                                         {vitimaPCDValue === "Sim" && (<div className="space-y-2">
                                                                                 <Label htmlFor="vitimaPCDDetalhe">Qual?</Label>
                                                                                 <Controller name="vitimaPCDDetalhe" control={control} render={({ field }) => (<Input id="vitimaPCDDetalhe" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCDDetalhe?.message}</p>}
                                                                         </div>)}
-                                                                        <div className="space-y-2"><Label>Faz tratamento de saúde?</Label><Controller control={control} name="tratamentoSaude" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Faz tratamento de saúde?</Label><Controller control={control} name="tratamentoSaude" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaude?.message}</p>}</div>
                                                                         {tratamentoSaudeValue === "Sim" && (<div className="space-y-2">
                                                                                 <Label htmlFor="tratamentoSaudeDetalhe">Onde?</Label>
                                                                                 <Controller name="tratamentoSaudeDetalhe" control={control} render={({ field }) => (<Input id="tratamentoSaudeDetalhe" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaudeDetalhe?.message}</p>}
                                                                         </div>)}
-                                                                        <div className="space-y-2"><Label>Depende financeiramente do agressor?</Label><Controller control={control} name="dependeFinanceiro" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Depende financeiramente do agressor?</Label><Controller control={control} name="dependeFinanceiro" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.dependeFinanceiro?.message}</p>}</div>
                                                                 </div>
                                                         </TabsContent>
 
                                                         <TabsContent value="encaminhamentos" className="space-y-6">
                                                                 <CardHeader className="-m-6 mb-0"><CardTitle>Fluxos e Encaminhamentos</CardTitle></CardHeader>
-                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
-                                                                        <div className="space-y-2"><Label>Encaminhamento realizado?</Label><Controller control={control} name="encaminhamento" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">                                                                        <div className="space-y-2"><Label>Encaminhamento realizado?</Label><Controller control={control} name="encaminhamento" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamento?.message}</p>}</div>
                                                                         {encaminhamentoValue === "Sim" && (<div className="space-y-2">
                                                                                 <Label htmlFor="encaminhamentoDetalhe">Para onde?</Label>
                                                                                 <Controller name="encaminhamentoDetalhe" control={control} render={({ field }) => (<Input id="encaminhamentoDetalhe" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamentoDetalhe?.message}</p>}
                                                                         </div>)}
-                                                                        <div className="space-y-2"><Label>Vítima encaminhada ao SCFV/CDI?</Label><Controller control={control} name="encaminhadaSCFV" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="SCFV">SCFV</SelectItem><SelectItem value="CDI">CDI</SelectItem><SelectItem value="NÃO">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Vítima Inserida no PAEFI?</Label><Controller control={control} name="inseridoPAEFI" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Confirmação da Violência</Label><Controller control={control} name="confirmacaoViolencia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Confirmada">Confirmada</SelectItem><SelectItem value="Em análise">Em análise</SelectItem><SelectItem value="Não confirmada">Não confirmada</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>É um caso de reincidência?</Label><Controller control={control} name="reincidente" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
-                                                                        <div className="space-y-2"><Label>Notificação no SINAM?</Label><Controller control={control} name="notificacaoSINAM" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} /></div>
+                                                                        <div className="space-y-2"><Label>Vítima encaminhada ao SCFV/CDI?</Label><Controller control={control} name="encaminhadaSCFV" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="SCFV">SCFV</SelectItem><SelectItem value="CDI">CDI</SelectItem><SelectItem value="NÃO">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhadaSCFV?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Vítima Inserida no PAEFI?</Label><Controller control={control} name="inseridoPAEFI" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.inseridoPAEFI?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Confirmação da Violência</Label><Controller control={control} name="confirmacaoViolencia" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Confirmada">Confirmada</SelectItem><SelectItem value="Em análise">Em análise</SelectItem><SelectItem value="Não confirmada">Não confirmada</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.confirmacaoViolencia?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>É um caso de reincidência?</Label><Controller control={control} name="reincidente" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.reincidente?.message}</p>}</div>
+                                                                        <div className="space-y-2"><Label>Notificação no SINAM?</Label><Controller control={control} name="notificacaoSINAM" render={({ field }) => (<Select onValueChange={field.onChange} value={field.value ?? ""}><SelectTrigger><SelectValue placeholder="..." /></SelectTrigger><SelectContent><SelectItem value="Sim">Sim</SelectItem><SelectItem value="Não">Não</SelectItem></SelectContent></Select>)} />{isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.notificacaoSINAM?.message}</p>}</div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="canalDenuncia">Canal de denúncia</Label>
                                                                                 <Controller name="canalDenuncia" control={control} render={({ field }) => (<Input id="canalDenuncia" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.canalDenuncia?.message}</p>}
                                                                         </div>
                                                                         <div className="space-y-2">
                                                                                 <Label htmlFor="qtdAtendimentos">Qtd. de Atendimentos</Label>
                                                                                 <Controller name="qtdAtendimentos" control={control} render={({ field }) => (<Input id="qtdAtendimentos" type="number" {...field} value={field.value ?? ''} />)} />
+                                                                                {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.qtdAtendimentos?.message}</p>}
                                                                         </div>
                                                                 </div>
                                                         </TabsContent>
