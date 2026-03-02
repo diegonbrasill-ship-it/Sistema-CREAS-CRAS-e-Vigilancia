@@ -53,7 +53,7 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     // 1. ESTRUTURA PRINCIPAL ALTERADA para ser o container de posicionamento
     <div className="login-page-background min-h-screen flex flex-col justify-between p-6 relative">
-      <ToastContainer position="top-right" hideProgressBar />
+      
 
       {/* 2. NOVO CABEÇALHO posicionado no topo da tela */}
       <header className="login-header">
