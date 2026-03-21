@@ -97,7 +97,7 @@ export default function Consulta() {
             filters.status = searchTerm;
         } else if ((selectedFilterKey === 'por_violencia' || selectedFilterKey === 'por_bairro') && searchTerm) {
             // Envia a chave e o valor para os filtros específicos (que usam a estrutura filtro + valor)
-            filters.filtro = getFilterKeyForBackend(selectedFilterKey);
+            filters.filtro = getFilterKeyForBackend(selectedFilterKey);     
             filters.valor = searchTerm;
         }
 

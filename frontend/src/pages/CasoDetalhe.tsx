@@ -319,9 +319,9 @@ export default function CasoDetalhe() {
 
     // Fallbacks snake_case/camelCase para compatibilidade com API
     const dataCadRaw = currentCaso.data_cad;
-    const dataCadastroFormatada = dataCadRaw
-        ? new Date(dataCadRaw).toLocaleDateString("pt-BR", { timeZone: "UTC" })
+    const dataCadastroFormatada = dataCadRaw ? new Date(dataCadRaw).toLocaleDateString("pt-BR", { timeZone: "UTC" })
         : "Data não informada";
+    currentCaso.data_cad = dataCadastroFormatada
     const tecnicoRef = currentCaso.tec_ref;
     const demandasVinculadas: any[] = currentCaso.demandas_vinculadas;
 
