@@ -11,6 +11,8 @@ import { TabVitima } from "./components/TabVitima";
 import { TabFamilia } from "./components/TabFamilia";
 import { TabSaude } from "./components/TabSaude";
 import { TabEncaminhamentos } from "./components/TabEncaminhamentos";
+import { TabAgressor } from "./components/TabAgressor";
+import { TabMoradia } from "./components/TabMoradia";
 
 export default function Cadastro() {
   const {
@@ -49,7 +51,7 @@ export default function Cadastro() {
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="atendimento">1. Atendimento</TabsTrigger>
               <TabsTrigger value="vitima" disabled={!isEditMode}>
                 2. Vítima
@@ -62,6 +64,12 @@ export default function Cadastro() {
               </TabsTrigger>
               <TabsTrigger value="encaminhamentos" disabled={!isEditMode}>
                 5. Encaminhamentos
+              </TabsTrigger>
+              <TabsTrigger value="agressor" disabled={!isEditMode}>
+                6. Agressor
+              </TabsTrigger>
+              <TabsTrigger value="moradia" disabled={!isEditMode}>
+                7. Moradia
               </TabsTrigger>
             </TabsList>
 
@@ -85,6 +93,14 @@ export default function Cadastro() {
 
                 <TabsContent value="encaminhamentos" className="space-y-6">
                   <TabEncaminhamentos isEditMode={isEditMode} />
+                </TabsContent>
+
+                <TabsContent value="agressor" className="space-y-6">
+                  <TabAgressor isEditMode={isEditMode} />
+                </TabsContent>
+
+                <TabsContent value="moradia" className="space-y-6">
+                  <TabMoradia isEditMode={isEditMode} />
                 </TabsContent>
               </CardContent>
             </Card>

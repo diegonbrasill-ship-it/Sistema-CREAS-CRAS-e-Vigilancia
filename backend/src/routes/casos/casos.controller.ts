@@ -3,7 +3,6 @@ import pool from "../../db";
 import { CASOS_SQL } from "./casos.sql";
 import { logAction } from "../../services/logger";
 import { CasosService } from "./casos.service";
-import { anonimizarDadosSeNecessario } from "./casos.middleware";
 
 export class CasosCrontroller {
 
@@ -30,130 +29,26 @@ export class CasosCrontroller {
             status = 'Ativo',
             confirmedViolence,
             socioeducacao,
-            mes
-        } = req.query;
-
-        console.log('listar casos: dados vindo do front')
-        console.log({
-            tec_ref,
-            filtro,
-            valor,
-            status,
-            confirmedViolence,
-            socioeducacao,
-            mes
-        } )
+            mes,
+            page,
+            limit,
+        } = req.query as any;
 
         try {
+            const rows = await CasosService.list({
+                accessFilter,
+                tec_ref,
+                filtro,
+                valor,
+                status,
+                confirmedViolence,
+                socioeducacao,
+                mes,
+                page,
+                limit,
+            });
 
-            let query = CASOS_SQL.SELECT_BASE
-
-            const params: any[] = [];
-            const whereClauses: string[] = [];
-
-            // helper: adiciona param e retorna placeholder $n
-            const addParam = (val: any) => {
-                params.push(val);
-                return `$${params.length}`;
-            };
-
-            // 1. FILTROS STATUS E MÊS
-            if (status !== 'todos') {
-                const indexDoParametro = addParam(status);
-                whereClauses.push(`status = ${indexDoParametro}::VARCHAR`);
-            }
-
-            if (mes) {
-                const indexDoParametro = addParam(mes);
-                whereClauses.push(`TO_CHAR(data_cad, 'YYYY-MM') = ${indexDoParametro}::VARCHAR`);
-            }
-
-            // 2. FILTRO DE BUSCA (geral ou por tec_ref/filtro)
-            const searchTerm = valor && filtro === 'q' ? valor : tec_ref;
-            if (searchTerm) {
-                const wild = `%${searchTerm}%`;
-                const p1 = addParam(wild);
-                const p2 = addParam(wild);
-                const p3 = addParam(wild);
-                const p4 = addParam(wild);
-
-                whereClauses.push(CASOS_SQL.CLEAN(`
-              (nome ILIKE ${p1} OR
-               tec_ref ILIKE ${p2} OR
-               dados_completos->>'nis' ILIKE ${p3} OR
-               dados_completos->>'cpf' ILIKE ${p4})
-            `));
-            }
-            
-            else if (filtro && valor && filtro !== 'q') {
-
-                const jsonKey = filtro;
-                const phValor = addParam(valor);
-
-                if (jsonKey === 'por_bairro') {
-                    // Lógica de Bairro (busca exata)
-                    whereClauses.push(`LOWER(dados_completos->>'bairro') = LOWER(${phValor}::TEXT)`);
-                } else if (jsonKey === 'por_violencia') {
-                    // Lógica de Tipo de Violência (busca parcial - ILIKE)
-                    whereClauses.push(`dados_completos->>'tipo_violencia' ILIKE ${phValor}`);
-                } else if (jsonKey === 'por_faixa_etaria') {
-                    // Lógica de Faixa Etária (filtro complexo no frontend, tratamento especial no backend)
-                    whereClauses.push(CASOS_SQL.CLEAN(`
-                  CASE 
-                      WHEN (dados_completos->>'idade')::integer BETWEEN 0 AND 11 THEN 'Criança (0-11)' 
-                      WHEN (dados_completos->>'idade')::integer BETWEEN 12 AND 17 THEN 'Adolescente (12-17)' 
-                      WHEN (dados_completos->>'idade')::integer BETWEEN 18 AND 29 THEN 'Jovem (18-29)' 
-                      WHEN (dados_completos->>'idade')::integer BETWEEN 30 AND 59 THEN 'Adulto (30-59)' 
-                      WHEN (dados_completos->>'idade')::integer >= 60 THEN 'Idoso (60+)' 
-                      ELSE 'Não informado' 
-                  END = ${phValor}::TEXT
-              `));
-                }
-                // ⭐️ CORREÇÃO FINAL BPC: Trata o filtro do card BPC (Listagem)
-                else if (jsonKey === 'recebeBPC') {
-                    // O modal BPC deve listar todos os casos que se qualificam (Idoso OU PCD)
-                    whereClauses.push(`(dados_completos->>'recebeBPC' = 'Idoso' OR dados_completos->>'recebeBPC' = 'PCD')`);
-
-                    // 🛑 AÇÃO CRÍTICA: Remove o parâmetro 'valor' que estava contaminando o array
-                    params.pop();
-                }
-                else {
-                    // Lógica Genérica (Violência Confirmada, Sexo, etc.)
-                    whereClauses.push(`dados_completos->>'${jsonKey}' = ${phValor}::TEXT`);
-                }
-            }
-
-            // 3. FILTROS DE COERÊNCIA (Apenas mantidos por compatibilidade)
-            if (confirmedViolence === 'true') whereClauses.push(`(dados_completos->>'confirmacaoViolencia')::TEXT = 'Confirmada'`);
-            if (socioeducacao === 'true') whereClauses.push(`(dados_completos->>'membroSocioeducacao')::TEXT = 'Sim'`);
-
-            // 4. FILTRO DE ACESSO POR UNIDADE (Visibilidade restaurada e Estabilidade)
-            const reqParams = accessFilter.params; 
-            console.log(reqParams)
-            
-            if (reqParams.length !== 0) {
-                
-                if(reqParams.length == 1){
-                    const indexDoParametro = addParam(reqParams[0]);
-                    const unitWhere = accessFilter.whereClause;
-                    whereClauses.push(`${unitWhere} = ${indexDoParametro}`);
-                } else { //TODO: adaptar else para quando os filtros forem maior que 1 (unitAcces.middleware.ts)
-
-                }
-            }
-
-            // Montagem final da query
-            if (whereClauses.length > 0) query += ` WHERE ${whereClauses.join(' AND ')}`;
-            query += ` ORDER BY data_cad DESC`;
-
-            // Debug: verifique se placeholders e params estão sincronizados
-            //console.log("DEBUG: FINAL QUERY:", CASOS_SQL.CLEAN(query));
-            // console.log("DEBUG: FINAL PARAMS:", params);
-
-            // Execução
-            const result = await pool.query(CASOS_SQL.CLEAN(query), params);
-            const dadosProcessados = anonimizarDadosSeNecessario(user, result.rows);
-            res.json(dadosProcessados);
+            res.json(rows);
 
         } catch (err: any) {
             console.error("Erro ao listar casos:", err.message);
@@ -280,8 +175,8 @@ export class CasosCrontroller {
                 demandas_vinculadas: demandasResult.rows
             };
 
-            const dadosProcessados = anonimizarDadosSeNecessario(user, payloadCasoCompleto);
-            res.status(200).json(dadosProcessados);
+    
+            res.status(200).json(payloadCasoCompleto);
 
         } catch (err: any) {
 
@@ -291,38 +186,12 @@ export class CasosCrontroller {
     }
 
     static async getEncaminhamentos(req: Request, res: Response) {
-
         const { casoId } = req.params;
-        const accessFilter = req.accessFilter!; // Cláusula de filtro de unidade
-
-        // 1. Resolve Placeholders para a checagem de acesso
-        const unitParams: (string | number)[] = [casoId]; // ID do Caso é o $1 
-        let unitWhere = accessFilter.whereClause;
-
-        if (accessFilter.params.length === 1) {
-            unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`);
-            unitParams.push(accessFilter.params[0]);
-        } else if (accessFilter.params.length === 2) {
-            unitWhere = unitWhere.replace('$X', `$${unitParams.length + 1}`).replace('$Y', `$${unitParams.length + 2}`);
-            unitParams.push(accessFilter.params[0], accessFilter.params[1]);
-        }
-
-        // 2. Query: Busca encaminhamentos APENAS se o caso pertencer à unidade
-        const finalUnitWhere = accessFilter.whereClause === 'TRUE' ? 'TRUE' : `(${unitWhere.replace(/casos\./g, 'c.')} OR c.unit_id IS NULL)`;
-
-        const checkQuery = CASOS_SQL.CLEAN(`
-            SELECT enc.id, enc.servico_destino, enc.data_encaminhamento, enc.status,
-                   enc.observacoes, usr.username AS tec_ref
-            FROM encaminhamentos enc
-            LEFT JOIN users usr ON enc.user_id = usr.id
-            LEFT JOIN casos c ON enc.caso_id = c.id
-            WHERE enc.caso_id = $1 AND ${finalUnitWhere}
-            ORDER BY enc.data_encaminhamento DESC
-        `);
+        const accessFilter = req.accessFilter!;
 
         try {
-            const result = await pool.query(checkQuery, unitParams);
-            res.json(result.rows);
+            const rows = await CasosService.getEncaminhamentos({ casoId, accessFilter });
+            res.json(rows);
         } catch (err: any) {
             console.error(`Erro ao listar encaminhamentos para o caso ${casoId}:`, err.message);
             res.status(500).json({ message: "Erro ao buscar encaminhamentos." });
@@ -337,68 +206,12 @@ export class CasosCrontroller {
         const searchTerm = q?.trim();
 
         if (!searchTerm || searchTerm.length < 3) {
-            return res.json([]); // Retorna vazio se a busca for muito curta
+            return res.json([]);
         }
 
         try {
-            const params: any[] = [];
-            const addParam = (val: any) => {
-                params.push(val);
-                return `$${params.length}`;
-            };
-
-            // 1. Constrói a cláusula WHERE de busca (Nome, NIS, CPF, ID)
-            const wild = `%${searchTerm}%`;
-            const p1 = addParam(wild);
-            const p2 = addParam(wild);
-            const p3 = addParam(wild);
-
-            // Tentativa de buscar por ID exato se o termo for numérico
-            const idSearch = parseInt(searchTerm, 10);
-            let idClause = '';
-            if (!isNaN(idSearch)) {
-                const pId = addParam(idSearch);
-                idClause = ` OR id = ${pId}::INTEGER`;
-            }
-
-            const searchClause = CASOS_SQL.CLEAN(`
-                (nome ILIKE ${p1} OR
-                 dados_completos->>'nis' ILIKE ${p2} OR
-                 dados_completos->>'cpf' ILIKE ${p3}
-                 ${idClause}
-                )
-            `);
-
-            // 2. Constrói o filtro de acesso por unidade
-            const [unitFilterContent, unitParams] = [accessFilter.whereClause, accessFilter.params];
-            let accessParams = [...unitParams];
-
-            // Substitui placeholders do accessFilter
-            let accessWhere = unitFilterContent;
-            let pIndex = params.length;
-
-            if (unitParams.length === 1) {
-                accessWhere = accessWhere.replace('$X', `$${++pIndex}`);
-            } else if (unitParams.length === 2) {
-                accessWhere = accessWhere.replace('$X', `$${++pIndex}`).replace('$Y', `$${++pIndex}`);
-            }
-
-            params.push(...accessParams);
-
-            // 3. Montagem final da query (combinando busca, status Ativo e segurança)
-            const query = CASOS_SQL.CLEAN(`
-                SELECT id, nome, tec_ref, dados_completos->>'nis' AS nis, dados_completos->>'cpf' AS cpf
-                FROM casos
-                WHERE status = 'Ativo' 
-                  AND (${searchClause})
-                  AND (${accessWhere})
-                ORDER BY nome ASC
-                LIMIT 10
-            `);
-
-            const result = await pool.query(query, params);
-
-            res.json(result.rows);
+            const rows = await CasosService.getFast({ accessFilter, q: searchTerm });
+            res.json(rows);
         } catch (err: any) {
             console.error("Erro na busca rápida de casos:", err.message);
             res.status(500).json({ message: "Erro na busca rápida de casos." });

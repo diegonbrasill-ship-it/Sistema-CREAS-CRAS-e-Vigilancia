@@ -6,6 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import type { CasoForm } from "../schema";
+import {
+  CONFIRMACAO_VIOLENCIA_OPTIONS,
+  ENCAMINHADA_SCFV_OPTIONS,
+  SIM_NAO_OPTIONS,
+} from "../options";
 
 export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
   const {
@@ -34,8 +39,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sim">Sim</SelectItem>
-                  <SelectItem value="Não">Não</SelectItem>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -62,9 +70,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SCFV">SCFV</SelectItem>
-                  <SelectItem value="CDI">CDI</SelectItem>
-                  <SelectItem value="NÃO">Não</SelectItem>
+                  {ENCAMINHADA_SCFV_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -83,8 +93,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sim">Sim</SelectItem>
-                  <SelectItem value="Não">Não</SelectItem>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -103,9 +116,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Confirmada">Confirmada</SelectItem>
-                  <SelectItem value="Em análise">Em análise</SelectItem>
-                  <SelectItem value="Não confirmada">Não confirmada</SelectItem>
+                  {CONFIRMACAO_VIOLENCIA_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -124,8 +139,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sim">Sim</SelectItem>
-                  <SelectItem value="Não">Não</SelectItem>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -144,8 +162,11 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sim">Sim</SelectItem>
-                  <SelectItem value="Não">Não</SelectItem>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -155,7 +176,24 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
 
         <div className="space-y-2">
           <Label htmlFor="canalDenuncia">Canal de denúncia</Label>
-          <Controller name="canalDenuncia" control={control} render={({ field }) => <Input id="canalDenuncia" {...field} value={field.value ?? ""} />} />
+          <Controller
+            name="canalDenuncia"
+            control={control}
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <SelectTrigger>
+                  <SelectValue placeholder="..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.canalDenuncia?.message}</p>}
         </div>
 

@@ -22,19 +22,21 @@ router.get("/", async (req: Request, res: Response) => {
         const { mes, tec_ref, bairro } = req.query as { mes?: string, tec_ref?: string, bairro?: string };
 
         // 1. Monta os filtros com QueryBuilder
-        const qb = new QueryBuilder("SELECT")
-            .whereIf(mes, (ph) => `TO_CHAR(casos.data_cad, 'YYYY-MM') = ${ph}`)
-            .whereIf(tec_ref, (ph) => `casos.tec_ref ILIKE ${ph}`)
-            .whereIf(bairro, (ph) => `LOWER(casos.dados_completos->>'bairro') = LOWER(${ph})`)
-            .applyAccessFilter(accessFilter);        // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
-        const whereClause = qb.getWhereClause() ? ` ${qb.getWhereClause()}` : '';
-        const andClause = qb.getAndClause() ? ` ${qb.getAndClause()}` : '';
+        const queryBuilder = new QueryBuilder("SELECT")
+            .whereIf(mes, (placeholder) => `TO_CHAR(casos.data_cad, 'YYYY-MM') = ${placeholder}`)
+            .whereIf(tec_ref, (placeholder) => `casos.tec_ref ILIKE ${placeholder}`)
+            .whereIf(bairro, (placeholder) => `LOWER(casos.dados_completos->>'bairro') = LOWER(${placeholder})`)
+            .applyAccessFilter(accessFilter);
+
+        // 2. Monta as cláusulas WHERE/AND de forma EXPLICITA e segura
+        const whereClause = queryBuilder.getWhereClause() ? ` ${queryBuilder.getWhereClause()}` : '';
+        const andClause = queryBuilder.getAndClause() ? ` ${queryBuilder.getAndClause()}` : '';
         // whereTrue: âncora segura para queries que NÃO têm WHERE fixo mas precisam
         // de WHERE + AND adicionais (ex: queries 9-12, 19-22).
         // Sempre começa com WHERE — quando há filtros usa "WHERE <filtros>",
         // quando não há filtros usa "WHERE TRUE" como fallback.
-        const whereTrue = whereClause.length > 0 ? ` ${qb.getWhereClause()}` : ' WHERE TRUE';
-        const params = qb.getParams();
+        const whereTrue = whereClause.length > 0 ? ` ${queryBuilder.getWhereClause()}` : ' WHERE TRUE';
+        const params = queryBuilder.getParams();
 
         console.log('rota dashboard')
         console.log('whereClause')

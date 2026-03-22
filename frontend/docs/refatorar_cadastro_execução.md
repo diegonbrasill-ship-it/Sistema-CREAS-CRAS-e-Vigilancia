@@ -407,6 +407,141 @@ Notas:
 
 ---
 
+### PR-4: Ampliação de modelagem (enums + novos blocos) — **dedicado**
+
+**Objetivo:** implementar a “ampliação grande” de modelagem proposta em `docs/refatorar_cadastro.md` (enums fechados e novos campos/blocos: violência detalhada, origem estruturada, raça/cor/etnia, moradia, agressor, sexo/orientação/identidade etc.), **sem degradar edição/criação**, e com transição compatível (aliases + backfill opcional).
+
+> Por que PR-4 separado: este escopo altera o contrato “clínico/estatístico” e tende a impactar dashboards/relatórios/backend. Separar reduz risco e facilita rollback.
+
+#### 4.1 Regras (não-negociáveis)
+
+1. **Adapters continuam sendo a única ponte** entre Form ⇄ API.
+   - UI/Tabs não fazem `snake_case/camelCase`, não fazem alias e não “achatem” `dados_completos`.
+2. **Não quebrar consumidores atuais**:
+   - durante a transição, manter chaves legadas que Painel/Consulta/Dashboard esperam.
+3. **Compatibilidade de leitura:** sempre `coalesce` (canônico → legado) ao popular formulário e ao montar views/analytics.
+4. **Compatibilidade de escrita (dual-write controlado):** ao salvar, escrever:
+   - chave canônica **e** (quando aplicável) chave legado/alias, aproveitando que o backend tolera `additionalProperties`.
+5. **Campos sensíveis**: se opcionais, não podem virar obrigatórios por acidente (UI + Zod alinhados).
+
+#### 4.2 Escopo (o que entra no PR-4)
+
+Baseado no contrato/modelagem de `docs/refatorar_cadastro.md`:
+
+1. **Enums fechados (Zod) + options canônicas (UI)**
+
+   - `escolaridade`, `racaCor`, `inseridoPAEFI`, `sexo`, `orientacaoSexual`, `identidadeGenero`
+   - `tipoViolencia` + `tipoViolenciaDescricoes[]` (subtipos por tipo)
+   - `canalOrigem` (canônico) e manutenção de `canalDenuncia` (legado) como alias
+   - `vinculoAgressor`, `coabitaComAgressor`, `faixaEtariaAgressor`, `sexoAgressor`
+   - `tipoResidencia`, `formaOcupacao`, `materialConstrucao`
+
+2. **Novos campos/blocos no formulário (com UX e condicionais)**
+
+   - Origem estruturada: `dataDenuncia`, `protocolo`, `especificacaoOutroCanal`
+   - Raça/cor e etnia: `etniaIndigena` condicional quando `racaCor = INDIGENA`
+   - Violência detalhada: `tipoViolenciaDescricoes` com reset ao trocar `tipoViolencia`
+   - Moradia: regras para `SITUACAO_DE_RUA` e `ALUGADA` (ex.: `valorAluguel`)
+   - Agressor: `vinculoAgressor` + `especificacaoOutroVinculo` condicional
+
+3. **Armazenamento/persistência (compatível)**
+   - Persistir novos campos dentro de `dados_completos` (flat), conforme premissa do doc.
+   - Manter aliases legados, quando houver consumo no app (principalmente em filtros/analytics).
+
+#### 4.3 Passo a passo de execução (sugestão de sequência)
+
+1. **Alinhar contrato com backend (antes de codar UI)**
+
+   - Confirmar se o backend:
+     - validará/enforçará enums ou apenas armazenará JSONB.
+     - já filtra por `tipoViolencia`/`bairro`/`canalDenuncia` em endpoints de vigilância.
+   - Decidir política de migração:
+     - (A) **dual-write** por 1–2 ciclos + backfill opcional
+     - (B) canônico-first imediato (mais risco)
+
+2. **Criar arquivo único de options/enums (fonte de verdade do FE)**
+
+   - Criar `src/pages/Cadastro/options.ts` contendo:
+     - arrays `{ value, label }` para selects
+     - mapas de subtipos por `tipoViolencia` (para `tipoViolenciaDescricoes`)
+
+3. **Atualizar `src/pages/Cadastro/schema.ts`**
+
+   - Promover campos de texto para `z.enum([...])` onde aplicável.
+   - Adicionar campos novos com defaults coerentes.
+   - Implementar regras condicionais com `superRefine`:
+     - `canalOrigem = OUTROS` → exige `especificacaoOutroCanal`
+     - `vinculoAgressor = OUTROS` → exige `especificacaoOutroVinculo`
+     - `racaCor = INDIGENA` → habilita/exige (se decidido) `etniaIndigena`
+     - `tipoResidencia = SITUACAO_DE_RUA` → força `formaOcupacao/materialConstrucao/valorAluguel` para `null`
+     - `formaOcupacao = ALUGADA` → habilita `valorAluguel` (opcional ou obrigatório conforme regra definida)
+     - `tipoViolencia` → valida `tipoViolenciaDescricoes` dentro da lista permitida
+
+4. **Atualizar `src/pages/Cadastro/adapters.ts` (compat + dual-write)**
+
+   - Leitura (`caseToFormValues`):
+     - coalesce de:
+       - `tipoViolencia` ⇄ `tipo_violencia`
+       - `localOcorrencia` ⇄ `local_ocorrencia`
+       - `canalOrigem` ⇄ `canalDenuncia` (ou manter ambos no form, conforme UX)
+     - garantir defaults: arrays `[]`, enums `null`, strings vazias → `null` quando apropriado.
+   - Escrita (`formValuesToCreatePayload` / `formValuesToUpdatePayload`):
+     - escrever canônico em `dados_completos`
+     - escrever alias legado quando existir consumidor atual
+     - normalizar valores (trim/upper/lower conforme escolhido)
+
+5. **Atualizar as Tabs (UI) para os novos campos**
+
+   - Usar `Select`/componentes do padrão shadcn já existente.
+   - Manter UX de opt-out em campos sensíveis (opções “Prefiro não informar” quando aplicável).
+   - Implementar reset/limpeza ao trocar controladores:
+     - troca de `tipoViolencia` → limpar `tipoViolenciaDescricoes`
+     - `canalOrigem` != OUTROS → limpar `especificacaoOutroCanal`
+     - `vinculoAgressor` != OUTROS → limpar `especificacaoOutroVinculo`
+     - `tipoResidencia = SITUACAO_DE_RUA` → limpar campos de moradia
+
+6. **Atualizar consumidores internos (somente leituras, sem quebrar compat)**
+
+   - Onde houver leitura de `dados_completos` em telas/relatórios, preferir canônico e cair para legado.
+   - Não remover suporte a legado até terminar backfill e estabilizar.
+
+7. **Plano de migração/backfill (se aplicável)**
+   - Backfill no backend para preencher canônico quando ausente (ex.: `tipo_violencia` → `tipoViolencia`).
+   - Janela de convivência (1–2 ciclos): manter ambos.
+   - Depois, PR posterior pode remover legado (fora do PR-4).
+
+#### 4.4 Checklist de validação (PR-4)
+
+1. **Criar caso**
+
+   - Salva com sucesso
+   - Persistência inclui campos novos em `dados_completos`
+   - Persistência inclui aliases legados necessários (quando aplicável)
+
+2. **Editar caso (legado)**
+
+   - Caso antigo (com `tipo_violencia`) abre e popula corretamente
+   - Ao salvar, não perde dados antigos e passa a preencher canônico
+
+3. **Painel Vigilância / Consulta / Dashboard**
+
+   - Casos novos continuam aparecendo
+   - Filtros por `bairro`, `canalDenuncia` e `tipoViolencia` continuam funcionando
+
+4. **Campos condicionais**
+   - `OUTROS` exige especificação correspondente
+   - Moradia `SITUACAO_DE_RUA` zera campos dependentes
+   - `ALUGADA` (se regra) habilita/valida `valorAluguel`
+
+#### 4.5 Critérios de aceite do PR-4
+
+- Formulário suporta os novos enums/campos sem regressão do fluxo atual.
+- `adapters.ts` garante compatibilidade (leitura e escrita) entre canônico e legado.
+- Casos legados continuam editáveis e consultáveis.
+- Painel/Consulta/Vigilância não quebram e continuam filtrando corretamente.
+
+---
+
 ## 6) Definições objetivas (para você validar antes de implementar)
 
 1. **Manteremos os nomes dos campos do RHF iguais aos atuais** neste ciclo.

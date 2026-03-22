@@ -53,7 +53,8 @@ export function useCadastroForm() {
           setIsDataLoading(true);
           const casoData = await getCasoById(id);
           const values = caseToFormValues(casoData);
-          reset(values as any);
+          // PR-2: `tec_ref` deve refletir o usuário logado, se disponível
+          reset({ ...values, tec_ref: tecRefFromAuth ?? (values as any)?.tec_ref } as any);
         } catch {
           toast.error("Não foi possível carregar os dados do caso para edição.");
           navigate("/consulta");
@@ -103,13 +104,15 @@ export function useCadastroForm() {
 
         // manter compat com backend atual
         (dirtyData as any).data_cad = data.data_cad;
-        (dirtyData as any).tec_ref = data.tec_ref;
+        // PR-2: `tec_ref` autoritativo no FE (e recomendado também no BE)
+        (dirtyData as any).tec_ref = tecRefFromAuth ?? data.tec_ref;
 
         const payload = formValuesToUpdatePayload(dirtyData, { tecRefFromAuth, unitIdFromAuth: user?.unit_id });
         await updateCase(id, payload);
 
         toast.success("✅ Progresso salvo com sucesso!");
-        reset(data, { keepValues: true, keepDefaultValues: true });
+        // mantém o formulário consistente com o que foi submetido (inclui tec_ref autoritativo)
+        reset({ ...data, tec_ref: tecRefFromAuth ?? data.tec_ref } as any, { keepValues: true, keepDefaultValues: true });
         toast.success("Prontuário finalizado!");
         navigate(`/caso/${id}`);
         return;

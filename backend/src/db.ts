@@ -15,7 +15,7 @@ const pool = new Pool({
 let isDbInitialized = false;
 
 export async function initDb() {
-  if (isDbInitialized) {
+  if (isDbInitialized) {  
     return pool;
   }
 

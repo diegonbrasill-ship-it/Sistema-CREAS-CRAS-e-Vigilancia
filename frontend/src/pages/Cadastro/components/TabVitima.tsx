@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { maskCPF, maskNIS } from "@/utils/masks";
 import type { CasoForm } from "../schema";
+import { COR_ETNIA_OPTIONS, ESCOLARIDADE_OPTIONS, SEXO_OPTIONS } from "../options";
 
 export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
   const {
@@ -75,6 +76,7 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
 
         <div className="space-y-2">
           <Label>Sexo</Label>
+          {!isEditMode && <p className="text-xs text-muted-foreground">Opcional. Se preferir, deixe em branco.</p>}
           <Controller
             control={control}
             name="sexo"
@@ -84,8 +86,11 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Masculino">Masculino</SelectItem>
-                  <SelectItem value="Feminino">Feminino</SelectItem>
+                  {SEXO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -95,6 +100,7 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
 
         <div className="space-y-2">
           <Label>Cor/Etnia</Label>
+          {!isEditMode && <p className="text-xs text-muted-foreground">Opcional. Se preferir, deixe em branco.</p>}
           <Controller
             control={control}
             name="corEtnia"
@@ -104,9 +110,11 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Branca">Branca</SelectItem>
-                  <SelectItem value="Preta">Preta</SelectItem>
-                  <SelectItem value="Parda">Parda</SelectItem>
+                  {COR_ETNIA_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -125,8 +133,11 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Fundamental Incompleto">Fundamental Incompleto</SelectItem>
-                  <SelectItem value="Fundamental Completo">Fundamental Completo</SelectItem>
+                  {ESCOLARIDADE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
