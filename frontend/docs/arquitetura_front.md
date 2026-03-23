@@ -1,880 +1,536 @@
-# 🏗️ ARQUITETURA FRONTEND — Sistema SUAS Patos/PB
+# Arquitetura Frontend
 
-> Documento de referência técnica sobre a arquitetura, padrões, decisões de design e fluxo de dados do frontend React/TypeScript.
+Documento de referência técnica do frontend React/TypeScript do sistema SUAS Patos/PB, revisado contra o código em `2026-03-23`.
 
----
+## 1. Visão Geral
 
-## 1. VISÃO GERAL DA ARQUITETURA
+O frontend é uma SPA em React com Vite, roteamento via `react-router-dom`, autenticação baseada em token JWT salvo em `localStorage` e controle de acesso por permissões granulares vindas do backend.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NAVEGADOR (SPA)                          │
-│                                                                 │
-│  ┌─────────────┐    ┌──────────────────────────────────────┐   │
-│  │  AuthContext │◄──►│           React Router v6            │   │
-│  │  (JWT +      │    │  BrowserRouter > Routes > Route      │   │
-│  │  localStorage│    │  PrivateRoute > Layout > Page        │   │
-│  └──────┬──────┘    └──────────────────┬─────────────────-─┘   │
-│         │                              │                        │
-│         ▼                              ▼                        │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    LAYOUT (Shell)                        │   │
-│  │  ┌─────────────────┐  ┌──────────────────────────────┐  │   │
-│  │  │    Sidebar       │  │         <Outlet />            │  │   │
-│  │  │  (menu dinâmico) │  │   (páginas renderizadas aqui) │  │   │
-│  │  │  usePermissoes   │  └──────────────────────────────┘  │   │
-│  │  │  SUAS()          │                                     │   │
-│  │  └─────────────────┘                                     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   CAMADA DE SERVIÇOS                     │   │
-│  │              src/services/api.ts                         │   │
-│  │         fetchWithAuth() → Bearer Token                   │   │
-│  └──────────────────────────┬──────────────────────────────┘   │
-│                              │                                   │
-└──────────────────────────────│──────────────────────────────────┘
-                               │ HTTPS/REST
-                               ▼
-                    ┌──────────────────┐
-                    │   BACKEND API    │
-                    │  (Node.js/Express│
-                    │  ou similar)     │
-                    │  VITE_API_BASE   │
-                    │  _URL env var    │
-                    └──────────────────┘
+Fluxo estrutural atual:
+
+```text
+main.tsx
+  └─ React.StrictMode
+     ├─ App
+     └─ ToastContainer (global)
+
+App.tsx
+  └─ AuthProvider
+     └─ BrowserRouter
+        └─ Routes
+           ├─ /login
+           └─ / -> PrivateRoute -> Layout -> rotas protegidas
 ```
 
----
+Principais camadas:
 
-## 2. STACK TECNOLÓGICO DETALHADO
+- `src/main.tsx`: bootstrap do React e `ToastContainer`.
+- `src/App.tsx`: `BrowserRouter`, `PrivateRoute`, `ProtectedRoute` e tabela de rotas.
+- `src/contexts/AuthContext.tsx`: sessão, login, logout e hidratação do usuário.
+- `src/hooks/usePermissoesSUAS.ts`: derivação central das permissões de tela e operação.
+- `src/services/api.ts`: cliente HTTP principal do projeto.
+- `src/components/Layout.tsx`: shell autenticado com sidebar e dropdown de usuário.
+- `src/pages/*`: módulos funcionais.
+
+## 2. Stack Atual
 
 ### 2.1 Core
 
-| Biblioteca         | Versão  | Papel                   |
-| ------------------ | ------- | ----------------------- |
-| `react`            | ^18.3.1 | UI Library              |
-| `react-dom`        | ^18.3.1 | Renderização DOM        |
-| `typescript`       | ^5.2.2  | Tipagem estática        |
-| `vite`             | ^5.1.4  | Build tool + dev server |
-| `react-router-dom` | ^6.22.3 | Roteamento SPA          |
+| Biblioteca | Versão | Uso atual |
+| --- | --- | --- |
+| `react` | `^18.3.1` | renderização da UI |
+| `react-dom` | `^18.3.1` | renderização DOM |
+| `typescript` | `^5.2.2` | tipagem estática |
+| `vite` | `^5.1.4` | dev server e build |
+| `react-router-dom` | `^6.22.3` | rotas SPA |
 
-### 2.2 Formulários e Validação
+### 2.2 UI, formulários e feedback
 
-| Biblioteca            | Versão  | Papel                        |
-| --------------------- | ------- | ---------------------------- |
-| `react-hook-form`     | ^7.62.0 | Gerenciamento de formulários |
-| `zod`                 | ^4.1.12 | Schema de validação          |
-| `@hookform/resolvers` | ^5.2.2  | Adapter Zod ↔ RHF            |
+| Biblioteca | Versão | Uso atual |
+| --- | --- | --- |
+| `tailwindcss` | `^3.4.1` | base utilitária |
+| `@radix-ui/*` | vários | primitives do shadcn/ui |
+| `react-hook-form` | `^7.62.0` | formulários complexos |
+| `zod` | `^4.1.12` | schema e validação |
+| `@hookform/resolvers` | `^5.2.2` | integração RHF + Zod |
+| `react-toastify` | `^11.0.5` | notificações |
+| `lucide-react` | `^0.544.0` | ícones |
+| `clsx`, `class-variance-authority`, `tailwind-merge` | atuais | composição de classes |
 
-### 2.3 UI e Estilização
+### 2.3 Visualização de dados
 
-| Biblioteca                 | Versão          | Papel                           |
-| -------------------------- | --------------- | ------------------------------- |
-| `tailwindcss`              | ^3.4.1          | CSS utilitário                  |
-| `@radix-ui/*`              | vários          | Componentes headless acessíveis |
-| `class-variance-authority` | ^0.7.1          | Variantes de componentes        |
-| `clsx` + `tailwind-merge`  | ^2.1.1 / ^3.3.1 | Merge de classes CSS            |
-| `lucide-react`             | ^0.544.0        | Ícones SVG                      |
-| `tailwindcss-animate`      | ^1.0.7          | Animações Tailwind              |
+| Biblioteca | Versão | Uso atual |
+| --- | --- | --- |
+| `recharts` | `^3.2.0` | gráficos do dashboard |
+| `leaflet` + `react-leaflet` | `^1.9.4`, `^4.2.1` | mapa do painel de vigilância |
+| `jspdf` + `jspdf-autotable` | `^3.0.2`, `^5.0.2` | dependências de PDF instaladas, mas o fluxo principal atual de relatório usa blob vindo da API |
 
-### 2.4 Dados e Visualização
+### 2.4 Dependências instaladas sem uso claro no fluxo principal
 
-| Biblioteca                  | Versão          | Papel                      |
-| --------------------------- | --------------- | -------------------------- |
-| `recharts`                  | ^3.2.0          | Gráficos (Bar, Pie)        |
-| `leaflet` + `react-leaflet` | ^1.9.4 / ^4.2.1 | Mapas interativos          |
-| `react-toastify`            | ^11.0.5         | Notificações toast         |
-| `jspdf` + `jspdf-autotable` | ^3.0.2 / ^5.0.2 | Geração de PDF client-side |
+- `react-slick`
+- `slick-carousel`
+- `swiper`
 
----
+No código lido nesta revisão, essas bibliotecas não aparecem no frontend ativo.
 
-## 3. ESTRUTURA DE PASTAS (DETALHADA)
+## 3. Estrutura de Pastas
 
-```
+```text
 frontend/
-├── index.html                    # Entry point HTML
-├── vite.config.ts                # Configuração Vite + alias @
-├── tsconfig.json                 # TypeScript config
-├── tailwind.config.cjs           # Tailwind config
-├── postcss.config.cjs            # PostCSS
-├── components.json               # shadcn/ui config
+├── docs/
+│   ├── arquitetura_front.md
+│   ├── VERIFICAÇÃO-PLANO-1.md
+│   ├── cadastro/
+│   └── legacy/
+├── public/
+│   └── vite.svg
+├── src/
+│   ├── assets/logos/
+│   ├── components/
+│   │   ├── DrillDown/
+│   │   ├── demandas/
+│   │   ├── mse/
+│   │   ├── ui/
+│   │   ├── users/
+│   │   └── vigilancia/
+│   ├── contexts/
+│   │   ├── AuthContext.tsx
+│   │   └── ProtectedRoute.tsx
+│   ├── hooks/
+│   ├── lib/
+│   ├── pages/
+│   │   ├── Cadastro/
+│   │   ├── Cras/
+│   │   ├── PainelVigilancia/
+│   │   └── *.tsx
+│   ├── services/
+│   │   └── api.ts
+│   ├── utils/
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── styles.css
 ├── package.json
-│
-├── public/                       # Assets estáticos
-│
-├── docs/                         # Documentação (este arquivo)
-│   ├── contexto.md
-│   └── arquitetura_front.md
-│
-└── src/
-    ├── main.tsx                  # Bootstrap React + BrowserRouter
-    ├── App.tsx                   # Definição de rotas
-    ├── App.css / index.css / styles.css  # Estilos globais
-    │
-    ├── assets/logos/             # Logotipos institucionais
-    │   ├── rmsuas-logo.png/svg
-    │   ├── prefeitura.png
-    │   ├── secretaria.png
-    │   ├── creas.png / paefi.png
-    │   └── suas.png / programa.png
-    │
-    ├── contexts/
-    │   ├── AuthContext.tsx        # Contexto de autenticação
-    │   └── ProtectedRoute.tsx    # Guard de rota por permissão
-    │
-    ├── hooks/
-    │   ├── usePermissoesSUAS.ts  # Hook central de permissões (CRÍTICO)
-    │   ├── useUsers.ts           # CRUD de usuários
-    │   ├── useCreateUser.ts      # Criação de usuário com useReducer
-    │   └── useUnidades.ts        # Listagem de unidades
-    │
-    ├── services/
-    │   └── api.ts                # Camada de acesso à API (ÚNICO arquivo de chamadas HTTP)
-    │
-    ├── utils/    │   ├── constants.ts          # Units, Roles, entityPermissions, SCREEN_PERMISSIONS
-    │   ├── roles.ts              # UserRole type + labels de perfil
-    │   ├── apiNormalizer.ts      # Normalização de respostas de lista
-    │   ├── dateUtils.ts          # calculateAge, addMonthsToDate, formatDateForInput
-    │   └── masks.ts              # Máscaras de CPF e NIS para formulários
-    │
-    ├── lib/
-    │   └── utils.ts              # cn() — merge de classes Tailwind
-    │
-    ├── pages/
-    │   ├── Login.tsx
-    │   ├── Dashboard.tsx + Dashboard.css
-    │   ├── Cadastro.tsx
-    │   ├── CasoDetalhe.tsx
-    │   ├── Consulta.tsx
-    │   ├── ControleMSE.tsx
-    │   ├── Demandas.tsx
-    │   ├── DemandaDetalhe.tsx
-    │   ├── Relatorios.tsx
-    │   ├── Integracoes.tsx
-    │   ├── GerenciarUsuarios.tsx
-    │   ├── PainelVigilancia/
-    │   │   ├── PainelVigilancia.tsx
-    │   │   └── PainelVigilancia.css
-    │   └── Cras/
-    │       ├── CrasProntuario.tsx
-    │       └── CrasConsulta.tsx  (placeholder)
-    │    └── components/
-        ├── Layout.tsx             # Shell principal (Sidebar + Outlet)
-        ├── Header.tsx
-        ├── DrillDown/
-        │   └── ListaCasosModal.tsx
-        ├── demandas/
-        │   └── DemandaFormModal.tsx
-        ├── mse/
-        │   └── MseRegistroModal.tsx
-        ├── users/
-        │   ├── UserEditModal.tsx
-        │   ├── ReassignCasesModal.tsx
-        │   └── UsersTable.tsx
-        ├── vigilancia/
-        │   ├── CardKPI.tsx + CardKPI.css
-        │   ├── GraficoBarras.tsx + GraficoBarras.css
-        │   ├── GraficoPizza.tsx + GraficoPizza.css
-        │   └── MapaCalor.tsx + MapaCalor.css
-        └── ui/                    # shadcn/ui (Radix-based)
-            ├── badge.tsx
-            ├── button.tsx
-            ├── card.tsx
-            ├── dialog.tsx
-            ├── dropdown-menu.tsx
-            ├── input.tsx
-            ├── label.tsx
-            ├── select.tsx
-            ├── table.tsx
-            ├── tabs.tsx
-            └── textarea.tsx
+├── tailwind.config.cjs
+├── tsconfig.json
+└── vite.config.ts
 ```
 
----
+Observações relevantes:
 
-## 4. SISTEMA DE ROTEAMENTO
+- `src/pages/Cadastro.tsx` hoje é apenas um reexport para `src/pages/Cadastro/Cadastro.tsx`.
+- `src/components/Header.tsx` existe, mas não está integrado no layout atual.
+- `src/hooks/useUsers.ts`, `src/hooks/useCreateUser.ts` e `src/hooks/useUnidades.ts` coexistem com implementações diretas em páginas; o projeto ainda não está totalmente consolidado em hooks.
 
-### 4.1 Hierarquia de Rotas
+## 4. Roteamento
 
-```
-/login                          → <Login />  (pública)
-/                               → <PrivateRoute>  →  <Layout />
-  /                             → redirect → /dashboard
+Rotas declaradas em `src/App.tsx`:
 
-  /dashboard                    → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.dashboard]>
-  /painel-vigilancia            → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.vigilancia]>
-  /relatorios                   → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.relatorios]>
-  /integracoes                  → <ProtectedRoute permissions=[SCREEN_PERMISSIONS.integracoes]>
-
-  /cadastro                     → <ProtectedRoute permissions=["casos.create"]>
-  /cadastro/:id                 → <ProtectedRoute permissions=["casos.edit"]>
-  /consulta                     → <ProtectedRoute permissions=["casos.read"]>
-  /caso/:id                     → <ProtectedRoute permissions=["casos.read"]>
-
-  /demandas                     → <ProtectedRoute permissions=["demandas.read"]>
-  /demandas/:id                 → <ProtectedRoute permissions=["demandas.read"]>
-
-  /controle-mse                 → <ProtectedRoute permissions=["mse.read"]>
-
-  /cras/cadastro                → <CrasProntuario />  (sem ProtectedRoute — em dev)
-  /cras/cadastro/:id            → <CrasProntuario />  (sem ProtectedRoute — em dev)
-  /cras/consulta                → <CrasConsulta />   (sem ProtectedRoute — em dev)
-
-  /gerenciar-usuarios           → <ProtectedRoute permissions=["users.read"]>
-
-/*                              → redirect → /login
+```text
+/login
+/
+  ├─ index -> Navigate("/dashboard")
+  ├─ /dashboard
+  ├─ /painel-vigilancia
+  ├─ /relatorios
+  ├─ /integracoes
+  ├─ /cadastro
+  ├─ /cadastro/:id
+  ├─ /consulta
+  ├─ /caso/:id
+  ├─ /demandas
+  ├─ /demandas/:id
+  ├─ /controle-mse
+  ├─ /cras/cadastro
+  ├─ /cras/cadastro/:id
+  ├─ /cras/consulta
+  └─ /gerenciar-usuarios
+* -> Navigate("/login")
 ```
 
-### 4.2 Guards de Rota
+### 4.1 Guards
 
-**`PrivateRoute`** — Verifica apenas `isAuthenticated`. Se não autenticado, redireciona para `/login`.
+- `PrivateRoute` está definido dentro de `src/App.tsx`.
+- `ProtectedRoute` está em `src/contexts/ProtectedRoute.tsx`.
 
-**`ProtectedRoute`** — Verifica `isAuthenticated` E se o usuário possui **todas** as permissões listadas. Se não autorizado, redireciona para `/dashboard` (fallback configurável).
+Comportamento atual:
 
----
+- `PrivateRoute` exige autenticação.
+- `ProtectedRoute` exige autenticação e checa se o usuário possui todas as permissões de `requiredPermissions`.
+- O fallback padrão de `ProtectedRoute` é `/dashboard`.
 
-## 5. FLUXO DE AUTENTICAÇÃO
+### 4.2 Divergência importante
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                         LOGIN FLOW                             │
-│                                                                │
-│  Login.tsx                                                     │
-│    │ handleLogin()                                             │
-│    ▼                                                           │
-│  AuthContext.login(username, password)                         │
-│    │                                                           │
-│    ▼                                                           │
-│  api.ts → POST /api/login/                                     │
-│    │                                                           │
-│    ▼ resposta: { token, user }                                 │
-│    │                                                           │
-│    ├─► localStorage.setItem('token', token)                    │
-│    ├─► localStorage.setItem('user', JSON.stringify(user))      │
-│    └─► setUser(safeUser)  → isAuthenticated = true            │
-│                                                                │
-│  navigate('/dashboard')                                        │
-└────────────────────────────────────────────────────────────────┘
+O `Layout` ainda contém uma lógica de redirecionamento baseada em permissões para a rota `/`, mas o índice da rota já faz `Navigate("/dashboard")` de forma fixa. Na prática:
 
-┌────────────────────────────────────────────────────────────────┐
-│                      PERSISTÊNCIA DE SESSÃO                    │
-│                                                                │
-│  AuthProvider useEffect (na montagem)                          │
-│    │                                                           │
-│    ├─ localStorage.getItem('token')                            │
-│    ├─ localStorage.getItem('user')  → JSON.parse()            │
-│    │   safe unit_id: string → number ou null                   │
-│    └─ setUser(safeUser)                                        │
-│                                                                │
-│  Se falhar → localStorage.clear() → setUser(null)             │
-└────────────────────────────────────────────────────────────────┘
+- o redirecionamento dinâmico planejado no `Layout` está parcialmente obsoleto;
+- o comportamento real de entrada hoje privilegia `/dashboard`.
 
-┌────────────────────────────────────────────────────────────────┐
-│                      CADA REQUISIÇÃO HTTP                      │
-│                                                                │
-│  fetchWithAuth(endpoint, options)                              │
-│    │                                                           │
-│    ├─ token = localStorage.getItem('token')                    │
-│    ├─ headers.Authorization = 'Bearer ' + token               │
-│    └─ fetch(API_BASE_URL + endpoint, {...options, headers})    │
-└────────────────────────────────────────────────────────────────┘
+## 5. Autenticação e Sessão
+
+### 5.1 AuthContext
+
+`src/contexts/AuthContext.tsx` é a fonte global da sessão:
+
+- guarda `user`, `isAuthenticated` e `isLoading`;
+- lê `token` e `user` do `localStorage` na montagem;
+- normaliza `unit_id` para `number | null`;
+- persiste `token` e `user` no login;
+- remove ambos no logout.
+
+### 5.2 Fluxo de login
+
+```text
+Login.tsx
+  -> useAuth().login(username, password)
+  -> api.login()
+  -> POST {VITE_API_BASE_URL}/api/login/
+  -> localStorage(token, user)
+  -> navigate("/dashboard")
 ```
 
----
+### 5.3 Observações
 
-## 6. CAMADA DE SERVIÇOS (`src/services/api.ts`)
+- `main.tsx` já renderiza um `ToastContainer` global.
+- `Login.tsx` ainda importa `ToastContainer`, mas não o renderiza; é resíduo de implementação anterior.
 
-### 6.1 Arquitetura
+## 6. Sistema de Permissões
 
-```
-api.ts
-├── INTERFACES DE TIPOS (export)
-│   ├── FiltrosBase, FiltrosCasos
-│   ├── LoginResponse, User
-│   ├── CasoDetalhado, DemandaResumida, Demanda, DemandaDetalhada
-│   ├── MseRegistroBody, MseRegistroResumido, MseKpis, MseApiResponse
-│   ├── DashboardApiDataType, ApiResponse
-│   └── Anexo
-│
-├── FUNÇÃO BASE
-│   └── fetchWithAuth(endpoint, options) → JSON | Response (blob)
-│
-├── HELPER
-│   └── appendFiltros(filters?: FiltrosBase) → string (query params)
-│
-└── FUNÇÕES EXPORTADAS (por domínio)
-    ├── auth:           login()
-    ├── casos:          createCase, updateCase, updateCasoStatus, deleteCaso,
-    │                   getCasoById, getCasosFiltrados, searchCasosByTerm
-    ├── acompanhamentos:getAcompanhamentos, createAcompanhamento
-    ├── encaminhamentos:getEncaminhamentos, createEncaminhamento, updateEncaminhamento
-    ├── anexos:         getAnexosByCasoId, uploadAnexoParaCaso, uploadAnexoParaDemanda,
-    │                   downloadAnexo
-    ├── users:          getUsers, createUser, updateUser, updateUserStatus,
-    │                   reassignUserCases
-    ├── demandas:       getDemandas, createDemanda, getDemandaById, updateDemandaStatus
-    ├── mse:            getMseRegistros, createMseRegistro, getMseRegistroById
-    ├── dashboard:      getDashboardData
-    ├── vigilancia:     getVigilanciaFluxoDemanda, getVigilanciaSobrecargaEquipe,
-    │                   getVigilanciaIncidenciaBairros, getVigilanciaFontesAcionamento,
-    │                   getVigilanciaTaxaReincidencia, getVigilanciaPerfilViolacoes
-    └── relatorios:     generateReport
-```
+O centro da regra de acesso está em `src/hooks/usePermissoesSUAS.ts`.
 
-### 6.2 Roteamento Inteligente de Casos
+Esse hook deriva:
 
-A função `getCasosFiltrados` roteia para endpoints diferentes baseado em `filters.origem`:
+- perfil percebido (`isGestorGeral`, `isVigilancia`, `isLotadoNoCreas`);
+- acesso a grupos de menu;
+- permissões de entidades (`canManageCasos`, `canManageDemandas`, `canManageUsers`, etc.);
+- permissões granulares (`canReadCasos`, `canEditCasos`, `canDeleteCasos`, `canCreateCasos`);
+- acesso a telas (`screen.dashboard.access`, `screen.vigilancia.access`, `screen.relatorios.access`, `screen.integrations.access`);
+- filtro de unidades para dashboards (`dashboardFilterUnits`).
 
-```typescript
-let endpoint = "/api/casos"; // padrão
-if (filters?.origem === "vigilancia") {
-  endpoint = "/api/vigilancia/casos-filtrados"; // painel vigilância
-}
-```
+Dependências desse fluxo:
 
-### 6.3 Tratamento de Respostas Binárias
+- `AuthContext` fornece `user.permissions`, `user.role`, `user.role_id` e `user.unit_id`.
+- `src/utils/constants.ts` define `entityPermissions`, `SCREEN_PERMISSIONS`, `UNIT_OPTIONS`, `Roles` e `Units`.
 
-`fetchWithAuth` detecta o `content-type` da resposta. Se for `application/pdf` ou `application/octet-stream`, retorna o objeto `Response` completo (para extração de blob). Para todas as outras, retorna `response.json()`.
+### 6.1 Estado atual do menu
 
----
+`src/components/Layout.tsx` monta a sidebar por grupos:
 
-## 7. SISTEMA DE PERMISSÕES (ARQUITETURA)
+- `MODULO CRAS`: hoje `isVisible: false`
+- `Atendimento Operacional CREAS`
+- `Análise e Gestão`
+- `Administração`
 
-```
-              ┌──────────────────────┐
-              │     AuthContext      │
-              │  user.permissions[]  │
-              └──────────┬───────────┘
-                         │
-                         ▼
-              ┌──────────────────────┐
-              │  usePermissoesSUAS() │◄── HOOK CENTRAL
-              │                      │
-              │  Lê: user.role       │
-              │  Lê: user.unit_id    │
-              │  Lê: user.permissions│
-              │                      │
-              │  Deriva:             │
-              │  · isGestorGeral     │
-              │  · isVigilancia      │
-              │  · isLotadoNoCreas   │
-              │  · canManage*        │
-              │  · canAccess*Screen  │
-              │  · dashboardFilter   │
-              └──────┬───────────────┘
-                     │
-         ┌───────────┼───────────────────┐
-         ▼           ▼                   ▼
-  ┌──────────┐ ┌──────────┐     ┌──────────────┐
-  │ Layout   │ │Protected │     │  Pages       │
-  │ (menu    │ │ Route    │     │  (lógica     │
-  │  visib.) │ │ (acesso) │     │   interna)   │
-  └──────────┘ └──────────┘     └──────────────┘
-```
+O grupo CRAS existe na árvore de rotas, mas ainda está desativado no menu.
 
-### Decisão de Design: Por que um hook centralizado?
+## 7. Shell da Aplicação
 
-Antes, a lógica de permissões estava espalhada por múltiplos componentes, com comparações diretas de `user.role`. Isso causava inconsistências. O hook `usePermissoesSUAS` resolve isso sendo **a única fonte de verdade** para:
+`src/components/Layout.tsx` implementa:
 
-- Verificação de perfil
-- Verificação de permissões de entidade
-- Filtros de unidade para dashboards
-- Visibilidade de itens de menu
+- sidebar fixa à esquerda;
+- dropdown de usuário no topo do conteúdo;
+- `Outlet` para páginas;
+- badge de diagnóstico em `import.meta.env.DEV`.
 
----
+Itens relevantes:
 
-## 8. PADRÃO DE FORMULÁRIOS
+- o layout usa classes Tailwind dinâmicas como `bg-${linkColorClass}-100`;
+- a logo da sidebar aponta para `/logos/rmsuas-logo.svg`;
+- `public/` atualmente contém apenas `vite.svg`.
 
-### 8.1 Stack
+Isso indica um ponto de inconsistência entre o layout e os assets públicos.
 
-```
-React Hook Form (controle)
-    +
-Zod (validação de schema)
-    +
-zodResolver (adapter)
-    +
-Controller (para componentes Radix/Select)
-```
+## 8. Camada de Serviços
 
-### 8.2 Padrão de Schema Zod
+`src/services/api.ts` continua sendo o cliente HTTP principal.
 
-```typescript
-const formSchema = z.object({
-  // Campos obrigatórios (Tab 1 — Atendimento)
-  data_cad: z.string().min(1, "Mensagem de erro"),
-  tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
-  tipo_violencia: z.string().min(1, "O tipo de violência é obrigatório."),
-  local_ocorrencia: z.string().min(1, "O local da ocorrência é obrigatório."),
+### 8.1 Comportamento do `fetchWithAuth`
 
-  // Campo opcional (pode ser null do DB)
-  nome: z.string().optional().nullable(),
+- lê o token do `localStorage`;
+- injeta `Authorization: Bearer ...`;
+- usa `Content-Type: application/json` quando o body não é `FormData`;
+- faz `fetch` contra `import.meta.env.VITE_API_BASE_URL`;
+- lança `Error` com a mensagem devolvida pela API;
+- retorna `Response` para conteúdo binário (`application/pdf` ou `application/octet-stream`);
+- retorna `response.json()` nos demais casos.
 
-  // Validação customizada com máscara
-  cpf: z
-    .string()
-    .optional()
-    .nullable()
-    .refine(validateCPF, { message: "CPF inválido." }),
-  // → Input usa maskCPF() de src/utils/masks.ts (formato: 000.000.000-00)
+### 8.2 Funções existentes
 
-  nis: z
-    .string()
-    .optional()
-    .nullable()
-    .refine(validateNIS, { message: "NIS deve conter 11 dígitos." }),
-  // → Input usa maskNIS() de src/utils/masks.ts (formato: 000.0000.0000-0)
+Domínios exportados atualmente:
 
-  // Número com coerção
-  mse_duracao_meses: z.preprocess(
-    (val) => (val === "" ? 0 : val),
-    z.coerce.number().min(1).max(99)
-  ),
-});
-type FormType = z.infer<typeof formSchema>;
+- autenticação: `login`
+- casos: `createCase`, `updateCase`, `updateCasoStatus`, `deleteCaso`, `getCasoById`, `getCasosFiltrados`, `searchCasosByTerm`
+- acompanhamentos: `getAcompanhamentos`, `createAcompanhamento`
+- encaminhamentos: `getEncaminhamentos`, `createEncaminhamento`, `updateEncaminhamento`
+- anexos: `getAnexosByCasoId`, `uploadAnexoParaCaso`, `uploadAnexoParaDemanda`, `downloadAnexo`
+- usuários: `getUsers`, `createUser`, `updateUser`, `updateUserStatus`, `reassignUserCases`
+- relatórios: `generateReport`
+- dashboard: `getDashboardData`
+- vigilância: `getVigilanciaFluxoDemanda`, `getVigilanciaSobrecargaEquipe`, `getVigilanciaIncidenciaBairros`, `getVigilanciaFontesAcionamento`, `getVigilanciaTaxaReincidencia`, `getVigilanciaPerfilViolacoes`
+- demandas: `getDemandas`, `createDemanda`, `getDemandaById`, `updateDemandaStatus`
+- MSE: `getMseRegistros`, `createMseRegistro`, `getMseRegistroById`
+
+### 8.3 Roteamento de casos por origem
+
+`getCasosFiltrados` muda o endpoint quando `filters.origem === "vigilancia"`:
+
+- padrão: `/api/casos`
+- vigilância: `/api/vigilancia/casos-filtrados`
+
+### 8.4 Limite da padronização
+
+O documento anterior afirmava que toda integração HTTP passava por `api.ts`. Isso não é mais verdade:
+
+- `src/pages/Integracoes.tsx` faz `fetch` direto para a API do IBGE.
+
+## 9. Módulos Funcionais
+
+### 9.1 Cadastro de casos
+
+O módulo de cadastro foi modularizado e hoje vive em `src/pages/Cadastro/`.
+
+Arquivos centrais:
+
+- `Cadastro.tsx`: composição visual das abas
+- `useCadastroForm.ts`: orquestração do formulário
+- `schema.ts`: validação Zod
+- `adapters.ts`: adaptação entre payload da API e shape do formulário
+- `options.ts`: opções auxiliares
+- `components/Tab*.tsx`: seções do formulário
+
+Fluxo atual:
+
+```text
+modo criação
+  -> createCase({ data_cad, tec_ref, unit_id, dados_completos_payload })
+  -> navega para /cadastro/:id
+
+modo edição
+  -> getCasoById(id)
+  -> caseToFormValues()
+  -> salva somente dirtyFields relevantes
+  -> updateCase(id, { data_cad?, tec_ref?, dados_completos_payload })
+  -> navega para /caso/:id
 ```
 
-### 8.3 Fluxo de Submit (Modo Criação vs. Edição)
+Abas ativas hoje:
 
-```
-CRIAÇÃO:
-  handleSubmit → onSubmit(data) → createCase(payload) → navigate(`/cadastro/${id}`)
+1. Atendimento
+2. Vítima
+3. Família
+4. Saúde
+5. Encaminhamentos
+6. Agressor
+7. Moradia
 
-EDIÇÃO:
-  handleSubmit → onSubmit(data)
-    ├── Coleta apenas dirtyFields (campos modificados)
-    ├── Garante campos SQL obrigatórios (data_cad, tec_ref)
-    └── updateCase(id, dirtyData) → reset(data, keepValues) → navigate(`/caso/${id}`)
-```
+### 9.2 Consulta
 
-### 8.4 Formulário Multi-Abas (Cadastro CREAS)
+`src/pages/Consulta.tsx` implementa:
 
-```
-Tab 1: Atendimento    ← desbloqueada sempre (criação e edição)
-Tab 2: Vítima         ← bloqueada até ter um id (só edição)
-Tab 3: Família        ← bloqueada até ter um id
-Tab 4: Saúde          ← bloqueada até ter um id
-Tab 5: Encaminhamentos← bloqueada até ter um id
-```
+- busca geral;
+- filtro por status;
+- filtro por tipo de violência;
+- filtro por bairro;
+- debounce de `300ms`.
 
----
+O backend é tratado como responsável pelo recorte de unidade do usuário.
 
-## 9. PADRÃO DE COMPONENTES DE MODAL
+### 9.3 Caso detalhado
 
-Todos os modais seguem a mesma interface:
+`src/pages/CasoDetalhe.tsx` concentra:
 
-```typescript
-interface ModalProps {
-  isOpen: boolean; // Controla visibilidade
-  onClose: () => void; // Fecha o modal
-  onSuccess: () => void; // Callback após sucesso (aciona refetch da lista pai)
-  // Props específicas...
-}
-```
+- leitura do prontuário;
+- edição via retorno para `/cadastro/:id`;
+- desligamento/reativação/exclusão;
+- acompanhamentos;
+- encaminhamentos;
+- anexos;
+- demandas vinculadas.
 
-**Componentes de modal existentes:**
+Os dados exibidos combinam:
 
-- `MseRegistroModal` — Criação/edição de MSE
-- `DemandaFormModal` — Criação de demanda com busca inteligente de caso
-- `UserEditModal` — Edição de servidor
-- `ReassignCasesModal` — Reatribuição de casos entre técnicos
-- `ListaCasosModal` — Drill-down genérico (lista de casos filtrados)
+- campos de topo do caso;
+- `dados_completos` achatado para renderização.
 
----
+### 9.4 Dashboard
 
-## 10. PADRÃO DE DRILL-DOWN (ANÁLISE INTERATIVA)
+`src/pages/Dashboard.tsx` usa:
 
-Usado no Dashboard PAEFI e no Painel de Vigilância.
+- filtros por mês, técnico e bairro;
+- `getDashboardData`;
+- `ListaCasosModal` para drill-down;
+- `recharts` para barras e pizzas;
+- modo apresentação com Fullscreen API.
 
-```
-Usuário clica em card/gráfico
-         │
-         ▼
-handleDrillDown(action, valor, title)
-         │
-         ├── Consulta o mapa de filtros (CARD_FILTERS_MAP / VIGILANCIA_FILTERS_MAP)
-         │     ├── Se encontrado: usa campo e valor do mapa
-         │     └── Se não encontrado: usa action como campo, valor como valor
-         │
-         ├── Abre ListaCasosModal (estado isModalOpen = true)
-         ├── Seta isModalLoading = true
-         │
-         ▼
-getCasosFiltrados({ filtro, valor, ...filtrosAtivos, [origem?] })
-         │
-         ▼
-Modal exibe tabela com casos resultantes
-(link "Ver Prontuário" → /caso/:id)
-```
+### 9.5 Painel de Vigilância
 
----
+`src/pages/PainelVigilancia/PainelVigilancia.tsx` agrega várias chamadas paralelas:
 
-## 11. LAYOUT E NAVEGAÇÃO
+- fluxo de demanda;
+- sobrecarga da equipe;
+- incidência por bairros;
+- fontes de acionamento;
+- reincidência;
+- perfil de violações.
 
-### 11.1 Shell da Aplicação
+Também usa:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          Layout.tsx                              │
-│                                                                 │
-│  ┌────────────────┐  ┌──────────────────────────────────────┐  │
-│  │   SIDEBAR      │  │            CONTENT AREA              │  │
-│  │  (w-64)        │  │  (flex-1, overflow-y-auto)           │  │
-│  │                │  │                                      │  │
-│  │  Logo RMSUAS   │  │  <Outlet /> ← página renderizada     │  │
-│  │  Debug Badge*  │  │                                      │  │
-│  │                │  └──────────────────────────────────────┘  │
-│  │  [MENU GROUPS] │                                            │
-│  │  · CRAS        │  ← isVisible: false (em dev)              │
-│  │  · CREAS Op.   │  ← isVisible: canViewCreasOperacional      │
-│  │  · Análise     │  ← isVisible: canAccessAnaliseGroup        │
-│  │  · Administração│  ← isVisible: canManageUsers              │
-│  │                │                                            │
-│  │  [USER MENU]   │                                            │
-│  │  DropdownMenu  │                                            │
-│  │  (logout, etc) │                                            │
-│  └────────────────┘                                            │
-└─────────────────────────────────────────────────────────────────┘
-```
+- `MapaCalor`
+- `GraficoBarras`
+- `GraficoPizza`
+- `ListaCasosModal`
 
-> **\*Debug Badge:** O bloco de diagnóstico (ROLE, UNIT ID, permissões) é protegido por `import.meta.env.DEV` — visível apenas em ambiente de desenvolvimento.
+### 9.6 Demandas
 
-### 11.2 Lógica de Redirecionamento Inicial
+Fluxo atual dividido em:
 
-Ao entrar na rota `/`, o `Layout` redireciona baseado em permissões:
+- `src/pages/Demandas.tsx`: listagem e abertura do modal
+- `src/components/demandas/DemandaFormModal.tsx`: criação
+- `src/pages/DemandaDetalhe.tsx`: detalhe, status e anexos
 
-```typescript
-if (canAccessDashboardScreen)    → navigate('/dashboard')
-if (canAccessVigilanciaScreen)   → navigate('/painel-vigilancia')
-if (canViewCreasOperacional)     → navigate('/cadastro')
-```
+Há designação automática do técnico ao selecionar um caso associado, tentando casar `selectedCaso.tecRef` com `user.nome_completo`.
 
-### 11.3 Menu Dinâmico
+### 9.7 Controle MSE
 
-O menu usa uma estrutura de dados (`menuItems`) com `isVisible` por grupo e por item. Grupos invisíveis não são renderizados. A cor dos links de menu muda por grupo (azul para CREAS, roxo para Análise).
+Arquivos:
 
----
+- `src/pages/ControleMSE.tsx`
+- `src/components/mse/MseRegistroModal.tsx`
 
-## 12. COMPONENTES DE VISUALIZAÇÃO
+Funcionalidades:
 
-### 12.1 Dashboard Charts (Recharts)
+- KPIs do módulo;
+- busca com debounce;
+- criação de registro MSE;
+- abertura do modal em modo de detalhe/edição.
 
-```
-BarChart (horizontal) → Casos por Bairro
-BarChart (vertical)   → Encaminhamentos, Faixa Etária
-PieChart (donut)      → Violações, Sexo
-PieChart (flat)       → Canal de Denúncia, Cor/Etnia
+Limitação atual:
+
+- o modal em modo edição carrega os dados, mas o `update` ainda não está implementado de fato; o submit apenas exibe toast de sucesso.
+
+### 9.8 Relatórios
+
+`src/pages/Relatorios.tsx` gera um PDF a partir da API:
+
+- formulário com data inicial e final;
+- `generateReport`;
+- download do blob gerado.
+
+### 9.9 Integrações
+
+`src/pages/Integracoes.tsx` é um módulo mais demonstrativo do que consolidado:
+
+- lista integrações prioritárias, intermediárias e estratégicas;
+- consulta o IBGE diretamente via `fetch`;
+- não usa `api.ts`;
+- mistura conteúdo institucional com uma integração operacional real.
+
+## 10. Padrões de Formulário
+
+### 10.1 Padrão dominante
+
+O padrão principal hoje é:
+
+```text
+react-hook-form
+  + zodResolver
+  + schema Zod
+  + componentes shadcn/ui
+  + adapters para compatibilizar payload legado/canônico
 ```
 
-Todos os gráficos têm `cursor="pointer"` e handler `onClick` para drill-down.
-
-### 12.2 MapaCalor (Leaflet)
-
-```typescript
-// Coordenadas hardcoded para bairros de Patos/PB
-const coordenadasBairros = {
-  'Centro':          [-7.0285, -37.2799],
-  'Belo Horizonte':  [-7.0224, -37.2885],
-  'Liberdade':       [-7.0363, -37.2825],
-  'Jatobá':          [-7.0451, -37.2910],
-  'São Sebastião':   [-7.0315, -37.2701],
-};
-
-// Escala de cores por quantidade de casos
-casos > 50  → '#d53e4f' (vermelho escuro)
-casos > 30  → '#f46d43' (laranja)
-casos > 15  → '#fdae61' (amarelo-laranja)
-casos > 5   → '#fee08b' (amarelo)
-casos ≤ 5   → '#abdda4' (verde)
-```
-
-O `z-index: 2000` no `ListaCasosModal` garante que apareça acima do mapa Leaflet.
-
----
-
-## 13. PADRÕES DE STATE MANAGEMENT
-
-### 13.1 Estratégia Geral
-
-O projeto não usa Redux ou Zustand. O estado é gerenciado com:
-
-| Tipo          | Onde usar                                         |
-| ------------- | ------------------------------------------------- |
-| `useState`    | Estado local de páginas e componentes             |
-| `useReducer`  | Formulários complexos (ex: `useCreateUser`)       |
-| `useContext`  | Estado global (Auth)                              |
-| `useCallback` | Funções de fetch para evitar loops                |
-| Custom Hooks  | Lógica reutilizável (useUsers, usePermissoesSUAS) |
-
-### 13.2 Padrão de Fetch em Páginas
-
-```typescript
-// 1. Estado
-const [data, setData] = useState<Type | null>(null);
-const [isLoading, setIsLoading] = useState(true);
-
-// 2. Função de fetch (com useCallback se usada em useEffect com dependências)
-const fetchData = useCallback(async () => {
-  setIsLoading(true);
-  try {
-    const result = await apiFunction();
-    setData(result);
-  } catch (error: any) {
-    toast.error(`Erro: ${error.message}`);
-  } finally {
-    setIsLoading(false);
-  }
-}, [dependencies]);
+### 10.2 Exemplos reais
 
-// 3. Trigger inicial
-useEffect(() => {
-  fetchData();
-}, [fetchData]);
-```
+- `Cadastro`: fluxo mais elaborado e canônico do projeto.
+- `MseRegistroModal`: RHF + Zod + `Controller`.
 
-### 13.3 Debounce em Buscas
+### 10.3 Exceções
 
-```typescript
-useEffect(() => {
-  const timer = setTimeout(() => {
-    fetchCasos(); // ou fetchMseRegistros()
-  }, 300); // 300ms para Consulta, 500ms para DemandaFormModal
-  return () => clearTimeout(timer); // cleanup
-}, [searchTerm, selectedFilterKey]);
-```
+Nem todos os formulários seguem esse padrão:
 
----
+- `DemandaFormModal` usa `useState` manual.
+- `GerenciarUsuarios.tsx` também usa estado manual para o formulário de criação.
 
-## 14. NORMALIZAÇÃO DE RESPOSTAS DA API
+## 11. Estado e Reutilização
 
-O backend pode retornar listas em diferentes formatos. A função `normalizeListResponse` padroniza:
+Estratégia observada no código:
 
-```typescript
-// src/utils/apiNormalizer.ts
-export function normalizeListResponse<T>(response: any): T[] {
-  if (Array.isArray(response)) return response; // [item, ...]
-  return (
-    response?.rows ?? // { rows: [...] }  (Sequelize/Knex)
-    response?.data ?? // { data: [...] }
-    response?.results ?? // { results: [...] }
-    [] // fallback vazio
-  );
-}
-```
+- `useState`: dominante em páginas e modais
+- `useEffect`: fetch inicial e debounce
+- `useCallback`: usado em páginas com recarga de dados
+- `useMemo`: usado principalmente em `useCadastroForm`
+- `useContext`: apenas autenticação
+- custom hooks: uso parcial, não homogêneo
 
----
+Hooks existentes:
 
-## 15. CONFIGURAÇÕES DE BUILD E DEV
+- `usePermissoesSUAS`: central e ativo
+- `useUsers`: ativo, mas não adotado pela página de gestão
+- `useCreateUser`: existe, mas não é usado em `GerenciarUsuarios.tsx`
+- `useUnidades`: existe, porém depende de exports ausentes em `api.ts`
 
-### 15.1 Vite Config (`vite.config.ts`)
+## 12. Normalização de Respostas
 
-```typescript
-// Alias @ → src/
-// Plugin: @vitejs/plugin-react
-```
+`src/utils/apiNormalizer.ts` expõe `normalizeListResponse`, que trata:
 
-### 15.2 TypeScript Path Aliases
+- array puro
+- `rows`
+- `data`
+- `results`
 
-O `@` mapeia para `src/`, permitindo imports como:
+Estado atual:
 
-```typescript
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-```
+- a utility existe;
+- é usada por `useUsers` e `useUnidades`;
+- não foi incorporada de forma uniforme às páginas nem ao `api.ts`.
 
-### 15.3 Scripts
+## 13. Build e Ambiente
 
-```json
-"dev":     "vite"          // servidor de desenvolvimento
-"build":   "vite build"    // build de produção
-"preview": "vite preview"  // preview do build
-```
+### 13.1 Vite
 
----
+`vite.config.ts` define:
 
-## 16. PADRÕES DE UX E FEEDBACK
+- plugin React
+- alias `@ -> ./src`
+- proxy local para `/api` e `/news`
 
-### 16.1 Notificações Toast
+Proxy dev atual:
 
-```typescript
-toast.success("✅ Mensagem de sucesso"); // verde
-toast.error("❌ Mensagem de erro"); // vermelho
-toast.warn("⚠️ Aviso"); // amarelo
-toast.info("ℹ️ Informação"); // azul
-```
+- `/api -> http://localhost:4000`
+- `/news -> http://localhost:4000`
 
-Usando `react-toastify` com posição `top-right`.
+### 13.2 TypeScript
 
-### 16.2 Loading States
+`tsconfig.json` define:
 
-- Páginas: `<Loader2 className="animate-spin" />` centralizado
-- Botões: `<Loader2 className="mr-2 h-4 w-4 animate-spin" />` inline
-- Tabelas: linha única com Loader2 centralizado
+- `strict: true`
+- `jsx: react-jsx`
+- `baseUrl: "."`
+- `paths["@/*"] = ["./src/*"]`
 
-### 16.3 Estados Vazios
+### 13.3 Estilos globais
 
-- Tabelas sem dados: `<TableCell colSpan={N}>Nenhum item encontrado</TableCell>`
-- Modais sem casos: "Nenhum caso encontrado para este filtro."
+O carregamento global real é:
 
-### 16.4 Confirmações Destrutivas
+- `src/styles.css` em `main.tsx`
+- CSS específicos importados nas páginas/componentes
 
-```typescript
-if (!window.confirm("Mensagem de confirmação")) return;
-```
+`App.css` e `index.css` existem no repositório, mas não aparecem no bootstrap principal lido nesta revisão.
 
-Usado em: excluir caso, desligar caso, inativar servidor.
+## 14. Divergências e Débitos Arquiteturais
 
----
+Itens verificados no código que merecem atenção:
 
-## 17. DECISÕES DE ARQUITETURA E TRADE-OFFS
+1. `Layout.tsx` aponta para `/logos/rmsuas-logo.svg`, mas `public/` não contém essa estrutura.
+2. O redirecionamento inicial documentado anteriormente não corresponde ao comportamento real; o índice da rota vai direto para `/dashboard`.
+3. `Integracoes.tsx` contorna `api.ts` e depende de `fetch` direto para um serviço externo.
+4. `useUnidades.ts` importa `getUnidades` e `Unidades` de `api.ts`, mas esses exports não existem no arquivo revisado.
+5. `MseRegistroModal.tsx` carrega edição, mas ainda não persiste atualização no backend.
+6. O projeto combina hooks reutilizáveis e implementações locais para o mesmo domínio, sem padronização completa.
+7. `normalizeListResponse` ainda não é a camada padrão de entrada para listas.
+8. Existem dependências instaladas e componentes legados não integrados ao fluxo principal.
 
-### 17.1 Por que `fetch` nativo em vez de `axios`?
+## 15. Resumo Executivo
 
-A função `fetchWithAuth` resolve todas as necessidades HTTP:
+A arquitetura atual continua baseada em uma SPA React com autenticação local, permissões granulares e uma camada principal de serviços em `api.ts`. O avanço mais relevante desde a versão anterior da documentação é a modularização do cadastro de casos em `src/pages/Cadastro/`, com schema, adapters e hook dedicados.
 
-- Injeção automática do Bearer token
-- Tratamento de erros HTTP
-- Suporte a blobs (downloads de arquivo)
-- Menos dependências na bundle
-
-### 17.2 Por que shadcn/ui em vez de MUI ou Ant Design?
-
-- Componentes headless (Radix) com acesso total ao DOM
-- Integração natural com Tailwind CSS
-- Bundle menor (tree-shaking total)
-- Acessibilidade built-in (ARIA)
-
-### 17.3 Por que não Redux/Zustand?
-
-O projeto é focado em dados de formulário e listagens. O estado é efêmero por página. `React Context` é suficiente para o estado global (Auth). Custom hooks substituem stores para lógica de negócio.
-
-### 17.4 Por que JSONB no banco de dados?
-
-O prontuário PAEFI tem dezenas de campos opcionais que variam por caso. Armazenar como JSONB (`dados_completos`) evita dezenas de colunas NULL na tabela principal, facilita a adição de novos campos sem migrations e permite queries flexíveis.
-
-### 17.5 Separação CREAS/CRAS
-
-O módulo CRAS foi planejado como **paralelo** ao CREAS, usando a mesma infraestrutura de casos (`/api/casos`) mas com `unit_id` diferente. A separação de rotas (`/cras/*`) e componentes (`Cras/`) mantém o código isolado para futuras divergências de regra de negócio.
-
----
-
-## 18. FLUXOS COMPLETOS DE DADOS
-
-### 18.1 Fluxo: Registrar Novo Prontuário PAEFI
-
-```
-/cadastro (modo criação)
-  1. useEffect → preenche tec_ref com user.nome_completo + cargo
-  2. Tab 1 desbloqueada: data_cad + tec_ref + tipo_violencia (obrigatório) + local_ocorrencia (obrigatório)
-  3. handleSubmit → POST /api/casos → { id: N }
-  4. toast.success + navigate('/cadastro/N')
-  5. Agora em modo edição, todas as tabs desbloqueadas
-  6. Usuário preenche tabs 2-5, clicando "Salvar Progresso" em cada
-     → PUT /api/casos/N  (apenas dirtyFields)
-     → CPF e NIS aplicam máscara visual (maskCPF, maskNIS de src/utils/masks.ts)
-  7. "Finalizar" → PUT + navigate('/caso/N')
-```
-
-### 18.2 Fluxo: Dashboard com Drill-Down
-
-```
-/dashboard
-  1. useEffect → getDashboardData(filters) → { dados, opcoesFiltro }
-  2. Renderiza KPIs e gráficos com dados
-  3. Usuário clica no card "Casos Reincidentes"
-  4. handleDrillDown('reincidentes', null, 'Casos Reincidentes')
-  5. Consulta CARD_FILTERS_MAP → { campo: 'reincidente', valor: 'Sim' }
-  6. getCasosFiltrados({ filtro: 'reincidente', valor: 'Sim', ...filtrosAtivos })
-     → GET /api/casos?filtro=reincidente&valor=Sim&mes=...&tecRef=...
-  7. ListaCasosModal abre com lista de casos reincidentes
-  8. Usuário clica "Ver Prontuário" → /caso/:id
-```
-
-### 18.3 Fluxo: Registrar Demanda com Caso Vinculado
-
-```
-/demandas
-  1. Clica "Registrar Nova Demanda" → abre DemandaFormModal
-  2. Preenche tipo_documento, instituicao_origem, etc.
-  3. Digita nome do caso na busca → debounce 500ms
-     → GET /api/casos?q=termo → lista de resultados
-  4. Seleciona um caso da lista → selectedCaso
-  5. useEffect detecta selectedCaso:
-     → Busca tecnico na lista allUsers pelo nome_completo dentro de tecRef
-     → Auto-preenche tecnico_designado_id
-  6. Clica "Registrar" → POST /api/demandas → toast.success
-  7. onSuccess() → fetchDemandas() → lista atualizada
-```
-
----
-
-## 19. CONVENÇÕES DE NOMENCLATURA
-
-| Elemento          | Convenção                       | Exemplo                               |
-| ----------------- | ------------------------------- | ------------------------------------- |
-| Componentes React | PascalCase                      | `CasoDetalhe`, `MseRegistroModal`     |
-| Hooks             | camelCase com `use`             | `usePermissoesSUAS`, `useCreateUser`  |
-| Funções de API    | camelCase                       | `getCasoById`, `createMseRegistro`    |
-| Interfaces        | PascalCase                      | `FiltrosCasos`, `MseRegistroBody`     |
-| Types             | PascalCase                      | `UserRole`, `MseTipo`                 |
-| Constants         | UPPER_SNAKE_CASE                | `CREAS_UNIT_ID`, `CARD_FILTERS_MAP`   |
-| Variáveis         | camelCase                       | `isLoading`, `selectedFilter`         |
-| CSS files         | kebab-case (par com componente) | `Dashboard.css`, `MapaCalor.css`      |
-| Rotas URL         | kebab-case                      | `/controle-mse`, `/painel-vigilancia` |
-
----
-
-## 20. MAPA DE DEPENDÊNCIAS ENTRE ARQUIVOS
-
-```
-App.tsx
-  ├── AuthContext.tsx
-  │     └── api.ts (login)
-  ├── ProtectedRoute.tsx
-  │     └── AuthContext.tsx
-  └── [todas as pages]
-
-Layout.tsx
-  ├── AuthContext.tsx
-  ├── usePermissoesSUAS.ts
-  │     ├── AuthContext.tsx
-  │     └── constants.ts
-  └── ui/* (shadcn)
-
-Dashboard.tsx
-  ├── api.ts
-  ├── ListaCasosModal.tsx
-  │     └── ui/dialog, table
-  └── recharts
-
-PainelVigilancia.tsx
-  ├── api.ts
-  ├── CardKPI.tsx
-  ├── MapaCalor.tsx (leaflet)
-  ├── GraficoBarras.tsx (recharts)
-  ├── GraficoPizza.tsx (recharts)
-  └── ListaCasosModal.tsx
-
-Cadastro.tsx / CrasProntuario.tsx
-  ├── react-hook-form + zod
-  ├── api.ts
-  ├── AuthContext.tsx
-  └── ui/* (shadcn)
-
-GerenciarUsuarios.tsx
-  ├── api.ts
-  ├── AuthContext.tsx
-  ├── constants.ts
-  ├── UserEditModal.tsx
-  └── ReassignCasesModal.tsx
-
-ControleMSE.tsx
-  ├── api.ts
-  ├── AuthContext.tsx
-  └── MseRegistroModal.tsx
-        ├── api.ts
-        ├── dateUtils.ts
-        └── react-hook-form + zod
-```
+Ao mesmo tempo, o frontend ainda convive com trechos legados e algumas inconsistências arquiteturais: redirecionamento inicial parcialmente obsoleto, integrações fora da camada padrão de serviços, hooks não adotados de forma uniforme e o fluxo de edição de MSE incompleto.

@@ -7,8 +7,8 @@ import { Loader2, Eye } from "lucide-react";
 interface CasoParaLista {
   id: number;
   nome?: string;
-  tecRef: string;
-  dataCad: string;
+  tec_ref: string;
+  data_cad: string;
   bairro?: string;
 }
 
@@ -21,6 +21,21 @@ interface ListaCasosModalProps {
   isLoading: boolean;
   errorMessage?: string | null;
 }
+
+const formatCaseDate = (value?: string) => {
+  if (!value) return "---";
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return `${day}/${month}/${year}`;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+};
 
 export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoading }: ListaCasosModalProps) {
   return (
@@ -65,9 +80,9 @@ export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoadi
                     <TableRow key={caso.id}>
                       <TableCell className="font-medium">{caso.id}</TableCell>
                       <TableCell>{caso.nome || '---'}</TableCell>
-                      <TableCell>{caso.tecRef}</TableCell>
+                      <TableCell>{caso.tec_ref}</TableCell>
                       <TableCell>{caso.bairro || 'Não informado'}</TableCell>
-                      <TableCell>{new Date(caso.dataCad).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
+                      <TableCell>{formatCaseDate(caso.data_cad)}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="outline" size="sm">
                           <Link to={`/caso/${caso.id}`}>

@@ -10,34 +10,34 @@ exports.shorthands = undefined;
  */
 exports.up = (pgm) => {
   pgm.sql(`
-      -- 1. GESTOR (4) e ADMIN (8): Todas as permissões
+      -- Gestor: todas as permissões
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id 
       FROM roles r, permissions p
-      WHERE r.id IN (4, 8)
+      WHERE r.name = 'gestor'
       ON CONFLICT DO NOTHING;
   
-      -- 2. COORDENADORES (3, 6): Todas as entidades (1-35), sem telas (screen.%)
+      -- Coordenadores: todas as entidades, sem telas
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id
       FROM roles r, permissions p
-      WHERE r.id IN (3, 6) 
+      WHERE r.name IN ('coordenador_creas', 'coordenador_cras')
         AND p.name NOT LIKE 'screen.%'
       ON CONFLICT DO NOTHING;
   
-      -- 3. VIGILÂNCIA (5): Somente as telas (screen.%)
+      -- Vigilância: somente telas
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id
       FROM roles r, permissions p
-      WHERE r.id = 5 
+      WHERE r.name = 'vigilancia'
         AND p.name LIKE 'screen.%'
       ON CONFLICT DO NOTHING;
   
-      -- 4. TÉCNICOS (1, 2, 7): Sem 'users.%' e sem 'screen.%'
+      -- Técnicos: sem users.* e sem telas
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id
       FROM roles r, permissions p
-      WHERE r.id IN (1, 2, 7)
+      WHERE r.name IN ('tecnico_superior', 'tecnico_medio', 'tecnico_cras')
         AND p.name NOT LIKE 'users.%'
         AND p.name NOT LIKE 'screen.%'
       ON CONFLICT DO NOTHING;
@@ -50,7 +50,19 @@ exports.up = (pgm) => {
  * @returns {Promise<void> | void}
  */
 exports.down = (pgm) => {
-  exports.down = (pgm) => {
-    pgm.sql(`DELETE FROM role_permissions;`);
-  };
+  pgm.sql(`
+    DELETE FROM role_permissions
+    WHERE role_id IN (
+      SELECT id FROM roles
+      WHERE name IN (
+        'gestor',
+        'coordenador_creas',
+        'coordenador_cras',
+        'vigilancia',
+        'tecnico_superior',
+        'tecnico_medio',
+        'tecnico_cras'
+      )
+    );
+  `);
 };

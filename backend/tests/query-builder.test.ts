@@ -156,6 +156,17 @@ describe("QueryBuilder", () => {
     expect(params).toEqual([99]);
   });
 
+  it("13.1 - applyAccessFilter() com allowNullUnit false não adiciona OR unit_id IS NULL", () => {
+    const [sql, params] = new QueryBuilder("SELECT * FROM casos")
+      .applyAccessFilter(
+        { whereClause: "casos.unit_id", params: [42] },
+        { allowNullUnit: false }
+      )
+      .build();
+    expect(sql).toBe("SELECT * FROM casos WHERE (casos.unit_id = $1)");
+    expect(params).toEqual([42]);
+  });
+
   // ─────────────────────────────────────────────────────────────────────────────
   // 14. order()
   // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +186,23 @@ describe("QueryBuilder", () => {
       .build();
     expect(sql).toBe("SELECT * FROM casos LIMIT $1 OFFSET $2");
     expect(params).toEqual([10, 20]);
+  });
+
+  it("15.1 - whereJsonEquals() monta filtro seguro em JSONB", () => {
+    const [sql, params] = new QueryBuilder("SELECT * FROM casos")
+      .whereJsonEquals("dados_completos", "bairro", "Centro", { caseInsensitive: true })
+      .build();
+    expect(sql).toBe(
+      "SELECT * FROM casos WHERE LOWER(dados_completos->>'bairro') = LOWER($1::TEXT)"
+    );
+    expect(params).toEqual(["Centro"]);
+  });
+
+  it("15.2 - applyOrdering() usa somente whitelist", () => {
+    const [sql] = new QueryBuilder("SELECT * FROM casos")
+      .applyOrdering("data_cad", "desc", { data_cad: "data_cad" })
+      .build();
+    expect(sql).toBe("SELECT * FROM casos ORDER BY data_cad DESC");
   });
 
   // ─────────────────────────────────────────────────────────────────────────────

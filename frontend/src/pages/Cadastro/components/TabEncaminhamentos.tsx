@@ -152,10 +152,10 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
         </div>
 
         <div className="space-y-2">
-          <Label>Notificação no SINAM?</Label>
+          <Label>Notificação no SINAN?</Label>
           <Controller
             control={control}
-            name="notificacaoSINAM"
+            name="notificacaoSINAN"
             render={({ field }) => (
               <Select onValueChange={field.onChange} value={field.value ?? ""}>
                 <SelectTrigger>
@@ -171,36 +171,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.notificacaoSINAM?.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="canalDenuncia">Canal de denúncia</Label>
-          <Controller
-            name="canalDenuncia"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                <SelectTrigger>
-                  <SelectValue placeholder="..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIM_NAO_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.canalDenuncia?.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="qtdAtendimentos">Qtd. de Atendimentos</Label>
-          <Controller name="qtdAtendimentos" control={control} render={({ field }) => <Input id="qtdAtendimentos" type="number" {...field} value={field.value ?? ""} />} />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.qtdAtendimentos?.message}</p>}
+          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).notificacaoSINAN?.message}</p>}
         </div>
       </div>
     </div>

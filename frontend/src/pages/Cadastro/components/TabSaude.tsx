@@ -86,29 +86,6 @@ export function TabSaude({ isEditMode }: { isEditMode: boolean }) {
             {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaudeDetalhe?.message}</p>}
           </div>
         )}
-
-        <div className="space-y-2">
-          <Label>Depende financeiramente do agressor?</Label>
-          <Controller
-            control={control}
-            name="dependeFinanceiro"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                <SelectTrigger>
-                  <SelectValue placeholder="..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIM_NAO_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.dependeFinanceiro?.message}</p>}
-        </div>
       </div>
     </div>
   );

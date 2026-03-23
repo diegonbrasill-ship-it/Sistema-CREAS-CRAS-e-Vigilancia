@@ -1,53 +1,67 @@
 // backend/src/seed.ts
 import pool from "./db";
+import bcrypt from "bcryptjs";
 
-const UNIDADES_DISPONIVEIS = [
-    { id: 1, name: 'CREAS', type: 'CREAS' },
-    { id: 2, name: 'CRAS Geralda Medeiros', type: 'CRAS' },
-    { id: 3, name: 'CRAS Mariana Alves', type: 'CRAS' },
-    { id: 4, name: 'CRAS Matheus Leitão', type: 'CRAS' },
-    { id: 5, name: 'CRAS Severina Celestino', type: 'CRAS' },
-    { id: 6, name: 'Vigilancia SocioAssistencial', type: 'Vigilancia' },
-    { id: 7, name: 'Centro POP', type: 'Centro POP' },
-    { id: 8, name: 'Conselho Tutelar Norte', type: 'Conselho Tutelar' },
-];
-
-const PROFILE_OPTIONS = [
-    { name: "tecnico_superior", description: "Técnico de Nível Superior" },
-    { name: "tecnico_medio", description: "Técnico de Nível Médio" },
-    { name: "coordenador", description: "Coordenador(a) CREAS" },
-    { name: "gestor", description: "Secretário(a) / Gestor Geral" },
-    { name: "vigilancia", description: "Vigilância Socioassistencial" },
-    { name: "coordenador_cras", description: "Coordenador(a) CRAS" },
-    { name: "tecnico_cras", description: "Técnico(a) CRAS" },
-];
+const TEST_MANAGER_ACCOUNT = {
+    username: "admin",
+    password: "admin",
+    role: "gestor",
+    nome_completo: "admin",
+    cargo: "Gestor",
+    unit_id: 1,
+};
 
 async function seed() {
     const client = await pool.connect();
     try {
-        console.log("🌱 Iniciando o seed de dados...");
+        console.log("🌱 Iniciando seed do usuário admin de teste...");
 
-        // 1. Inserindo Unidades
-        for (const unidade of UNIDADES_DISPONIVEIS) {
-            await client.query(`
-        INSERT INTO unidades (id, name, type)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (id) DO UPDATE 
-        SET name = EXCLUDED.name, type = EXCLUDED.type
-      `, [unidade.id, unidade.name, unidade.type]);
-        }
-        console.log("✅ Unidades inseridas/atualizadas.");
+        const gestorRoleResult = await client.query<{ id: number }>(`
+            SELECT id
+            FROM roles
+            WHERE name = $1
+            LIMIT 1
+        `, [TEST_MANAGER_ACCOUNT.role]);
 
-        // 2. Inserindo Roles (Cargos/Perfis)
-        for (const role of PROFILE_OPTIONS) {
-            await client.query(`
-        INSERT INTO roles (name, description)
-        VALUES ($1, $2)
-        ON CONFLICT (name) DO UPDATE 
-        SET description = EXCLUDED.description
-      `, [role.name, role.description]);
+        if (gestorRoleResult.rowCount === 0) {
+            throw new Error("Role 'gestor' não encontrada. Rode as migrations antes da seed.");
         }
-        console.log("✅ Cargos (roles) inseridos/atualizados.");
+
+        const passwordHash = await bcrypt.hash(TEST_MANAGER_ACCOUNT.password, 10);
+        const gestorRoleId = gestorRoleResult.rows[0].id;
+
+        await client.query(`
+            INSERT INTO users (
+                username,
+                password_hash,
+                nome_completo,
+                cargo,
+                role,
+                is_active,
+                unit_id,
+                role_id,
+                deleted_at
+            )
+            VALUES ($1, $2, $3, $4, $5, true, $6, $7, NULL)
+            ON CONFLICT (username) DO UPDATE SET
+                password_hash = EXCLUDED.password_hash,
+                nome_completo = EXCLUDED.nome_completo,
+                cargo = EXCLUDED.cargo,
+                role = EXCLUDED.role,
+                is_active = EXCLUDED.is_active,
+                unit_id = EXCLUDED.unit_id,
+                role_id = EXCLUDED.role_id,
+                deleted_at = EXCLUDED.deleted_at
+        `, [
+            TEST_MANAGER_ACCOUNT.username,
+            passwordHash,
+            TEST_MANAGER_ACCOUNT.nome_completo,
+            TEST_MANAGER_ACCOUNT.cargo,
+            TEST_MANAGER_ACCOUNT.role,
+            TEST_MANAGER_ACCOUNT.unit_id,
+            gestorRoleId,
+        ]);
+        console.log("✅ Usuário admin de teste inserido/atualizado.");
 
         console.log("🚀 Seed finalizado com sucesso!");
     } catch (err) {

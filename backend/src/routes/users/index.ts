@@ -11,6 +11,6 @@ const router = Router();
 router.use(authMiddleware, unitAccessMiddleware('users', 'unit_id'));
 router.get('/', UsersController.list);
 router.post('/', checkRole(['Coordenador', 'coordenador_creas', 'gestor', 'coordenador_cras']), UsersController.create);
-router.put('/:id', checkRole(['coordenador', 'gestor']), checkUserUnitAccess, UsersController.update);
+router.put('/:id', checkRole(['coordenador_creas', 'gestor']), checkUserUnitAccess, UsersController.update);
 
 export default router;

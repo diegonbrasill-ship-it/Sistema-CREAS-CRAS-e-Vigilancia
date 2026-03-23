@@ -23,8 +23,8 @@ export function useCadastroForm() {
     defaultValues: {
       data_cad: new Date().toISOString().split("T")[0],
       tec_ref: "",
-      tipo_violencia: "",
-      local_ocorrencia: "",
+      tipoViolencia: "" as any,
+      canalDenuncia: "" as any,
     },
   });
 

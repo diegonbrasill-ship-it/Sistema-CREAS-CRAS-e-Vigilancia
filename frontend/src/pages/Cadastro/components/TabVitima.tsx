@@ -7,13 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { maskCPF, maskNIS } from "@/utils/masks";
 import type { CasoForm } from "../schema";
-import { COR_ETNIA_OPTIONS, ESCOLARIDADE_OPTIONS, SEXO_OPTIONS } from "../options";
+import { ESCOLARIDADE_OPTIONS, RACA_COR_OPTIONS, SEXO_OPTIONS } from "../options";
 
 export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
   const {
     control,
+    watch,
     formState: { errors },
   } = useFormContext<CasoForm>();
+
+  const bairro = watch("bairro");
+  const racaCor = watch("racaCor");
 
   return (
     <div className="space-y-6">
@@ -99,18 +103,18 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
         </div>
 
         <div className="space-y-2">
-          <Label>Cor/Etnia</Label>
+          <Label>Raça/Cor</Label>
           {!isEditMode && <p className="text-xs text-muted-foreground">Opcional. Se preferir, deixe em branco.</p>}
           <Controller
             control={control}
-            name="corEtnia"
+            name="racaCor"
             render={({ field }) => (
               <Select onValueChange={field.onChange} value={field.value ?? ""}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {COR_ETNIA_OPTIONS.map((opt) => (
+                  {RACA_COR_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -119,8 +123,20 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.corEtnia?.message}</p>}
+          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).racaCor?.message}</p>}
         </div>
+
+        {racaCor === "INDIGENA" && (
+          <div className="space-y-2">
+            <Label htmlFor="etniaIndigena">Etnia indígena</Label>
+            <Controller
+              name="etniaIndigena"
+              control={control}
+              render={({ field }) => <Input id="etniaIndigena" {...field} value={field.value ?? ""} />}
+            />
+            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).etniaIndigena?.message}</p>}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Escolaridade</Label>
@@ -150,6 +166,18 @@ export function TabVitima({ isEditMode }: { isEditMode: boolean }) {
           <Controller name="bairro" control={control} render={({ field }) => <Input id="bairro" {...field} value={field.value ?? ""} />} />
           {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.bairro?.message}</p>}
         </div>
+
+        {bairro?.trim() && (
+          <div className="space-y-2">
+            <Label htmlFor="macroRegiao">MacroRegiao</Label>
+            <Controller
+              name="macroRegiao"
+              control={control}
+              render={({ field }) => <Input id="macroRegiao" {...field} value={field.value ?? ""} />}
+            />
+            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).macroRegiao?.message}</p>}
+          </div>
+        )}
       </div>
     </div>
   );

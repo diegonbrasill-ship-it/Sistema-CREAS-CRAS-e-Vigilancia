@@ -9,21 +9,19 @@ export const SIM_NAO_OPTIONS: Option[] = [
   { value: "Não", label: "Não" },
 ];
 
-// --- Vítima (legado / PR-3) ---
-export const SEXO_OPTIONS: Option[] = [
-  { value: "Masculino", label: "Masculino" },
-  { value: "Feminino", label: "Feminino" },
-];
-
-export const COR_ETNIA_OPTIONS: Option[] = [
-  { value: "Branca", label: "Branca" },
-  { value: "Preta", label: "Preta" },
-  { value: "Parda", label: "Parda" },
-];
-
 export const ESCOLARIDADE_OPTIONS: Option[] = [
-  { value: "Fundamental Incompleto", label: "Fundamental Incompleto" },
-  { value: "Fundamental Completo", label: "Fundamental Completo" },
+  { value: "SEM_IDADE_ESCOLAR", label: "Sem idade escolar" },
+  { value: "EJA", label: "EJA" },
+  { value: "FUNDAMENTAL_1_INCOMPLETO", label: "Fundamental I incompleto" },
+  { value: "FUNDAMENTAL_1_COMPLETO", label: "Fundamental I completo" },
+  { value: "FUNDAMENTAL_2_INCOMPLETO", label: "Fundamental II incompleto" },
+  { value: "FUNDAMENTAL_2_COMPLETO", label: "Fundamental II completo" },
+  { value: "ENSINO_MEDIO_INCOMPLETO", label: "Ensino médio incompleto" },
+  { value: "ENSINO_MEDIO_COMPLETO", label: "Ensino médio completo" },
+  { value: "TECNICO_INCOMPLETO", label: "Técnico incompleto" },
+  { value: "TECNICO_COMPLETO", label: "Técnico completo" },
+  { value: "SUPERIOR_INCOMPLETO", label: "Superior incompleto" },
+  { value: "SUPERIOR_COMPLETO", label: "Superior completo" },
 ];
 
 // --- Encaminhamentos (PR-3) ---
@@ -39,17 +37,6 @@ export const CONFIRMACAO_VIOLENCIA_OPTIONS: Option[] = [
   { value: "Não confirmada", label: "Não confirmada" },
 ];
 
-export const TIPO_VIOLENCIA_FORM_OPTIONS: Option[] = [
-  { value: "Física", label: "Física" },
-  { value: "Psicológica", label: "Psicológica" },
-  { value: "Sexual", label: "Sexual" },
-];
-
-// -------------------
-// PR-4 — Contrato canônico (novos blocos)
-// -------------------
-
-// Violência canônica
 export const TIPO_VIOLENCIA_OPTIONS: Option[] = [
   { value: "FISICA", label: "Física" },
   { value: "PSICOLOGICA", label: "Psicológica" },
@@ -60,34 +47,51 @@ export const TIPO_VIOLENCIA_OPTIONS: Option[] = [
 
 export const TIPO_VIOLENCIA_DESCRICOES_MAP: Record<string, Option[]> = {
   FISICA: [
-    { value: "EMPURRAO", label: "Empurrão" },
-    { value: "SOCOS", label: "Socos" },
+    { value: "ESPANCAMENTO", label: "Espancamento" },
+    { value: "SACUDIDAS", label: "Sacudidas" },
     { value: "CHUTES", label: "Chutes" },
+    { value: "BOFETADAS", label: "Bofetadas" },
     { value: "QUEIMADURAS", label: "Queimaduras" },
-    { value: "OUTROS", label: "Outros" },
+    { value: "EMPURROES", label: "Empurroes" },
+    { value: "ARREMESSO_DE_OBJETOS", label: "Arremesso de objetos" },
+    { value: "LESOES_COM_ARMAS", label: "Lesoes com armas" },
+    { value: "OFENSA_A_INTEGRIDADE_CORPORAL", label: "Ofensa a integridade corporal" },
   ],
   PSICOLOGICA: [
-    { value: "AMEACAS", label: "Ameaças" },
-    { value: "HUMILHACOES", label: "Humilhações" },
+    { value: "AMEACA", label: "Ameaca" },
+    { value: "HUMILHACAO", label: "Humilhacao" },
     { value: "ISOLAMENTO", label: "Isolamento" },
-    { value: "OUTROS", label: "Outros" },
+    { value: "VIGILANCIA_CONSTANTE", label: "Vigilancia constante" },
+    { value: "PERSEGUICAO", label: "Perseguicao" },
+    { value: "INSULTO", label: "Insulto" },
+    { value: "CHANTAGEM", label: "Chantagem" },
+    { value: "RIDICULARIZACAO", label: "Ridicularizacao" },
+    { value: "LIMITACAO_DE_IR_E_VIR", label: "Limitacao de ir e vir" },
+    { value: "DANO_EMOCIONAL", label: "Dano emocional" },
   ],
   SEXUAL: [
     { value: "ESTUPRO", label: "Estupro" },
-    { value: "ASSDIO", label: "Assédio" },
-    { value: "EXPLORACAO", label: "Exploração" },
-    { value: "OUTROS", label: "Outros" },
+    { value: "COACAO_SEXUAL", label: "Coacao sexual" },
+    { value: "IMPEDIR_USO_DE_CONTRACEPTIVO", label: "Impedir uso de contraceptivo" },
+    { value: "FORCAR_ABORTO", label: "Forcar aborto" },
+    { value: "FORCAR_MATRIMONIO", label: "Forcar matrimonio" },
+    { value: "PROSTITUICAO_FORCADA", label: "Prostituicao forcada" },
+    { value: "GRAVIDEZ_NAO_DESEJADA", label: "Gravidez nao desejada" },
   ],
   PATRIMONIAL: [
-    { value: "DESTRUICAO_BENS", label: "Destruição de bens" },
-    { value: "RETENCAO_RECURSOS", label: "Retenção de recursos" },
-    { value: "OUTROS", label: "Outros" },
+    { value: "RETENCAO_DE_DOCUMENTOS", label: "Retencao de documentos" },
+    { value: "SUBTRACAO_DE_BENS", label: "Subtracao de bens" },
+    { value: "DESTRUICAO_DE_FERRAMENTAS", label: "Destruicao de ferramentas" },
+    { value: "CONTROLE_DE_SALARIO", label: "Controle de salario" },
+    { value: "QUEBRA_DE_CELULAR", label: "Quebra de celular" },
+    { value: "DANO_PATRIMONIAL", label: "Dano patrimonial" },
   ],
   MORAL: [
     { value: "CALUNIA", label: "Calúnia" },
-    { value: "DIFAMACAO", label: "Difamação" },
-    { value: "INJURIA", label: "Injúria" },
-    { value: "OUTROS", label: "Outros" },
+    { value: "DIFAMACAO", label: "Difamacao" },
+    { value: "INJURIA", label: "Injuria" },
+    { value: "EXPOSICAO_DE_INTIMIDADE", label: "Exposicao de intimidade" },
+    { value: "MENTIRAS_PUBLICAS", label: "Mentiras publicas" },
   ],
 };
 
@@ -102,7 +106,6 @@ export const CANAL_ORIGEM_OPTIONS: Option[] = [
   { value: "OUTROS", label: "Outros" },
 ];
 
-// Raça/cor canônico (mantém corEtnia legado via adapter)
 export const RACA_COR_OPTIONS: Option[] = [
   { value: "BRANCA", label: "Branca" },
   { value: "PRETA", label: "Preta" },
@@ -112,8 +115,7 @@ export const RACA_COR_OPTIONS: Option[] = [
   { value: "NAO_DECLARADO", label: "Não declarado" },
 ];
 
-// Campos sensíveis (canônico)
-export const SEXO_CANON_OPTIONS: Option[] = [
+export const SEXO_OPTIONS: Option[] = [
   { value: "MASCULINO", label: "Masculino" },
   { value: "FEMININO", label: "Feminino" },
   { value: "INTERSEXO", label: "Intersexo" },

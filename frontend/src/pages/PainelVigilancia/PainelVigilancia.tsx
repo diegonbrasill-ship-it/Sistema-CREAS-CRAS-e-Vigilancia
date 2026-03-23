@@ -19,8 +19,9 @@ import {
   getVigilanciaFontesAcionamento, 
   getVigilanciaTaxaReincidencia,
   getVigilanciaPerfilViolacoes, 
-  getCasosFiltrados
+  listCasosCanonicos
 } from '../../services/api'; 
+import { buildCasosDrilldownParams } from '../../services/casosDrilldown';
 
 import './PainelVigilancia.css';
 
@@ -44,27 +45,10 @@ interface PainelData {
 interface CasoParaLista {
   id: number;
   nome?: string;
-  tecRef: string;
-  dataCad: string;
+  tec_ref: string;
+  data_cad: string;
   bairro?: string;
 }
-
-// ⭐️ MAPA DE FILTROS PARA VIGILÂNCIA ⭐️
-const VIGILANCIA_FILTERS_MAP: { [key: string]: { campo: string, valor?: string } | null } = {
-    // KPI's de Acesso
-    'total_ativos': { campo: 'status', valor: 'Ativo' }, 
-    'novos_no_mes': { campo: 'mes', valor: new Date().toISOString().substring(0, 7) }, 
-    'reincidentes': { campo: 'reincidente', valor: 'Sim' }, 
-    
-    // Filtros de Gráfico
-    'por_bairro': { campo: 'bairro' }, 
-    'por_canal': { campo: 'canalDenuncia' }, 
-    'por_violencia': { campo: 'tipoViolencia' }, 
-    
-    // Casos Específicos
-    'casos_novos_30d': { campo: 'dataCad', valor: 'ultimos_30_dias' }, 
-};
-
 
 const PainelVigilancia: React.FC = () => {
     const [painelData, setPainelData] = useState<PainelData | null>(null);
@@ -113,29 +97,20 @@ const PainelVigilancia: React.FC = () => {
         fetchAllPainelData();
     }, []);
 
-    // LÓGICA CORRIGIDA PARA TRADUÇÃO DE FILTROS E CHAMADA DA API
     const handleDrillDown = async (action: string, valor: string | null = null, title: string) => {
         setModalError(null); 
         setModalTitle(title);
         setIsModalOpen(true);
         setIsModalLoading(true);
         setModalCases([]);
-        
-        const map = VIGILANCIA_FILTERS_MAP[action];
-        let filtroParam: string | undefined = undefined;
-        let valorParam: string | undefined = undefined;
-
-        if (map) {
-            filtroParam = map.campo;
-            valorParam = map.valor || valor || undefined;
-        } else {
-             filtroParam = action;
-             valorParam = valor || undefined;
-        }
 
         try {
-            // ✅ CORRIGIDO: Passando a 'origem' para que o api.ts chame o endpoint correto
-            const data = await getCasosFiltrados({ filtro: filtroParam, valor: valorParam, origem: 'vigilancia' });
+            const params = buildCasosDrilldownParams({
+                source: 'vigilancia',
+                action,
+                value: valor,
+            });
+            const data = await listCasosCanonicos(params);
             setModalCases(data);
         } catch (err: any) {
             setModalError("Seu perfil não tem permissão para visualizar esta lista detalhada.");

@@ -262,6 +262,42 @@ Notas:
 
 ---
 
+### ✅ PR-2 — CONCLUÍDO (Convergência de contrato)
+
+> Data: 2026-03-22
+
+- Leitura canônico-first + fallback para legado em `src/pages/Cadastro/adapters.ts`.
+- Escrita canônico-first + dual-write/aliases para `tipoViolencia`/`tipo_violencia`, `localOcorrencia`/`local_ocorrencia` e alias `dataCad`.
+- `tec_ref` autoritativo no FE via `useCadastroForm.ts` (preferindo `tecRefFromAuth`).
+- Compilação validada (sem erros).
+
+---
+
+### ✅ PR-3 — CONCLUÍDO (Qualidade de dados)
+
+> Data: 2026-03-22
+
+- Fonte única de opções em `src/pages/Cadastro/options.ts`.
+- `schema.ts` com enums Zod (campos já controlados via `Select`) e regras de consistência.
+- Tabs migradas para options + microcopy (vitima/encaminhamentos) e normalização no adapter (`normalizeSimNao`, `normalizeText`).
+- Padronização de valores inconsistentes (ex.: "Não" vs "NÃO").
+
+---
+
+### ✅ PR-4 — CONCLUÍDO (Ampliação de modelagem — dedicado)
+
+> Data: 2026-03-22
+
+- Novos enums/blocos (origem estruturada, violência detalhada, raça/cor/etnia, agressor, moradia, campos sensíveis) adicionados em `schema.ts` e `options.ts`.
+- Novas abas implementadas e integradas no container: `TabAgressor.tsx` e `TabMoradia.tsx`.
+- `adapters.ts` atualizado para leitura/escrita canônico-first com compat:
+  - `canalOrigem` ⇄ `canalDenuncia`
+  - `racaCor` ⇄ `corEtnia` (mapeamento seguro)
+  - normalização de textos/arrays/sim-não
+- Build validado.
+
+---
+
 ## 4) Checklist de validação (regressão zero)
 
 ### 4.1 Fluxos principais
@@ -302,243 +338,25 @@ Notas:
 
 ### PR-2: Convergência de contrato (gradual e segura)
 
+> ✅ **Executado neste ciclo** (ver seção "PR-2 — CONCLUÍDO" acima). Mantido aqui como referência histórica do plano.
+
 **Objetivo:** convergir para um contrato canônico em `dados_completos` (ex.: `tipoViolencia`) sem quebrar Painel/Consulta/Vigilância e sem perder compatibilidade com dados legados.
-
-#### 2.1 Escopo (o que muda)
-
-1. **Definir contrato canônico mínimo** (primeira leva)
-
-   - `tipoViolencia` (canônico) — manter `tipo_violencia` como legado/alias
-   - `localOcorrencia` (canônico) — manter `local_ocorrencia` como legado/alias
-   - `dataCad` (alias/entrada de filtro) — manter `data_cad` como campo top-level (persistência)
-
-2. **Leitura em todo o app passa a “preferir canônico”**
-
-   - Onde houver leitura de `dados_completos` para analytics/filtros, priorizar `tipoViolencia` e cair para `tipo_violencia`.
-
-3. **Reforçar `tec_ref` autoritativo**
-   - Front-end: manter `tec_ref` read-only (já está desabilitado na edição).
-   - Back-end (recomendado): sobrescrever `tec_ref` pelo usuário logado (se ainda não faz).
-
-#### 2.2 Passo a passo de execução
-
-1. **Padronizar os nomes canônicos em um único lugar**
-
-   - Criar/atualizar constantes em `src/pages/Cadastro/adapters.ts` (ex.: `CANON = { tipoViolencia: 'tipoViolencia', ... }`).
-
-2. **Atualizar o adapter de escrita para “canônico-first”**
-
-   - Em `formValuesToCreatePayload`:
-     - escrever `tipoViolencia` como chave principal no objeto persistido (quando você decidir virar a chave)
-     - manter `tipo_violencia` como alias (por um período)
-   - Em `formValuesToUpdatePayload`:
-     - quando `tipo_violencia` vier no patch, escrever também `tipoViolencia`
-     - quando `tipoViolencia` vier no patch (futuro), manter `tipo_violencia` por compat
-
-3. **Atualizar consumidores (Painel/Consulta/Dashboard) para ler canônico**
-
-   - Painel Vigilância já filtra por `tipoViolencia` → garantir que:
-     - o backend / endpoint `/api/vigilancia/casos-filtrados` entenda `tipoViolencia`
-     - e, durante migração, também aceite `tipo_violencia` se o filtro vier legado
-   - Consulta:
-     - manter os filtros `por_violencia`/`por_bairro` como estão (contrato é do backend)
-     - validar se o backend está usando `tipoViolencia` no filtro interno; se não, compatibilizar.
-   - Dashboard:
-     - validar que agregações de violência/canal usam a chave esperada (e aceitar legado enquanto houver).
-
-4. **Backfill/migração (opcional, mas recomendado)**
-   - Se existir base legada com `tipo_violencia`, planejar:
-     - job/script no backend para copiar `tipo_violencia` → `tipoViolencia` quando ausente
-     - manter ambos por 1-2 ciclos e depois remover legado.
-
-#### 2.3 Critérios de aceite do PR-2
-
-- Painel Vigilância continua filtrando por `tipoViolencia` e encontra casos novos e antigos.
-- Edição de caso não perde dados (reset/populate ok).
-- Dados legados (`tipo_violencia`) continuam visíveis/consultáveis.
 
 ---
 
 ### PR-3: Qualidade de dados
 
+> ✅ **Executado neste ciclo** (ver seção "PR-3 — CONCLUÍDO" acima). Mantido aqui como referência histórica do plano.
+
 **Objetivo:** reduzir dispersão de valores (melhorando filtros/relatórios) e melhorar UX de campos sensíveis, sem reintroduzir acoplamento no container.
-
-#### 3.1 Escopo (primeira leva, controlada)
-
-1. **Enums/listas controladas** (no frontend)
-
-   - Transformar campos texto/soltos em `Select` com opções canônicas (onde aplicável):
-     - `canalDenuncia` (já é texto; virar lista controlada ou pelo menos sugerida)
-     - `bairro` (ideal: lista canônica, com fallback “Outro”)
-     - normalização de valores inconsistentes (ex.: `Não` vs `NÃO`)
-
-2. **Normalização no adapter**
-
-   - Em `formValuesToCreatePayload` e `formValuesToUpdatePayload`:
-     - normalizar outputs (`trim`, padronizar `Sim/Não`, remover duplicidades)
-
-3. **UX/microcopy para dados sensíveis**
-   - Inserir textos de apoio (exibição) para:
-     - sexo/cor/etnia/violência (evitar coerção, permitir “não informar” se aplicável)
-   - Garantir comportamento consistente com validação Zod (se campo for opcional, não forçar).
-
-#### 3.2 Passo a passo de execução
-
-1. Criar arquivo de constantes de opções (recomendado)
-
-   - `src/pages/Cadastro/options.ts` (ou dentro de `schema.ts`) contendo arrays de options para selects.
-
-2. Atualizar `schema.ts` para enums Zod onde já for seguro
-
-   - Começar por campos que já são selecionados via `Select` (baixo risco).
-
-3. Atualizar as Tabs para usar essas options
-
-   - Sem lógica de payload na UI.
-
-4. Atualizar adapters para padronizar valores
-   - Ex.: mapear `"NÃO"` → `"Não"` (ou vice-versa) de forma única.
-
-#### 3.3 Critérios de aceite do PR-3
-
-- Novos registros passam a gravar valores mais consistentes.
-- Filtros/indicadores continuam funcionando (sem regressão).
-- Campos sensíveis não ficam mais “obrigatórios por acidente” (Zod/UI coerentes).
 
 ---
 
 ### PR-4: Ampliação de modelagem (enums + novos blocos) — **dedicado**
 
+> ✅ **Executado neste ciclo** (ver seção "PR-4 — CONCLUÍDO" acima). Mantido aqui como referência histórica do plano.
+
 **Objetivo:** implementar a “ampliação grande” de modelagem proposta em `docs/refatorar_cadastro.md` (enums fechados e novos campos/blocos: violência detalhada, origem estruturada, raça/cor/etnia, moradia, agressor, sexo/orientação/identidade etc.), **sem degradar edição/criação**, e com transição compatível (aliases + backfill opcional).
-
-> Por que PR-4 separado: este escopo altera o contrato “clínico/estatístico” e tende a impactar dashboards/relatórios/backend. Separar reduz risco e facilita rollback.
-
-#### 4.1 Regras (não-negociáveis)
-
-1. **Adapters continuam sendo a única ponte** entre Form ⇄ API.
-   - UI/Tabs não fazem `snake_case/camelCase`, não fazem alias e não “achatem” `dados_completos`.
-2. **Não quebrar consumidores atuais**:
-   - durante a transição, manter chaves legadas que Painel/Consulta/Dashboard esperam.
-3. **Compatibilidade de leitura:** sempre `coalesce` (canônico → legado) ao popular formulário e ao montar views/analytics.
-4. **Compatibilidade de escrita (dual-write controlado):** ao salvar, escrever:
-   - chave canônica **e** (quando aplicável) chave legado/alias, aproveitando que o backend tolera `additionalProperties`.
-5. **Campos sensíveis**: se opcionais, não podem virar obrigatórios por acidente (UI + Zod alinhados).
-
-#### 4.2 Escopo (o que entra no PR-4)
-
-Baseado no contrato/modelagem de `docs/refatorar_cadastro.md`:
-
-1. **Enums fechados (Zod) + options canônicas (UI)**
-
-   - `escolaridade`, `racaCor`, `inseridoPAEFI`, `sexo`, `orientacaoSexual`, `identidadeGenero`
-   - `tipoViolencia` + `tipoViolenciaDescricoes[]` (subtipos por tipo)
-   - `canalOrigem` (canônico) e manutenção de `canalDenuncia` (legado) como alias
-   - `vinculoAgressor`, `coabitaComAgressor`, `faixaEtariaAgressor`, `sexoAgressor`
-   - `tipoResidencia`, `formaOcupacao`, `materialConstrucao`
-
-2. **Novos campos/blocos no formulário (com UX e condicionais)**
-
-   - Origem estruturada: `dataDenuncia`, `protocolo`, `especificacaoOutroCanal`
-   - Raça/cor e etnia: `etniaIndigena` condicional quando `racaCor = INDIGENA`
-   - Violência detalhada: `tipoViolenciaDescricoes` com reset ao trocar `tipoViolencia`
-   - Moradia: regras para `SITUACAO_DE_RUA` e `ALUGADA` (ex.: `valorAluguel`)
-   - Agressor: `vinculoAgressor` + `especificacaoOutroVinculo` condicional
-
-3. **Armazenamento/persistência (compatível)**
-   - Persistir novos campos dentro de `dados_completos` (flat), conforme premissa do doc.
-   - Manter aliases legados, quando houver consumo no app (principalmente em filtros/analytics).
-
-#### 4.3 Passo a passo de execução (sugestão de sequência)
-
-1. **Alinhar contrato com backend (antes de codar UI)**
-
-   - Confirmar se o backend:
-     - validará/enforçará enums ou apenas armazenará JSONB.
-     - já filtra por `tipoViolencia`/`bairro`/`canalDenuncia` em endpoints de vigilância.
-   - Decidir política de migração:
-     - (A) **dual-write** por 1–2 ciclos + backfill opcional
-     - (B) canônico-first imediato (mais risco)
-
-2. **Criar arquivo único de options/enums (fonte de verdade do FE)**
-
-   - Criar `src/pages/Cadastro/options.ts` contendo:
-     - arrays `{ value, label }` para selects
-     - mapas de subtipos por `tipoViolencia` (para `tipoViolenciaDescricoes`)
-
-3. **Atualizar `src/pages/Cadastro/schema.ts`**
-
-   - Promover campos de texto para `z.enum([...])` onde aplicável.
-   - Adicionar campos novos com defaults coerentes.
-   - Implementar regras condicionais com `superRefine`:
-     - `canalOrigem = OUTROS` → exige `especificacaoOutroCanal`
-     - `vinculoAgressor = OUTROS` → exige `especificacaoOutroVinculo`
-     - `racaCor = INDIGENA` → habilita/exige (se decidido) `etniaIndigena`
-     - `tipoResidencia = SITUACAO_DE_RUA` → força `formaOcupacao/materialConstrucao/valorAluguel` para `null`
-     - `formaOcupacao = ALUGADA` → habilita `valorAluguel` (opcional ou obrigatório conforme regra definida)
-     - `tipoViolencia` → valida `tipoViolenciaDescricoes` dentro da lista permitida
-
-4. **Atualizar `src/pages/Cadastro/adapters.ts` (compat + dual-write)**
-
-   - Leitura (`caseToFormValues`):
-     - coalesce de:
-       - `tipoViolencia` ⇄ `tipo_violencia`
-       - `localOcorrencia` ⇄ `local_ocorrencia`
-       - `canalOrigem` ⇄ `canalDenuncia` (ou manter ambos no form, conforme UX)
-     - garantir defaults: arrays `[]`, enums `null`, strings vazias → `null` quando apropriado.
-   - Escrita (`formValuesToCreatePayload` / `formValuesToUpdatePayload`):
-     - escrever canônico em `dados_completos`
-     - escrever alias legado quando existir consumidor atual
-     - normalizar valores (trim/upper/lower conforme escolhido)
-
-5. **Atualizar as Tabs (UI) para os novos campos**
-
-   - Usar `Select`/componentes do padrão shadcn já existente.
-   - Manter UX de opt-out em campos sensíveis (opções “Prefiro não informar” quando aplicável).
-   - Implementar reset/limpeza ao trocar controladores:
-     - troca de `tipoViolencia` → limpar `tipoViolenciaDescricoes`
-     - `canalOrigem` != OUTROS → limpar `especificacaoOutroCanal`
-     - `vinculoAgressor` != OUTROS → limpar `especificacaoOutroVinculo`
-     - `tipoResidencia = SITUACAO_DE_RUA` → limpar campos de moradia
-
-6. **Atualizar consumidores internos (somente leituras, sem quebrar compat)**
-
-   - Onde houver leitura de `dados_completos` em telas/relatórios, preferir canônico e cair para legado.
-   - Não remover suporte a legado até terminar backfill e estabilizar.
-
-7. **Plano de migração/backfill (se aplicável)**
-   - Backfill no backend para preencher canônico quando ausente (ex.: `tipo_violencia` → `tipoViolencia`).
-   - Janela de convivência (1–2 ciclos): manter ambos.
-   - Depois, PR posterior pode remover legado (fora do PR-4).
-
-#### 4.4 Checklist de validação (PR-4)
-
-1. **Criar caso**
-
-   - Salva com sucesso
-   - Persistência inclui campos novos em `dados_completos`
-   - Persistência inclui aliases legados necessários (quando aplicável)
-
-2. **Editar caso (legado)**
-
-   - Caso antigo (com `tipo_violencia`) abre e popula corretamente
-   - Ao salvar, não perde dados antigos e passa a preencher canônico
-
-3. **Painel Vigilância / Consulta / Dashboard**
-
-   - Casos novos continuam aparecendo
-   - Filtros por `bairro`, `canalDenuncia` e `tipoViolencia` continuam funcionando
-
-4. **Campos condicionais**
-   - `OUTROS` exige especificação correspondente
-   - Moradia `SITUACAO_DE_RUA` zera campos dependentes
-   - `ALUGADA` (se regra) habilita/valida `valorAluguel`
-
-#### 4.5 Critérios de aceite do PR-4
-
-- Formulário suporta os novos enums/campos sem regressão do fluxo atual.
-- `adapters.ts` garante compatibilidade (leitura e escrita) entre canônico e legado.
-- Casos legados continuam editáveis e consultáveis.
-- Painel/Consulta/Vigilância não quebram e continuam filtrando corretamente.
 
 ---
 

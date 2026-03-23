@@ -10,7 +10,6 @@ import {
   CANAL_ORIGEM_OPTIONS,
   TIPO_VIOLENCIA_DESCRICOES_MAP,
   TIPO_VIOLENCIA_OPTIONS,
-  TIPO_VIOLENCIA_FORM_OPTIONS,
 } from "../options";
 
 export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
@@ -22,7 +21,7 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
     formState: { errors },
   } = useFormContext<CasoForm>();
 
-  const canalOrigemValue = watch("canalOrigem");
+  const canalDenunciaValue = watch("canalDenuncia");
   const tipoViolenciaValue = watch("tipoViolencia");
   const tipoViolenciaDescricoes = watch("tipoViolenciaDescricoes") ?? [];
 
@@ -31,17 +30,6 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
   const handleTipoViolenciaChange = (v: string) => {
     setValue("tipoViolencia", v as any, { shouldDirty: true });
     setValue("tipoViolenciaDescricoes", [] as any, { shouldDirty: true });
-
-    // compat: manter campo legado também preenchido com label amigável (sem mudar UX atual)
-    const legacyMatch = TIPO_VIOLENCIA_FORM_OPTIONS.find((o) => {
-      if (v === "FISICA") return o.value === "Física";
-      if (v === "PSICOLOGICA") return o.value === "Psicológica";
-      if (v === "SEXUAL") return o.value === "Sexual";
-      if (v === "PATRIMONIAL") return false;
-      if (v === "MORAL") return false;
-      return false;
-    });
-    if (legacyMatch) setValue("tipo_violencia", legacyMatch.value as any, { shouldDirty: true });
   };
 
   const toggleDescricao = (value: string) => {
@@ -59,7 +47,7 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
       <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
         <div className="space-y-2">
           <Label htmlFor="data_cad">Data do Cadastro</Label>
-          <Input id="data_cad" type="date" {...register("data_cad")} />
+          <Input id="data_cad" type="date" {...register("data_cad")} disabled={isEditMode} />
           <p className="text-sm text-red-500 mt-1 h-4">{errors.data_cad?.message}</p>
         </div>
 
@@ -70,42 +58,9 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
         </div>
       </div>
 
-      {/* Legado (mantido) */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label>Tipo de Violência (legado)</Label>
-          <Controller
-            control={control}
-            name="tipo_violencia"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPO_VIOLENCIA_FORM_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          <p className="text-sm text-red-500 mt-1 h-4">{errors.tipo_violencia?.message}</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="local_ocorrencia">Local da Ocorrência</Label>
-          <Controller name="local_ocorrencia" control={control} render={({ field }) => <Input id="local_ocorrencia" {...field} value={field.value ?? ""} />} />
-          <p className="text-sm text-red-500 mt-1 h-4">{errors.local_ocorrencia?.message}</p>
-        </div>
-      </div>
-
-      {/* PR-4: canônico */}
       <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
         <div className="space-y-2">
-          <Label>Tipo de Violência (canônico)</Label>
+          <Label>Tipo de Violência</Label>
           <Controller
             control={control}
             name="tipoViolencia"
@@ -124,7 +79,7 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoViolencia?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoViolencia?.message}</p>
         </div>
 
         <div className="space-y-2 md:col-span-2">
@@ -141,18 +96,18 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
               );
             })}
           </div>
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoViolenciaDescricoes?.message as any}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoViolenciaDescricoes?.message as any}</p>
         </div>
 
         <div className="space-y-2">
-          <Label>Canal de origem (canônico)</Label>
+          <Label>Canal de denúncia</Label>
           <Controller
             control={control}
-            name="canalOrigem"
+            name="canalDenuncia"
             render={({ field }) => (
               <Select
                 onValueChange={(v) => {
-                  setValue("canalOrigem", v as any, { shouldDirty: true });
+                  setValue("canalDenuncia", v as any, { shouldDirty: true });
                   if (v !== "OUTROS") setValue("especificacaoOutroCanal", null as any, { shouldDirty: true });
                 }}
                 value={field.value ?? ""}
@@ -170,22 +125,16 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).canalOrigem?.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="dataDenuncia">Data da denúncia</Label>
-          <Controller name="dataDenuncia" control={control} render={({ field }) => <Input id="dataDenuncia" type="date" {...field} value={field.value ?? ""} />} />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).dataDenuncia?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).canalDenuncia?.message}</p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="protocolo">Protocolo (opcional)</Label>
           <Controller name="protocolo" control={control} render={({ field }) => <Input id="protocolo" {...field} value={field.value ?? ""} />} />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).protocolo?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).protocolo?.message}</p>
         </div>
 
-        {canalOrigemValue === "OUTROS" && (
+        {canalDenunciaValue === "OUTROS" && (
           <div className="space-y-2 md:col-span-3">
             <Label htmlFor="especificacaoOutroCanal">Especificar outro canal</Label>
             <Controller
@@ -193,7 +142,7 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
               control={control}
               render={({ field }) => <Input id="especificacaoOutroCanal" {...field} value={field.value ?? ""} />}
             />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).especificacaoOutroCanal?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).especificacaoOutroCanal?.message}</p>
           </div>
         )}
       </div>

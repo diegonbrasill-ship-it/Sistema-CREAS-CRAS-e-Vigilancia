@@ -1,5 +1,5 @@
 
-export type UserRole = 'gestor' | 'coordenador' | 'tecnico_superior' | 'tecnico_medio' | 'vigilancia';
+export type UserRole = 'gestor' | 'coordenador_creas' | 'tecnico_superior' | 'tecnico_medio' | 'vigilancia';
 
 export interface AuthenticatedUser {
     id: number;

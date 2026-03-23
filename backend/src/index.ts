@@ -1,14 +1,12 @@
 // backend/src/index.ts
 import express from "express";
 
-import 'dotenv/config';
+import "./config/loadEnv";
 import cors from "cors";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { initDb } from "./db";
-import { generateCasosMock } from "./seed_casos" 
-
 // Importações das Rotas
 import loginRoutes from "./routes/login/login";
 import usersRoutes from "./routes/users";
@@ -51,7 +49,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
     app.use('/api/cras', crasRouter);
     app.use("/api/demandas", demandasRoutes);
 
-    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost : ${PORT}`))
+    app.listen(PORT, () => console.log(`✅ Backend rodando em http://localhost:${PORT}`))
 
   } catch (err) {
     console.error("Erro ao iniciar backend:", err);

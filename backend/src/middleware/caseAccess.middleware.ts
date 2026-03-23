@@ -38,24 +38,33 @@ export const checkCaseAccess = (idLocation: 'params' | 'body', idName: string) =
 
         const accessFilter = req.accessFilter!;
         
-        // 1. RESOLVER PLACEHOLDERS E PARÂMETROS
-        // O ID do caso (NUMÉRICO) é agora o primeiro parâmetro, $1.
-        const params: (string | number)[] = [casoId]; 
-        let unitWhere = accessFilter.whereClause;
-        
-        if (accessFilter.params.length === 1) {
-            unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
-            params.push(accessFilter.params[0]);
-        } else if (accessFilter.params.length === 2) {
-            unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
-            params.push(accessFilter.params[0], accessFilter.params[1]);
-        }
-
-        // 2. CONSULTA DE VERIFICAÇÃO DE PERMISSÃO
-        // O $1::INTEGER é seguro porque casoId é checado como número válido.
-        const query = `SELECT id FROM casos WHERE id = $1::INTEGER AND ${unitWhere}`;
+        const existenceQuery = `SELECT id FROM casos WHERE id = $1::INTEGER AND deleted_at IS NULL`;
         
         try {
+            const existsResult = await pool.query(existenceQuery, [casoId]);
+            if (existsResult.rowCount === 0) {
+                return res.status(404).json({ message: "Caso não encontrado." });
+            }
+
+            if (accessFilter.whereClause === 'TRUE') {
+                (req as any).casoId = casoId;
+                return next();
+            }
+
+            // 1. RESOLVER PLACEHOLDERS E PARÂMETROS
+            // O ID do caso (NUMÉRICO) é agora o primeiro parâmetro, $1.
+            const params: (string | number)[] = [casoId]; 
+            let unitWhere = accessFilter.whereClause;
+            
+            if (accessFilter.params.length === 1) {
+                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
+                params.push(accessFilter.params[0]);
+            } else if (accessFilter.params.length === 2) {
+                unitWhere = unitWhere.replace('$X', `$${params.length + 1}`).replace('$Y', `$${params.length + 2}`);
+                params.push(accessFilter.params[0], accessFilter.params[1]);
+            }
+
+            const query = `SELECT id FROM casos WHERE id = $1::INTEGER AND deleted_at IS NULL AND ${unitWhere}`;
             const result = await pool.query(query, params);
 
             if (result.rowCount === 0) {

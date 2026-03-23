@@ -165,28 +165,6 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
           />
           {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.composicaoFamiliar?.message}</p>}
         </div>
-
-        <div className="space-y-2">
-          <Label>Tipo de Moradia</Label>
-          <Controller
-            control={control}
-            name="tipoMoradia"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                <SelectTrigger>
-                  <SelectValue placeholder="..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Própria">Própria</SelectItem>
-                  <SelectItem value="Alugada">Alugada</SelectItem>
-                  <SelectItem value="Cedida">Cedida</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tipoMoradia?.message}</p>}
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="referenciaFamiliar">Referência Familiar</Label>
           <Controller name="referenciaFamiliar" control={control} render={({ field }) => <Input id="referenciaFamiliar" {...field} value={field.value ?? ""} />} />

@@ -12,4 +12,4 @@ export const cleanSqlString = (sql: string): string => {
  * Tipos de Perfis de Acesso Válidos (Roles do Back-end).
  * Usamos essas strings em todo o sistema para checagem de permissão.
  */
-export type UserRole = 'gestor' | 'coordenador' | 'tecnico_superior' | 'tecnico_medio' | 'vigilancia' | 'tecnico';
+export type UserRole = 'gestor' | 'coordenador_creas' | 'tecnico_superior' | 'tecnico_medio' | 'vigilancia' | 'tecnico';

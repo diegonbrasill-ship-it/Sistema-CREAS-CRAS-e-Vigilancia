@@ -17,16 +17,16 @@ export const CASOS_SQL = {
       FROM casos
     `,
   SELECT_BY_ID: `
-      SELECT * FROM casos WHERE id = $1
+      SELECT * FROM casos WHERE id = $1 AND deleted_at IS NULL
     `,
   UPDATE: `
-      UPDATE casos SET data_cad=$1, tec_ref=$2, nome=$3, dados_completos=$4 WHERE id=$5
+      UPDATE casos SET data_cad=$1, tec_ref=$2, nome=$3, dados_completos=$4 WHERE id=$5 RETURNING *
     `,
   UPDATE_STATUS: `
-      UPDATE casos SET status = $1 WHERE id = $2 RETURNING nome
+      UPDATE casos SET status = $1 WHERE id = $2 AND deleted_at IS NULL RETURNING id, status, nome
     `,
   DELETE: `
-      DELETE FROM casos WHERE id = $1 RETURNING nome
+      UPDATE casos SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING id, nome
     `,
   SELECT_FROM_DEMANDAS: '',
 

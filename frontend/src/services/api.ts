@@ -2,6 +2,7 @@
 // frontend/src/services/api.ts
 
 import { arrayOutputType } from "zod/v3";
+import { CasosListParams, toCasosSearchParams } from "./casosDrilldown";
 
 //adicionar if modo debug
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -106,7 +107,6 @@ export interface FiltrosCasos extends FiltrosBase {
     filtro?: string;
     valor?: string;
     status?: string;
-    origem?: 'vigilancia' | 'dashboard' | 'consulta'; // Propriedade para direcionar o endpoint
 }
 
 export interface DemandaResumida {
@@ -199,17 +199,17 @@ export const updateCasoStatus = (casoId: string | number, status: string) => fet
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
 
-export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
-    
-    let endpoint = '/api/casos'; // Padrão: Dashboard/Consulta
-    if (filters?.origem === 'vigilancia') {
-        endpoint = '/api/vigilancia/casos-filtrados'; // Rota para o Painel de Vigilância
-    }
+export const listCasosCanonicos = (params?: CasosListParams): Promise<any[]> => {
+    const searchParams = toCasosSearchParams(params ?? {});
+    const query = searchParams.toString();
+    return fetchWithAuth(`/api/casos${query ? `?${query}` : ''}`);
+};
 
+export const getCasosFiltrados = (filters?: FiltrosCasos): Promise<any[]> => {
     // Garante que os parâmetros de filtro (incluindo unidades) sejam anexados
     const paramsString = appendFiltros(filters);
 
-    return fetchWithAuth(`${endpoint}${paramsString}`);
+    return fetchWithAuth(`/api/casos${paramsString}`);
 };
 
 export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {

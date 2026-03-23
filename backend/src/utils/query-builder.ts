@@ -68,11 +68,15 @@ export class QueryBuilder {
    *
    * Sempre monta: `(coluna = $N OR tabela.unit_id IS NULL)`
    */
-  applyAccessFilter(accessFilter: {
-    whereClause: string;
-    params: any[];
-  }): this {
+  applyAccessFilter(
+    accessFilter: {
+      whereClause: string;
+      params: any[];
+    },
+    options?: { allowNullUnit?: boolean }
+  ): this {
     if (accessFilter.whereClause === "TRUE") return this;
+    const allowNullUnit = options?.allowNullUnit ?? true;
 
     let unitWhere = accessFilter.whereClause;
 
@@ -93,12 +97,67 @@ export class QueryBuilder {
     // Extrai o prefixo da tabela (ex: "casos" de "casos.unit_id")
     const columnRef = accessFilter.whereClause;
     const tablePrefixMatch = columnRef.match(/^(\w+)\./);
-    const nullCheck = tablePrefixMatch
-      ? `${tablePrefixMatch[1]}.unit_id IS NULL`
-      : "unit_id IS NULL";
+    if (allowNullUnit) {
+      const nullCheck = tablePrefixMatch
+        ? `${tablePrefixMatch[1]}.unit_id IS NULL`
+        : "unit_id IS NULL";
 
-    this.whereClauses.push(`(${unitWhere} OR ${nullCheck})`);
+      this.whereClauses.push(`(${unitWhere} OR ${nullCheck})`);
+      return this;
+    }
+
+    this.whereClauses.push(`(${unitWhere})`);
     return this;
+  }
+
+  whereJsonEquals(
+    jsonColumn: string,
+    jsonKey: string,
+    value: any,
+    options?: { caseInsensitive?: boolean }
+  ): this {
+    if (value === undefined || value === null || value === "") {
+      return this;
+    }
+
+    const ph = this.addParam(value);
+    const accessor = `${jsonColumn}->>'${jsonKey}'`;
+
+    if (options?.caseInsensitive) {
+      this.whereClauses.push(`LOWER(${accessor}) = LOWER(${ph}::TEXT)`);
+      return this;
+    }
+
+    this.whereClauses.push(`${accessor} = ${ph}::TEXT`);
+    return this;
+  }
+
+  whereJsonILike(jsonColumn: string, jsonKey: string, value: string): this {
+    if (value === undefined || value === null || value === "") {
+      return this;
+    }
+
+    const ph = this.addParam(`%${value}%`);
+    this.whereClauses.push(`${jsonColumn}->>'${jsonKey}' ILIKE ${ph}`);
+    return this;
+  }
+
+  applyOrdering(
+    sortBy: string,
+    sortOrder: string,
+    whitelist: Record<string, string>
+  ): this {
+    const resolvedColumn = whitelist[sortBy];
+    if (!resolvedColumn) {
+      throw new Error(`Campo de ordenação inválido: ${sortBy}`);
+    }
+
+    const normalizedDirection = sortOrder.toUpperCase();
+    if (normalizedDirection !== "ASC" && normalizedDirection !== "DESC") {
+      throw new Error(`Direção de ordenação inválida: ${sortOrder}`);
+    }
+
+    return this.order(`${resolvedColumn} ${normalizedDirection}`);
   }
 
   /** Adiciona ORDER BY */

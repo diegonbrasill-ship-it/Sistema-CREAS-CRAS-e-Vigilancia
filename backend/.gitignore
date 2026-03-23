@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .env
+.env.dev
+.env.test
+.env.prod
 .vscode
 docs/
