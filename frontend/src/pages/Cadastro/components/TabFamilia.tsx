@@ -143,6 +143,12 @@ export function TabFamilia() {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="membroPAI">Membro PAI</Label>
+          <Controller name="membroPAI" control={control} render={({ field }) => <Input id="membroPAI" {...field} value={field.value ?? ""} />} />
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).membroPAI?.message}</p>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="composicaoFamiliar">Composição Familiar</Label>
           <Controller
             name="composicaoFamiliar"

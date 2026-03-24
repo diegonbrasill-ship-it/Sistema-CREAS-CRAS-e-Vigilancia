@@ -12,6 +12,8 @@ import {
   TIPO_VIOLENCIA_OPTIONS,
 } from "../options";
 
+type TipoViolenciaKey = keyof typeof TIPO_VIOLENCIA_DESCRICOES_MAP;
+
 export function TabAtendimento() {
   const {
     register,
@@ -25,7 +27,7 @@ export function TabAtendimento() {
   const tipoViolenciaValue = watch("tipoViolencia");
   const tipoViolenciaDescricoes = watch("tipoViolenciaDescricoes") ?? [];
 
-  const descricoesOptions = tipoViolenciaValue ? TIPO_VIOLENCIA_DESCRICOES_MAP[String(tipoViolenciaValue)] ?? [] : [];
+  const descricoesOptions = tipoViolenciaValue ? TIPO_VIOLENCIA_DESCRICOES_MAP[tipoViolenciaValue as TipoViolenciaKey] ?? [] : [];
 
   const handleTipoViolenciaChange = (v: string) => {
     setValue("tipoViolencia", v as any, { shouldDirty: true });

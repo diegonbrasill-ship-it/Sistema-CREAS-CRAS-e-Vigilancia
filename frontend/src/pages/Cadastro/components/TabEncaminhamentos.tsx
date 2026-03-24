@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
 import { CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,10 +17,17 @@ export function TabEncaminhamentos() {
   const {
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<CasoForm>();
 
   const encaminhamentoValue = watch("encaminhamento");
+
+  useEffect(() => {
+    if (encaminhamentoValue !== "Sim") {
+      setValue("encaminhamentoDetalhe", null as any, { shouldDirty: true });
+    }
+  }, [encaminhamentoValue, setValue]);
 
   return (
     <div className="space-y-6">

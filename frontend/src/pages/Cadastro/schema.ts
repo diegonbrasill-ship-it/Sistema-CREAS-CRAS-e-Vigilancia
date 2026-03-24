@@ -1,329 +1,214 @@
 import { z } from "zod";
+import { validateCPF, validateNIS } from "@/utils/validators";
 
-// Mantém as mesmas validações do arquivo legado `src/pages/Cadastro.tsx`
-// para evitar regressão de comportamento.
-
-export const validateCPF = (cpf: string | undefined | null): boolean => {
-  if (!cpf || cpf.trim() === "") return true;
-  const cpfClean = cpf.replace(/[^\d]/g, "");
-  if (cpfClean.length !== 11 || /^(\d)\1+$/.test(cpfClean)) return false;
-  return true;
-};
-
-export const validateNIS = (nis: string | undefined | null): boolean => {
-  if (!nis || nis.trim() === "") return true;
-  return /^\d{11}$/.test(nis.replace(/[^\d]/g, ""));
-};
+import {
+  CANAL_ORIGEM_VALUES,
+  CONFIRMACAO_VIOLENCIA_VALUES,
+  ENCAMINHADA_SCFV_VALUES,
+  ESCOLARIDADE_VALUES,
+  FAIXA_ETARIA_AGRESSOR_VALUES,
+  FORMA_OCUPACAO_VALUES,
+  getOptionValues,
+  IDENTIDADE_GENERO_VALUES,
+  MATERIAL_CONSTRUCAO_VALUES,
+  ORIENTACAO_SEXUAL_VALUES,
+  RACA_COR_VALUES,
+  SEXO_AGRESSOR_VALUES,
+  SEXO_VALUES,
+  SIM_NAO_VALUES,
+  TIPO_RESIDENCIA_VALUES,
+  TIPO_VIOLENCIA_DESCRICOES_MAP,
+  TIPO_VIOLENCIA_VALUES,
+  VINCULO_AGRESSOR_VALUES,
+} from "./options";
 
 export const toStr = (v: unknown) => (v === undefined || v === null ? "" : v);
 const isBlank = (v: unknown) => v === undefined || v === null || String(v).trim() === "";
 
-// PR-3: enums canônicos (baixo risco — campos já são Select na UI)
-const simNaoEnum = z.enum(["Sim", "Não"]);
-const sexoEnum = z.enum(["MASCULINO", "FEMININO", "INTERSEXO"]);
-const escolaridadeEnum = z.enum([
-  "SEM_IDADE_ESCOLAR",
-  "EJA",
-  "FUNDAMENTAL_1_INCOMPLETO",
-  "FUNDAMENTAL_1_COMPLETO",
-  "FUNDAMENTAL_2_INCOMPLETO",
-  "FUNDAMENTAL_2_COMPLETO",
-  "ENSINO_MEDIO_INCOMPLETO",
-  "ENSINO_MEDIO_COMPLETO",
-  "TECNICO_INCOMPLETO",
-  "TECNICO_COMPLETO",
-  "SUPERIOR_INCOMPLETO",
-  "SUPERIOR_COMPLETO",
-]);
-const encaminhadaScfvEnum = z.enum(["SCFV", "CDI", "Não"]);
-const confirmacaoViolenciaEnum = z.enum(["Confirmada", "Em análise", "Não confirmada"]);
+const orientacaoSexualEnum = z.enum(ORIENTACAO_SEXUAL_VALUES);
+const identidadeGeneroEnum = z.enum(IDENTIDADE_GENERO_VALUES);
+const faixaEtariaAgressorEnum = z.enum(FAIXA_ETARIA_AGRESSOR_VALUES);
+const tipoResidenciaEnum = z.enum(TIPO_RESIDENCIA_VALUES);
+const formaOcupacaoEnum = z.enum(FORMA_OCUPACAO_VALUES);
+const materialConstrucaoEnum = z.enum(MATERIAL_CONSTRUCAO_VALUES);
 
-// PR-4: enums canônicos (novos blocos)
-const tipoViolenciaEnum = z.enum(["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"]);
-const canalDenunciaEnum = z.enum([
-  "DISQUE_100_180",
-  "CONSELHO_TUTELAR",
-  "PODER_JUDICIARIO_MINISTERIO_PUBLICO",
-  "DELEGACIA_DE_POLICIA",
-  "DEMANDA_ESPONTANEA",
-  "ENCAMINHAMENTO_DA_REDE",
-  "OUTROS",
-]);
-const racaCorEnum = z.enum(["BRANCA", "PRETA", "PARDA", "AMARELA", "INDIGENA", "NAO_DECLARADO"]);
-const orientacaoSexualEnum = z.enum(["HETEROSSEXUAL", "HOMOSSEXUAL", "BISSEXUAL", "OUTRA", "PREFIRO_NAO_INFORMAR"]);
-const identidadeGeneroEnum = z.enum(["HOMEM", "MULHER", "TRAVESTI", "NAO_BINARIO", "OUTROS"]);
+const requiredTextField = (message: string) => z.preprocess(toStr, z.string().min(1, message));
+const optionalTextField = () => z.string().optional().nullable();
 
-const vinculoAgressorEnum = z.enum(["CONJUGE", "COMPANHEIRO", "EX_COMPANHEIRO", "PAI", "MAE", "FILHO", "IRMAO", "OUTROS"]);
-const faixaEtariaAgressorEnum = z.enum(["MENOR_18", "FAIXA_18_30", "FAIXA_31_40", "FAIXA_41_50", "FAIXA_51_60", "FAIXA_61_MAIS"]);
-const sexoAgressorEnum = z.enum(["HOMEM", "MULHER", "OUTRO"]);
+const requiredValidatedTextField = (requiredMessage: string, validate: (value: string) => boolean, invalidMessage: string) =>
+  z.preprocess(
+    toStr,
+    z
+      .string()
+      .min(1, requiredMessage)
+      .refine((value) => validate(value), { message: invalidMessage }),
+  );
 
-const tipoResidenciaEnum = z.enum(["CASA", "APARTAMENTO", "COMODO_QUITINETE", "BARRACO_OCUPACAO", "UNIDADE_INSTITUCIONAL", "SITUACAO_DE_RUA"]);
-const formaOcupacaoEnum = z.enum(["PROPRIA_PAGA", "PROPRIA_EM_AQUISICAO", "ALUGADA", "CEDIDA_FAMILIAR_AMIGO", "CEDIDA_EMPREGADOR", "OCUPADA_IRREGULAR"]);
-const materialConstrucaoEnum = z.enum(["ALVENARIA_TIJOLO", "MADEIRA_APARELHADA", "MATERIAL_REAPROVEITADO", "SEM_CONSTRUCAO_PERMANENTE"]);
+const optionalValidatedTextField = (validate: (value: string | undefined | null) => boolean, invalidMessage: string) =>
+  z.string().optional().nullable().refine(validate, { message: invalidMessage });
 
 const requiredEnumField = <T extends [string, ...string[]]>(values: T, message: string) =>
   z.preprocess(toStr, z.string().min(1, message).pipe(z.enum(values, { error: message })));
 
-const violenciaDescricoesByTipo = {
-  FISICA: [
-    "ESPANCAMENTO",
-    "SACUDIDAS",
-    "CHUTES",
-    "BOFETADAS",
-    "QUEIMADURAS",
-    "EMPURROES",
-    "ARREMESSO_DE_OBJETOS",
-    "LESOES_COM_ARMAS",
-    "OFENSA_A_INTEGRIDADE_CORPORAL",
-  ],
-  PSICOLOGICA: [
-    "AMEACA",
-    "HUMILHACAO",
-    "ISOLAMENTO",
-    "VIGILANCIA_CONSTANTE",
-    "PERSEGUICAO",
-    "INSULTO",
-    "CHANTAGEM",
-    "RIDICULARIZACAO",
-    "LIMITACAO_DE_IR_E_VIR",
-    "DANO_EMOCIONAL",
-  ],
-  SEXUAL: [
-    "ESTUPRO",
-    "COACAO_SEXUAL",
-    "IMPEDIR_USO_DE_CONTRACEPTIVO",
-    "FORCAR_ABORTO",
-    "FORCAR_MATRIMONIO",
-    "PROSTITUICAO_FORCADA",
-    "GRAVIDEZ_NAO_DESEJADA",
-  ],
-  PATRIMONIAL: [
-    "RETENCAO_DE_DOCUMENTOS",
-    "SUBTRACAO_DE_BENS",
-    "DESTRUICAO_DE_FERRAMENTAS",
-    "CONTROLE_DE_SALARIO",
-    "QUEBRA_DE_CELULAR",
-    "DANO_PATRIMONIAL",
-  ],
-  MORAL: ["CALUNIA", "DIFAMACAO", "INJURIA", "EXPOSICAO_DE_INTIMIDADE", "MENTIRAS_PUBLICAS"],
-} as const satisfies Record<string, readonly string[]>;
+const optionalEnumField = <T extends [string, ...string[]]>(values: T) => z.preprocess(toStr, z.enum(values)).optional().nullable();
 
-const canonicalOptionalFields = {
-  // origem
-  protocolo: z.preprocess(toStr, z.string()).optional().nullable(),
-  especificacaoOutroCanal: z.preprocess(toStr, z.string()).optional().nullable(),
-
-  // violência (canônico)
-  tipoViolenciaDescricoes: z.array(z.string()).optional().nullable(),
-
-  // raça/cor e etnia
-  etniaIndigena: z.preprocess(toStr, z.string()).optional().nullable(),
-  macroRegiao: z.preprocess(toStr, z.string()).optional().nullable(),
-
-  // sensíveis
-  orientacaoSexual: z.preprocess(toStr, orientacaoSexualEnum).optional().nullable(),
-  identidadeGenero: z.preprocess(toStr, identidadeGeneroEnum).optional().nullable(),
-
-  // agressor
-  vinculoAgressor: z.preprocess(toStr, vinculoAgressorEnum).optional().nullable(),
-  coabitaComAgressor: z.preprocess(toStr, simNaoEnum).optional().nullable(),
-  especificacaoOutroVinculo: z.preprocess(toStr, z.string()).optional().nullable(),
-  faixaEtariaAgressor: z.preprocess(toStr, faixaEtariaAgressorEnum).optional().nullable(),
-  bairroAgressor: z.preprocess(toStr, z.string()).optional().nullable(),
-  sexoAgressor: z.preprocess(toStr, sexoAgressorEnum).optional().nullable(),
-
-  // moradia
-  tipoResidencia: z.preprocess(toStr, tipoResidenciaEnum).optional().nullable(),
-  formaOcupacao: z.preprocess(toStr, formaOcupacaoEnum).optional().nullable(),
-  materialConstrucao: z.preprocess(toStr, materialConstrucaoEnum).optional().nullable(),
-  valorAluguel: z.preprocess(
+const optionalNumberField = () =>
+  z.preprocess(
     (v) => {
       if (v === "" || v === undefined || v === null) return null;
       const n = Number(v);
       return Number.isFinite(n) ? n : v;
     },
     z.number().nonnegative().optional().nullable(),
-  ),
+  );
+
+const violenciaDescricoesByTipo = {
+  FISICA: getOptionValues(TIPO_VIOLENCIA_DESCRICOES_MAP.FISICA),
+  PSICOLOGICA: getOptionValues(TIPO_VIOLENCIA_DESCRICOES_MAP.PSICOLOGICA),
+  SEXUAL: getOptionValues(TIPO_VIOLENCIA_DESCRICOES_MAP.SEXUAL),
+  PATRIMONIAL: getOptionValues(TIPO_VIOLENCIA_DESCRICOES_MAP.PATRIMONIAL),
+  MORAL: getOptionValues(TIPO_VIOLENCIA_DESCRICOES_MAP.MORAL),
+} as const satisfies Record<(typeof TIPO_VIOLENCIA_VALUES)[number], readonly string[]>;
+
+const sharedOptionalFields = {
+  protocolo: z.preprocess(toStr, z.string()).optional().nullable(),
+  especificacaoOutroCanal: z.preprocess(toStr, z.string()).optional().nullable(),
+  tipoViolenciaDescricoes: z.array(z.string()).optional().nullable(),
+  etniaIndigena: z.preprocess(toStr, z.string()).optional().nullable(),
+  macroRegiao: z.preprocess(toStr, z.string()).optional().nullable(),
+  orientacaoSexual: z.preprocess(toStr, orientacaoSexualEnum).optional().nullable(),
+  identidadeGenero: z.preprocess(toStr, identidadeGeneroEnum).optional().nullable(),
+  especificacaoOutroVinculo: z.preprocess(toStr, z.string()).optional().nullable(),
+  faixaEtariaAgressor: z.preprocess(toStr, faixaEtariaAgressorEnum).optional().nullable(),
+  bairroAgressor: z.preprocess(toStr, z.string()).optional().nullable(),
+  tipoResidencia: z.preprocess(toStr, tipoResidenciaEnum).optional().nullable(),
+  formaOcupacao: z.preprocess(toStr, formaOcupacaoEnum).optional().nullable(),
+  materialConstrucao: z.preprocess(toStr, materialConstrucaoEnum).optional().nullable(),
+  valorAluguel: optionalNumberField(),
 } as const;
 
-export const baseSchema = z
-  .object({
-    data_cad: z.string().min(1, "A data do cadastro é obrigatória."),
-    tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
-    tipoViolencia: requiredEnumField(["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"], "Selecione o tipo de violência."),
-    canalDenuncia: z.preprocess(toStr, canalDenunciaEnum).optional().nullable(),
+type SchemaMode = "base" | "edit";
 
-    nome: z.string().optional().nullable(),
-    cpf: z.string().optional().nullable().refine(validateCPF, { message: "CPF inválido." }),
-    nis: z.string().optional().nullable().refine(validateNIS, { message: "NIS deve conter 11 dígitos." }),
-    idade: z.string().optional().nullable(),
-    sexo: sexoEnum.optional().nullable(),
-    racaCor: racaCorEnum.optional().nullable(),
-    bairro: z.string().optional().nullable(),
-    escolaridade: escolaridadeEnum.optional().nullable(),
-    rendaFamiliar: z.string().optional().nullable(),
-    recebePBF: z.string().optional().nullable(),
-    recebeBPC: z.string().optional().nullable(),
-    recebeBE: z.string().optional().nullable(),
-    membrosCadUnico: z.string().optional().nullable(),
-    membroPAI: z.string().optional().nullable(),
-    composicaoFamiliar: z.string().optional().nullable(),
-    referenciaFamiliar: z.string().optional().nullable(),
-    membroCarcerario: z.string().optional().nullable(),
-    membroSocioeducacao: z.string().optional().nullable(),
-    vitimaPCD: z.string().optional().nullable(),
-    vitimaPCDDetalhe: z.string().optional().nullable(),
-    tratamentoSaude: z.string().optional().nullable(),
-    tratamentoSaudeDetalhe: z.string().optional().nullable(),
-    encaminhamento: z.string().optional().nullable(),
-    encaminhamentoDetalhe: z.string().optional().nullable(),
-    encaminhadaSCFV: encaminhadaScfvEnum.optional().nullable(),
-    inseridoPAEFI: simNaoEnum.optional().nullable(),
-    confirmacaoViolencia: confirmacaoViolenciaEnum.optional().nullable(),
-    notificacaoSINAN: simNaoEnum.optional().nullable(),
-    reincidente: simNaoEnum.optional().nullable(),
-    ...canonicalOptionalFields,
-  })
-  .superRefine((data: any, ctx) => {
-    const descricoes = Array.isArray(data.tipoViolenciaDescricoes) ? data.tipoViolenciaDescricoes.filter((item: unknown) => !isBlank(item)) : [];
-    const descricoesPermitidas =
-      data.tipoViolencia && Object.prototype.hasOwnProperty.call(violenciaDescricoesByTipo, data.tipoViolencia)
-        ? violenciaDescricoesByTipo[data.tipoViolencia as keyof typeof violenciaDescricoesByTipo]
-        : [];
+const buildModeFields = (mode: SchemaMode) => {
+  const isEdit = mode === "edit";
 
-    if (descricoes.length === 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tipoViolenciaDescricoes"], message: "Selecione ao menos uma descrição da violência." });
-    } else if (descricoesPermitidas.length > 0 && descricoes.some((item: string) => !descricoesPermitidas.includes(item))) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tipoViolenciaDescricoes"], message: "As descrições devem corresponder ao tipo de violência selecionado." });
-    }
+  const conditionalTextField = (message: string) => (isEdit ? requiredTextField(message) : optionalTextField());
+  const conditionalEnumField = <T extends [string, ...string[]]>(values: T, message: string) =>
+    isEdit ? requiredEnumField(values, message) : optionalEnumField(values);
 
-    if (data.canalDenuncia === "OUTROS" && !data.especificacaoOutroCanal) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["especificacaoOutroCanal"], message: "Especifique o outro canal." });
-    }
+  return {
+    data_cad: requiredTextField("A data do cadastro é obrigatória."),
+    tec_ref: requiredTextField("O nome do técnico é obrigatório."),
+    tipoViolencia: requiredEnumField(TIPO_VIOLENCIA_VALUES, "Selecione o tipo de violência."),
+    canalDenuncia: conditionalEnumField(CANAL_ORIGEM_VALUES, "Selecione o canal de denúncia."),
 
-    if (data.vinculoAgressor === "OUTROS" && !data.especificacaoOutroVinculo) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["especificacaoOutroVinculo"], message: "Especifique o vínculo (Outros)." });
-    }
+    nome: conditionalTextField("O nome completo é obrigatório."),
+    cpf: isEdit
+      ? requiredValidatedTextField("O CPF é obrigatório.", validateCPF, "CPF inválido.")
+      : optionalValidatedTextField(validateCPF, "CPF inválido."),
+    nis: isEdit
+      ? requiredValidatedTextField("O NIS é obrigatório.", validateNIS, "NIS deve conter 11 dígitos.")
+      : optionalValidatedTextField(validateNIS, "NIS deve conter 11 dígitos."),
+    idade: conditionalTextField("A idade é obrigatória."),
+    sexo: conditionalEnumField(SEXO_VALUES, "Selecione o sexo."),
+    racaCor: conditionalEnumField(RACA_COR_VALUES, "Selecione a raça/cor."),
+    bairro: conditionalTextField("O bairro é obrigatório."),
+    escolaridade: conditionalEnumField(ESCOLARIDADE_VALUES, "Selecione a escolaridade."),
 
-    if (data.racaCor === "INDIGENA" && !data.etniaIndigena) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["etniaIndigena"], message: "Informe a etnia indígena." });
-    }
+    rendaFamiliar: conditionalTextField("A renda familiar é obrigatória."),
+    recebePBF: conditionalTextField("Informe se recebe Bolsa Família."),
+    recebeBPC: conditionalTextField("Informe se recebe BPC."),
+    recebeBE: conditionalTextField("Informe se recebe Benefício de Erradicação."),
+    membrosCadUnico: conditionalTextField("Informe se possui membros no CadÚnico."),
+    membroPAI: optionalTextField(),
+    composicaoFamiliar: conditionalTextField("A composição familiar é obrigatória."),
+    referenciaFamiliar: conditionalTextField("A referência familiar é obrigatória."),
+    membroCarcerario: conditionalTextField("Informe se há membro em sistema carcerário."),
+    membroSocioeducacao: conditionalTextField("Informe se há membro em socioeducação."),
 
+    vitimaPCD: conditionalTextField("Informe se a vítima é PCD."),
+    vitimaPCDDetalhe: optionalTextField(),
+    tratamentoSaude: conditionalTextField("Informe se faz tratamento de saúde."),
+    tratamentoSaudeDetalhe: optionalTextField(),
+
+    encaminhamento: conditionalTextField("Informe se houve encaminhamento."),
+    encaminhamentoDetalhe: optionalTextField(),
+    encaminhadaSCFV: conditionalEnumField(ENCAMINHADA_SCFV_VALUES, "Informe se a vítima foi encaminhada ao SCFV/CDI."),
+    inseridoPAEFI: conditionalEnumField(SIM_NAO_VALUES, "Informe se a vítima foi inserida no PAEFI."),
+    confirmacaoViolencia: conditionalEnumField(CONFIRMACAO_VIOLENCIA_VALUES, "Selecione a confirmação da violência."),
+    notificacaoSINAN: conditionalEnumField(SIM_NAO_VALUES, "Informe se houve notificação no SINAN."),
+    reincidente: conditionalEnumField(SIM_NAO_VALUES, "Informe se é um caso de reincidência."),
+
+    vinculoAgressor: conditionalEnumField(VINCULO_AGRESSOR_VALUES, "Selecione o vínculo com o agressor."),
+    coabitaComAgressor: conditionalEnumField(SIM_NAO_VALUES, "Informe se a vítima coabita com o agressor."),
+    sexoAgressor: conditionalEnumField(SEXO_AGRESSOR_VALUES, "Selecione o sexo do agressor."),
+  };
+};
+
+const applySharedRefinements = (data: Record<string, any>, ctx: z.RefinementCtx, mode: SchemaMode) => {
+  const descricoes = Array.isArray(data.tipoViolenciaDescricoes) ? data.tipoViolenciaDescricoes.filter((item: unknown) => !isBlank(item)) : [];
+  const descricoesPermitidas: readonly string[] =
+    data.tipoViolencia && Object.prototype.hasOwnProperty.call(violenciaDescricoesByTipo, data.tipoViolencia)
+      ? violenciaDescricoesByTipo[data.tipoViolencia as keyof typeof violenciaDescricoesByTipo]
+      : [];
+
+  if (descricoes.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["tipoViolenciaDescricoes"], message: "Selecione ao menos uma descrição da violência." });
+  } else if (descricoesPermitidas.length > 0 && descricoes.some((item: string) => !descricoesPermitidas.includes(item))) {
+    ctx.addIssue({ code: "custom", path: ["tipoViolenciaDescricoes"], message: "As descrições devem corresponder ao tipo de violência selecionado." });
+  }
+
+  if (data.canalDenuncia === "OUTROS" && !data.especificacaoOutroCanal) {
+    ctx.addIssue({ code: "custom", path: ["especificacaoOutroCanal"], message: "Especifique o outro canal." });
+  }
+
+  if (data.vinculoAgressor === "OUTROS" && !data.especificacaoOutroVinculo) {
+    ctx.addIssue({ code: "custom", path: ["especificacaoOutroVinculo"], message: "Especifique o vínculo (Outros)." });
+  }
+
+  if (data.racaCor === "INDIGENA" && !data.etniaIndigena) {
+    ctx.addIssue({ code: "custom", path: ["etniaIndigena"], message: "Informe a etnia indígena." });
+  }
+
+  if (mode === "base") {
     if (data.tipoResidencia === "SITUACAO_DE_RUA") {
-      // não exigir campos dependentes
       return;
     }
 
     if (!isBlank(data.tipoResidencia)) {
       if (isBlank(data.formaOcupacao)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["formaOcupacao"], message: "Informe a forma de ocupação." });
+        ctx.addIssue({ code: "custom", path: ["formaOcupacao"], message: "Informe a forma de ocupação." });
       }
 
       if (isBlank(data.materialConstrucao)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["materialConstrucao"], message: "Informe o material da construção." });
+        ctx.addIssue({ code: "custom", path: ["materialConstrucao"], message: "Informe o material da construção." });
       }
     }
 
-    if (data.formaOcupacao === "ALUGADA" && (data.valorAluguel === null || data.valorAluguel === undefined || data.valorAluguel === "")) {
-      // opcional neste ciclo (não adiciona issue)
-    }
-  });
+    return;
+  }
 
-export const editSchema = z
-  .object({
-    data_cad: z.preprocess(toStr, z.string().min(1, "A data do cadastro é obrigatória.")),
-    tec_ref: z.preprocess(toStr, z.string().min(3, "O nome do técnico é obrigatório.")),
-    tipoViolencia: requiredEnumField(["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"], "Selecione o tipo de violência."),
-    canalDenuncia: requiredEnumField(
-      ["DISQUE_100_180", "CONSELHO_TUTELAR", "PODER_JUDICIARIO_MINISTERIO_PUBLICO", "DELEGACIA_DE_POLICIA", "DEMANDA_ESPONTANEA", "ENCAMINHAMENTO_DA_REDE", "OUTROS"],
-      "Selecione o canal de denúncia.",
-    ),
-    nome: z.preprocess(toStr, z.string().min(1, "O nome completo é obrigatório.")),
-    cpf: z.preprocess(toStr, z.string().min(1, "O CPF é obrigatório.").refine(validateCPF, { message: "CPF inválido." })),
-    nis: z.preprocess(toStr, z.string().min(1, "O NIS é obrigatório.").refine(validateNIS, { message: "NIS deve conter 11 dígitos." })),
-    idade: z.preprocess(toStr, z.string().min(1, "A idade é obrigatória.")),
-    sexo: requiredEnumField(["MASCULINO", "FEMININO", "INTERSEXO"], "Selecione o sexo."),
-    racaCor: requiredEnumField(["BRANCA", "PRETA", "PARDA", "AMARELA", "INDIGENA", "NAO_DECLARADO"], "Selecione a raça/cor."),
-    bairro: z.preprocess(toStr, z.string().min(1, "O bairro é obrigatório.")),
-    escolaridade: requiredEnumField(
-      [
-        "SEM_IDADE_ESCOLAR",
-        "EJA",
-        "FUNDAMENTAL_1_INCOMPLETO",
-        "FUNDAMENTAL_1_COMPLETO",
-        "FUNDAMENTAL_2_INCOMPLETO",
-        "FUNDAMENTAL_2_COMPLETO",
-        "ENSINO_MEDIO_INCOMPLETO",
-        "ENSINO_MEDIO_COMPLETO",
-        "TECNICO_INCOMPLETO",
-        "TECNICO_COMPLETO",
-        "SUPERIOR_INCOMPLETO",
-        "SUPERIOR_COMPLETO",
-      ],
-      "Selecione a escolaridade.",
-    ),
-    rendaFamiliar: z.preprocess(toStr, z.string().min(1, "A renda familiar é obrigatória.")),
-    recebePBF: z.preprocess(toStr, z.string().min(1, "Informe se recebe Bolsa Família.")),
-    recebeBPC: z.preprocess(toStr, z.string().min(1, "Informe se recebe BPC.")),
-    recebeBE: z.preprocess(toStr, z.string().min(1, "Informe se recebe Benefício de Erradicação.")),
-    membrosCadUnico: z.preprocess(toStr, z.string().min(1, "Informe se possui membros no CadÚnico.")),
-    membroPAI: z.string().optional().nullable(),
-    composicaoFamiliar: z.preprocess(toStr, z.string().min(1, "A composição familiar é obrigatória.")),
-    referenciaFamiliar: z.preprocess(toStr, z.string().min(1, "A referência familiar é obrigatória.")),
-    membroCarcerario: z.preprocess(toStr, z.string().min(1, "Informe se há membro em sistema carcerário.")),
-    membroSocioeducacao: z.preprocess(toStr, z.string().min(1, "Informe se há membro em socioeducação.")),
-    vitimaPCD: z.preprocess(toStr, z.string().min(1, "Informe se a vítima é PCD.")),
-    vitimaPCDDetalhe: z.string().optional().nullable(),
-    tratamentoSaude: z.preprocess(toStr, z.string().min(1, "Informe se faz tratamento de saúde.")),
-    tratamentoSaudeDetalhe: z.string().optional().nullable(),
-    encaminhamento: z.preprocess(toStr, z.string().min(1, "Informe se houve encaminhamento.")),
-    encaminhamentoDetalhe: z.string().optional().nullable(),
-    encaminhadaSCFV: requiredEnumField(["SCFV", "CDI", "Não"], "Informe se a vítima foi encaminhada ao SCFV/CDI."),
-    inseridoPAEFI: requiredEnumField(["Sim", "Não"], "Informe se a vítima foi inserida no PAEFI."),
-    confirmacaoViolencia: requiredEnumField(["Confirmada", "Em análise", "Não confirmada"], "Selecione a confirmação da violência."),
-    notificacaoSINAN: requiredEnumField(["Sim", "Não"], "Informe se houve notificação no SINAN."),
-    reincidente: requiredEnumField(["Sim", "Não"], "Informe se é um caso de reincidência."),
-    ...canonicalOptionalFields,
-    vinculoAgressor: requiredEnumField(["CONJUGE", "COMPANHEIRO", "EX_COMPANHEIRO", "PAI", "MAE", "FILHO", "IRMAO", "OUTROS"], "Selecione o vínculo com o agressor."),
-    coabitaComAgressor: requiredEnumField(["Sim", "Não"], "Informe se a vítima coabita com o agressor."),
-    sexoAgressor: requiredEnumField(["HOMEM", "MULHER", "OUTRO"], "Selecione o sexo do agressor."),
-  })
-  .superRefine((data: any, ctx) => {
-    const descricoes = Array.isArray(data.tipoViolenciaDescricoes) ? data.tipoViolenciaDescricoes.filter((item: unknown) => !isBlank(item)) : [];
-    const descricoesPermitidas =
-      data.tipoViolencia && Object.prototype.hasOwnProperty.call(violenciaDescricoesByTipo, data.tipoViolencia)
-        ? violenciaDescricoesByTipo[data.tipoViolencia as keyof typeof violenciaDescricoesByTipo]
-        : [];
-
-    if (descricoes.length === 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tipoViolenciaDescricoes"], message: "Selecione ao menos uma descrição da violência." });
-    } else if (descricoesPermitidas.length > 0 && descricoes.some((item: string) => !descricoesPermitidas.includes(item))) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tipoViolenciaDescricoes"], message: "As descrições devem corresponder ao tipo de violência selecionado." });
+  if (data.tipoResidencia !== "SITUACAO_DE_RUA") {
+    if (isBlank(data.formaOcupacao)) {
+      ctx.addIssue({ code: "custom", path: ["formaOcupacao"], message: "Informe a forma de ocupação." });
     }
 
-    if (data.canalDenuncia === "OUTROS" && !data.especificacaoOutroCanal) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["especificacaoOutroCanal"], message: "Especifique o outro canal." });
+    if (isBlank(data.materialConstrucao)) {
+      ctx.addIssue({ code: "custom", path: ["materialConstrucao"], message: "Informe o material da construção." });
     }
+  }
+};
 
-    if (data.vinculoAgressor === "OUTROS" && !data.especificacaoOutroVinculo) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["especificacaoOutroVinculo"], message: "Especifique o vínculo (Outros)." });
-    }
+const buildCasoSchema = (mode: SchemaMode) =>
+  z
+    .object({
+      ...buildModeFields(mode),
+      ...sharedOptionalFields,
+    })
+    .superRefine((data, ctx) => applySharedRefinements(data, ctx, mode));
 
-    if (data.racaCor === "INDIGENA" && !data.etniaIndigena) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["etniaIndigena"], message: "Informe a etnia indígena." });
-    }
-
-    if (data.tipoResidencia !== "SITUACAO_DE_RUA") {
-      if (isBlank(data.formaOcupacao)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["formaOcupacao"], message: "Informe a forma de ocupação." });
-      }
-
-      if (isBlank(data.materialConstrucao)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["materialConstrucao"], message: "Informe o material da construção." });
-      }
-    }
-  });
-
+export const baseSchema = buildCasoSchema("base");
+export const editSchema = buildCasoSchema("edit");
 export const submitSchema = editSchema;
 
 export type CasoForm = z.infer<typeof submitSchema>;
@@ -337,23 +222,12 @@ export const tabDefinitions = [
   {
     value: "vitima",
     label: "2. Vítima",
-    fields: ["nome", "cpf", "nis", "idade", "sexo", "racaCor", "etniaIndigena", "bairro", "macroRegiao", "escolaridade"],
+    fields: ["nome", "cpf", "nis", "idade", "sexo", "orientacaoSexual", "identidadeGenero", "racaCor", "etniaIndigena", "bairro", "macroRegiao", "escolaridade"],
   },
   {
     value: "familia",
     label: "3. Família",
-    fields: [
-      "rendaFamiliar",
-      "recebePBF",
-      "recebeBPC",
-      "recebeBE",
-      "membrosCadUnico",
-      "membroPAI",
-      "composicaoFamiliar",
-      "referenciaFamiliar",
-      "membroCarcerario",
-      "membroSocioeducacao",
-    ],
+    fields: ["rendaFamiliar", "recebePBF", "recebeBPC", "recebeBE", "membrosCadUnico", "membroPAI", "composicaoFamiliar", "referenciaFamiliar", "membroCarcerario", "membroSocioeducacao"],
   },
   {
     value: "saude",

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Eraser } from "lucide-react";
 
 import { useCadastroForm } from "./useCadastroForm";
+import { tabDefinitions } from "./schema";
 import { TabAtendimento } from "./components/TabAtendimento";
 import { TabVitima } from "./components/TabVitima";
 import { TabFamilia } from "./components/TabFamilia";
@@ -13,6 +14,8 @@ import { TabSaude } from "./components/TabSaude";
 import { TabEncaminhamentos } from "./components/TabEncaminhamentos";
 import { TabAgressor } from "./components/TabAgressor";
 import { TabMoradia } from "./components/TabMoradia";
+
+const isCadastroTab = (value: string): value is (typeof tabDefinitions)[number]["value"] => tabDefinitions.some((tab) => tab.value === value);
 
 export default function Cadastro() {
   const {
@@ -24,8 +27,7 @@ export default function Cadastro() {
     setActiveTab,
     onSubmit,
     onInvalid,
-    handleFinalize,
-    handleSaveProgress,
+    handleCancel,
     handleClearForm,
   } = useCadastroForm();
 
@@ -44,14 +46,22 @@ export default function Cadastro() {
         <h1 className="text-2xl font-bold text-slate-800">{isEditMode ? "Editando Prontuário" : "Registro de Atendimento PAEFI"}</h1>
         <p className="text-slate-500">
           {isEditMode
-            ? "Altere os dados, salve o progresso e finalize quando concluir o prontuário."
-            : "Preencha todas as abas e salve o cadastro completo na primeira gravação."}
+            ? "Altere os dados e finalize quando concluir o prontuário."
+            : "Preencha todas as abas, finalize o cadastro completo ou cancele para voltar à consulta."}
         </p>
       </div>
 
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              if (isCadastroTab(value)) {
+                setActiveTab(value);
+              }
+            }}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="atendimento">1. Atendimento</TabsTrigger>
               <TabsTrigger value="vitima">2. Vítima</TabsTrigger>
@@ -102,13 +112,13 @@ export default function Cadastro() {
             </Button>
 
             <div className="flex items-center gap-4">
-              <Button type="submit" disabled={isSubmitting} size="lg" variant="secondary" onClick={handleSaveProgress}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Salvando..." : isEditMode ? "Salvar Progresso" : "Criar e Salvar Progresso"}
+              <Button type="button" disabled={isSubmitting} size="lg" variant="destructive" onClick={handleCancel}>
+                Cancelar
               </Button>
 
-              <Button type="button" onClick={handleFinalize} disabled={isSubmitting} size="lg">
-                {isEditMode ? "Finalizar e Ver Prontuário" : "Criar e Ver Prontuário"}
+              <Button type="submit" disabled={isSubmitting} size="lg">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Salvando..." : isEditMode ? "Finalizar e Ver Prontuário" : "Criar e Ver Prontuário"}
               </Button>
             </div>
           </div>

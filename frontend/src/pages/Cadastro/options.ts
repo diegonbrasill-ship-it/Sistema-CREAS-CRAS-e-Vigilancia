@@ -1,15 +1,20 @@
-// Fonte única de opções/valores canônicos para Selects do Cadastro.
-// PR-3: reduzir dispersão de valores (ex.: "Não" vs "NÃO")
-// PR-4: expandir enums e novos blocos (contrato canônico)
+export type Option<T extends string = string> = {
+  readonly value: T;
+  readonly label: string;
+};
 
-export type Option = { value: string; label: string };
+type NonEmptyOptions<T extends string = string> = readonly [Option<T>, ...Option<T>[]];
 
-export const SIM_NAO_OPTIONS: Option[] = [
+export const getOptionValues = <const T extends NonEmptyOptions>(options: T) =>
+  options.map((option) => option.value) as [T[number]["value"], ...T[number]["value"][]];
+
+export const SIM_NAO_OPTIONS = [
   { value: "Sim", label: "Sim" },
   { value: "Não", label: "Não" },
-];
+] as const satisfies NonEmptyOptions;
+export const SIM_NAO_VALUES = getOptionValues(SIM_NAO_OPTIONS);
 
-export const ESCOLARIDADE_OPTIONS: Option[] = [
+export const ESCOLARIDADE_OPTIONS = [
   { value: "SEM_IDADE_ESCOLAR", label: "Sem idade escolar" },
   { value: "EJA", label: "EJA" },
   { value: "FUNDAMENTAL_1_INCOMPLETO", label: "Fundamental I incompleto" },
@@ -22,30 +27,33 @@ export const ESCOLARIDADE_OPTIONS: Option[] = [
   { value: "TECNICO_COMPLETO", label: "Técnico completo" },
   { value: "SUPERIOR_INCOMPLETO", label: "Superior incompleto" },
   { value: "SUPERIOR_COMPLETO", label: "Superior completo" },
-];
+] as const satisfies NonEmptyOptions;
+export const ESCOLARIDADE_VALUES = getOptionValues(ESCOLARIDADE_OPTIONS);
 
-// --- Encaminhamentos (PR-3) ---
-export const ENCAMINHADA_SCFV_OPTIONS: Option[] = [
+export const ENCAMINHADA_SCFV_OPTIONS = [
   { value: "SCFV", label: "SCFV" },
   { value: "CDI", label: "CDI" },
   { value: "Não", label: "Não" },
-];
+] as const satisfies NonEmptyOptions;
+export const ENCAMINHADA_SCFV_VALUES = getOptionValues(ENCAMINHADA_SCFV_OPTIONS);
 
-export const CONFIRMACAO_VIOLENCIA_OPTIONS: Option[] = [
+export const CONFIRMACAO_VIOLENCIA_OPTIONS = [
   { value: "Confirmada", label: "Confirmada" },
   { value: "Em análise", label: "Em análise" },
   { value: "Não confirmada", label: "Não confirmada" },
-];
+] as const satisfies NonEmptyOptions;
+export const CONFIRMACAO_VIOLENCIA_VALUES = getOptionValues(CONFIRMACAO_VIOLENCIA_OPTIONS);
 
-export const TIPO_VIOLENCIA_OPTIONS: Option[] = [
+export const TIPO_VIOLENCIA_OPTIONS = [
   { value: "FISICA", label: "Física" },
   { value: "PSICOLOGICA", label: "Psicológica" },
   { value: "SEXUAL", label: "Sexual" },
   { value: "PATRIMONIAL", label: "Patrimonial" },
   { value: "MORAL", label: "Moral" },
-];
+] as const satisfies NonEmptyOptions;
+export const TIPO_VIOLENCIA_VALUES = getOptionValues(TIPO_VIOLENCIA_OPTIONS);
 
-export const TIPO_VIOLENCIA_DESCRICOES_MAP: Record<string, Option[]> = {
+export const TIPO_VIOLENCIA_DESCRICOES_MAP = {
   FISICA: [
     { value: "ESPANCAMENTO", label: "Espancamento" },
     { value: "SACUDIDAS", label: "Sacudidas" },
@@ -93,10 +101,9 @@ export const TIPO_VIOLENCIA_DESCRICOES_MAP: Record<string, Option[]> = {
     { value: "EXPOSICAO_DE_INTIMIDADE", label: "Exposicao de intimidade" },
     { value: "MENTIRAS_PUBLICAS", label: "Mentiras publicas" },
   ],
-};
+} as const satisfies Record<(typeof TIPO_VIOLENCIA_VALUES)[number], NonEmptyOptions>;
 
-// Origem estruturada
-export const CANAL_ORIGEM_OPTIONS: Option[] = [
+export const CANAL_ORIGEM_OPTIONS = [
   { value: "DISQUE_100_180", label: "Disque 100/180" },
   { value: "CONSELHO_TUTELAR", label: "Conselho Tutelar" },
   { value: "PODER_JUDICIARIO_MINISTERIO_PUBLICO", label: "Poder Judiciário / Ministério Público" },
@@ -104,41 +111,45 @@ export const CANAL_ORIGEM_OPTIONS: Option[] = [
   { value: "DEMANDA_ESPONTANEA", label: "Demanda espontânea" },
   { value: "ENCAMINHAMENTO_DA_REDE", label: "Encaminhamento da rede" },
   { value: "OUTROS", label: "Outros" },
-];
+] as const satisfies NonEmptyOptions;
+export const CANAL_ORIGEM_VALUES = getOptionValues(CANAL_ORIGEM_OPTIONS);
 
-export const RACA_COR_OPTIONS: Option[] = [
+export const RACA_COR_OPTIONS = [
   { value: "BRANCA", label: "Branca" },
   { value: "PRETA", label: "Preta" },
   { value: "PARDA", label: "Parda" },
   { value: "AMARELA", label: "Amarela" },
   { value: "INDIGENA", label: "Indígena" },
   { value: "NAO_DECLARADO", label: "Não declarado" },
-];
+] as const satisfies NonEmptyOptions;
+export const RACA_COR_VALUES = getOptionValues(RACA_COR_OPTIONS);
 
-export const SEXO_OPTIONS: Option[] = [
+export const SEXO_OPTIONS = [
   { value: "MASCULINO", label: "Masculino" },
   { value: "FEMININO", label: "Feminino" },
   { value: "INTERSEXO", label: "Intersexo" },
-];
+] as const satisfies NonEmptyOptions;
+export const SEXO_VALUES = getOptionValues(SEXO_OPTIONS);
 
-export const ORIENTACAO_SEXUAL_OPTIONS: Option[] = [
+export const ORIENTACAO_SEXUAL_OPTIONS = [
   { value: "HETEROSSEXUAL", label: "Heterossexual" },
   { value: "HOMOSSEXUAL", label: "Homossexual" },
   { value: "BISSEXUAL", label: "Bissexual" },
   { value: "OUTRA", label: "Outra" },
   { value: "PREFIRO_NAO_INFORMAR", label: "Prefiro não informar" },
-];
+] as const satisfies NonEmptyOptions;
+export const ORIENTACAO_SEXUAL_VALUES = getOptionValues(ORIENTACAO_SEXUAL_OPTIONS);
 
-export const IDENTIDADE_GENERO_OPTIONS: Option[] = [
+export const IDENTIDADE_GENERO_OPTIONS = [
   { value: "HOMEM", label: "Homem" },
   { value: "MULHER", label: "Mulher" },
   { value: "TRAVESTI", label: "Travesti" },
   { value: "NAO_BINARIO", label: "Não-binário" },
   { value: "OUTROS", label: "Outros" },
-];
+] as const satisfies NonEmptyOptions;
+export const IDENTIDADE_GENERO_VALUES = getOptionValues(IDENTIDADE_GENERO_OPTIONS);
 
-// Agressor
-export const VINCULO_AGRESSOR_OPTIONS: Option[] = [
+export const VINCULO_AGRESSOR_OPTIONS = [
   { value: "CONJUGE", label: "Cônjuge" },
   { value: "COMPANHEIRO", label: "Companheiro(a)" },
   { value: "EX_COMPANHEIRO", label: "Ex-companheiro(a)" },
@@ -147,45 +158,50 @@ export const VINCULO_AGRESSOR_OPTIONS: Option[] = [
   { value: "FILHO", label: "Filho(a)" },
   { value: "IRMAO", label: "Irmão(ã)" },
   { value: "OUTROS", label: "Outros" },
-];
+] as const satisfies NonEmptyOptions;
+export const VINCULO_AGRESSOR_VALUES = getOptionValues(VINCULO_AGRESSOR_OPTIONS);
 
-export const FAIXA_ETARIA_AGRESSOR_OPTIONS: Option[] = [
+export const FAIXA_ETARIA_AGRESSOR_OPTIONS = [
   { value: "MENOR_18", label: "Menor de 18" },
   { value: "FAIXA_18_30", label: "18 a 30" },
   { value: "FAIXA_31_40", label: "31 a 40" },
   { value: "FAIXA_41_50", label: "41 a 50" },
   { value: "FAIXA_51_60", label: "51 a 60" },
   { value: "FAIXA_61_MAIS", label: "61+" },
-];
+] as const satisfies NonEmptyOptions;
+export const FAIXA_ETARIA_AGRESSOR_VALUES = getOptionValues(FAIXA_ETARIA_AGRESSOR_OPTIONS);
 
-export const SEXO_AGRESSOR_OPTIONS: Option[] = [
+export const SEXO_AGRESSOR_OPTIONS = [
   { value: "HOMEM", label: "Homem" },
   { value: "MULHER", label: "Mulher" },
   { value: "OUTRO", label: "Outro" },
-];
+] as const satisfies NonEmptyOptions;
+export const SEXO_AGRESSOR_VALUES = getOptionValues(SEXO_AGRESSOR_OPTIONS);
 
-// Moradia
-export const TIPO_RESIDENCIA_OPTIONS: Option[] = [
+export const TIPO_RESIDENCIA_OPTIONS = [
   { value: "CASA", label: "Casa" },
   { value: "APARTAMENTO", label: "Apartamento" },
   { value: "COMODO_QUITINETE", label: "Cômodo/Quitinete" },
   { value: "BARRACO_OCUPACAO", label: "Barraco/Ocupação" },
   { value: "UNIDADE_INSTITUCIONAL", label: "Unidade institucional" },
   { value: "SITUACAO_DE_RUA", label: "Situação de rua" },
-];
+] as const satisfies NonEmptyOptions;
+export const TIPO_RESIDENCIA_VALUES = getOptionValues(TIPO_RESIDENCIA_OPTIONS);
 
-export const FORMA_OCUPACAO_OPTIONS: Option[] = [
+export const FORMA_OCUPACAO_OPTIONS = [
   { value: "PROPRIA_PAGA", label: "Própria (paga)" },
   { value: "PROPRIA_EM_AQUISICAO", label: "Própria (em aquisição)" },
   { value: "ALUGADA", label: "Alugada" },
   { value: "CEDIDA_FAMILIAR_AMIGO", label: "Cedida (familiar/amigo)" },
   { value: "CEDIDA_EMPREGADOR", label: "Cedida (empregador)" },
   { value: "OCUPADA_IRREGULAR", label: "Ocupada irregular" },
-];
+] as const satisfies NonEmptyOptions;
+export const FORMA_OCUPACAO_VALUES = getOptionValues(FORMA_OCUPACAO_OPTIONS);
 
-export const MATERIAL_CONSTRUCAO_OPTIONS: Option[] = [
+export const MATERIAL_CONSTRUCAO_OPTIONS = [
   { value: "ALVENARIA_TIJOLO", label: "Alvenaria/Tijolo" },
   { value: "MADEIRA_APARELHADA", label: "Madeira" },
   { value: "MATERIAL_REAPROVEITADO", label: "Material reaproveitado" },
   { value: "SEM_CONSTRUCAO_PERMANENTE", label: "Sem construção permanente" },
-];
+] as const satisfies NonEmptyOptions;
+export const MATERIAL_CONSTRUCAO_VALUES = getOptionValues(MATERIAL_CONSTRUCAO_OPTIONS);

@@ -1,10 +1,13 @@
 // frontend/src/pages/CasoDetalhe.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissoesSUAS } from "@/hooks/usePermissoesSUAS";
+import { caseToFormValues } from "@/pages/Cadastro/adapters";
+import { formatCadastroFieldValue, getCadastroFieldLabel } from "@/pages/Cadastro/display";
+import { tabDefinitions, type CasoForm } from "@/pages/Cadastro/schema";
 
 // Importações dos serviços da API, agora com os tipos corretos
 import {
@@ -42,34 +45,21 @@ interface Encaminhamento { id: number; servicoDestino: string; dataEncaminhament
 // interface Anexo { id: number; nomeOriginal: string; tamanhoArquivo: number; dataUpload: string; descricao: string; uploadedBy: string; } 
 
 
-// Labels técnicos/internos que não devem ser exibidos ao usuário
-const LABELS_OCULTOS = new Set([
-    'id', 'status', 'unit_id', 'user_id',
-    'created_at', 'updated_at', 'deleted_at',
-    'dados_completos', 'demandasVinculadas', 'demandas_vinculadas',
-]);
-
-// Componente auxiliar
-function DataItem({ label, value }: { label: string; value: any }) {
-    // Ignorar campos nulos, vazios, técnicos ou de tipo complexo (objetos/arrays)
-    if (
-        value === null || value === undefined || value === "" ||
-        LABELS_OCULTOS.has(label) ||
-        typeof value === 'object'
-    ) {
-        return null;
-    }
-
-    // Formatar label: snake_case → espaços, camelCase → espaços
-    const labelFormatado = label
-        .replace(/_/g, " ")
-        .replace(/([A-Z])/g, " $1")
-        .trim();
-
+function CadastroFieldItem({ label, value }: { label: string; value: string | string[] }) {
     return (
-        <div className="py-2">
-            <p className="text-sm font-medium text-slate-500 capitalize">{labelFormatado}</p>
-            <p className="text-base text-slate-900 break-words">{String(value)}</p>
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+            <p className="text-sm font-medium text-slate-500">{label}</p>
+            {Array.isArray(value) ? (
+                <div className="flex flex-wrap gap-2">
+                    {value.map((item) => (
+                        <Badge key={item} variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-100">
+                            {item}
+                        </Badge>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-sm font-medium text-slate-900 break-words whitespace-pre-wrap">{value}</p>
+            )}
         </div>
     );
 }
@@ -139,6 +129,33 @@ export default function CasoDetalhe() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    const cadastroSections = useMemo(() => {
+        if (!currentCaso) return [];
+
+        const formValues = caseToFormValues(currentCaso);
+
+        return tabDefinitions
+            .map((tab) => {
+                const items = tab.fields.flatMap((field) => {
+                    const formattedValue = formatCadastroFieldValue(field, formValues[field]);
+                    if (!formattedValue) return [];
+
+                    return [{
+                        field,
+                        label: getCadastroFieldLabel(field),
+                        value: formattedValue,
+                    }];
+                });
+
+                return {
+                    key: tab.value,
+                    title: tab.label.replace(/^\d+\.\s*/, ""),
+                    items,
+                };
+            })
+            .filter((section) => section.items.length > 0);
+    }, [currentCaso]);
 
     const handleSalvarAcompanhamento = async () => {
         if (!id || !novoAcompanhamento.trim()) {
@@ -317,21 +334,10 @@ export default function CasoDetalhe() {
     };    if (isLoading) { return <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>; }
     if (!currentCaso) { return <div className="text-center p-10">Não foi possível carregar os dados do caso. Tente novamente mais tarde.</div>; }
 
-    // Fallbacks snake_case/camelCase para compatibilidade com API
     const dataCadRaw = currentCaso.data_cad;
     const dataCadastroFormatada = dataCadRaw ? new Date(dataCadRaw).toLocaleDateString("pt-BR", { timeZone: "UTC" })
         : "Data não informada";
-    currentCaso.data_cad = dataCadastroFormatada
     const tecnicoRef = currentCaso.tec_ref;
-    const demandasVinculadas: any[] = currentCaso.demandas_vinculadas;
-
-    // Achatar dados_completos para exibir campos do prontuário junto com os de nível superior
-    const dadosParaExibir = {
-        ...currentCaso,
-        ...(typeof currentCaso.dados_completos === 'object' && currentCaso.dados_completos !== null
-            ? currentCaso.dados_completos
-            : {}),
-    };
 
     return (
         <div className="space-y-6">
@@ -341,7 +347,6 @@ export default function CasoDetalhe() {
                 </Button>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    {/* 📌 BOTÕES OPERACIONAIS (Visível para TODOS os Operacionais) */}
                     {isOperacional && (
                         <>
                             <Button variant="outline" size="sm" onClick={() => navigate(`/cadastro/${id}`)}><Pencil className="mr-2 h-4 w-4" />Editar Dados</Button>
@@ -352,7 +357,6 @@ export default function CasoDetalhe() {
                                 <Button variant="outline" size="sm" onClick={handleReativarCaso} disabled={isActionLoading}><Power className="mr-2 h-4 w-4" />Reativar Caso</Button>
                             )}
 
-                            {/* 📌 EXCLUSÃO PERMANENTE (Visível para TODOS os Operacionais) */}
                             <Button variant="destructive" size="sm" onClick={handleExcluirCaso} disabled={isActionLoading}><Trash2 className="mr-2 h-4 w-4" />Excluir</Button>
                         </>
                     )}
@@ -369,15 +373,22 @@ export default function CasoDetalhe() {
                     <CardDescription>Prontuário de Atendimento | Cadastrado em: {dataCadastroFormatada} por {tecnicoRef}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="border-t pt-4">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-2">Informações Cadastrais</h3>                        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-x-6">
-                            {Object.entries(dadosParaExibir).map(([key, value]) => (<DataItem key={key} label={key} value={value} />))}
-                        </div>
-                    </div>
+                    {cadastroSections.map((section) => (
+                        <section key={section.key} className="rounded-xl border border-slate-200 bg-slate-50/70 p-5">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-semibold text-slate-800">{section.title}</h3>
+                                <p className="text-sm text-slate-500">Dados organizados conforme a estrutura do cadastro.</p>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {section.items.map((item) => (
+                                    <CadastroFieldItem key={String(item.field)} label={item.label} value={item.value} />
+                                ))}
+                            </div>
+                        </section>
+                    ))}
                 </CardContent>
             </Card>
 
-            {/* Módulos Operacionais visíveis para todos */}
             {isOperacional && (
                 <div className="space-y-6">
 

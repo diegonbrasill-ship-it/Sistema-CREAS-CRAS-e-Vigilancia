@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { maskCPF, maskNIS } from "@/utils/masks";
 import type { CasoForm } from "../schema";
-import { ESCOLARIDADE_OPTIONS, RACA_COR_OPTIONS, SEXO_OPTIONS } from "../options";
+import { ESCOLARIDADE_OPTIONS, IDENTIDADE_GENERO_OPTIONS, ORIENTACAO_SEXUAL_OPTIONS, RACA_COR_OPTIONS, SEXO_OPTIONS } from "../options";
 
 export function TabVitima() {
   const {
@@ -102,6 +102,52 @@ export function TabVitima() {
         </div>
 
         <div className="space-y-2">
+          <Label>Orientação sexual</Label>
+          <Controller
+            control={control}
+            name="orientacaoSexual"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORIENTACAO_SEXUAL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).orientacaoSexual?.message}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Identidade de gênero</Label>
+          <Controller
+            control={control}
+            name="identidadeGenero"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {IDENTIDADE_GENERO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).identidadeGenero?.message}</p>
+        </div>
+
+        <div className="space-y-2">
           <Label>Raça/Cor</Label>
           <Controller
             control={control}
@@ -167,7 +213,7 @@ export function TabVitima() {
 
         {bairro?.trim() && (
           <div className="space-y-2">
-            <Label htmlFor="macroRegiao">MacroRegiao</Label>
+            <Label htmlFor="macroRegiao">Macro-região</Label>
             <Controller
               name="macroRegiao"
               control={control}

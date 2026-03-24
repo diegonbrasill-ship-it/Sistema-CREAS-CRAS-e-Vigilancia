@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
 import { CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +13,24 @@ export function TabSaude() {
   const {
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<CasoForm>();
 
   const vitimaPCDValue = watch("vitimaPCD");
   const tratamentoSaudeValue = watch("tratamentoSaude");
+
+  useEffect(() => {
+    if (vitimaPCDValue !== "Sim") {
+      setValue("vitimaPCDDetalhe", null as any, { shouldDirty: true });
+    }
+  }, [setValue, vitimaPCDValue]);
+
+  useEffect(() => {
+    if (tratamentoSaudeValue !== "Sim") {
+      setValue("tratamentoSaudeDetalhe", null as any, { shouldDirty: true });
+    }
+  }, [setValue, tratamentoSaudeValue]);
 
   return (
     <div className="space-y-6">
