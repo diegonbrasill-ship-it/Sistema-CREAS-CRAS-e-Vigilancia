@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { CasoForm } from "../schema";
 import { SIM_NAO_OPTIONS } from "../options";
 
-export function TabSaude({ isEditMode }: { isEditMode: boolean }) {
+export function TabSaude() {
   const {
     control,
     watch,
@@ -45,14 +45,14 @@ export function TabSaude({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCD?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCD?.message}</p>
         </div>
 
         {vitimaPCDValue === "Sim" && (
           <div className="space-y-2">
             <Label htmlFor="vitimaPCDDetalhe">Qual?</Label>
             <Controller name="vitimaPCDDetalhe" control={control} render={({ field }) => <Input id="vitimaPCDDetalhe" {...field} value={field.value ?? ""} />} />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCDDetalhe?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCDDetalhe?.message}</p>
           </div>
         )}
 
@@ -76,14 +76,14 @@ export function TabSaude({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaude?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaude?.message}</p>
         </div>
 
         {tratamentoSaudeValue === "Sim" && (
           <div className="space-y-2">
             <Label htmlFor="tratamentoSaudeDetalhe">Onde?</Label>
             <Controller name="tratamentoSaudeDetalhe" control={control} render={({ field }) => <Input id="tratamentoSaudeDetalhe" {...field} value={field.value ?? ""} />} />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaudeDetalhe?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{errors.tratamentoSaudeDetalhe?.message}</p>
           </div>
         )}
       </div>

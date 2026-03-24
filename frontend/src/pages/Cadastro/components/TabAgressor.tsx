@@ -13,7 +13,7 @@ import {
   VINCULO_AGRESSOR_OPTIONS,
 } from "../options";
 
-export function TabAgressor({ isEditMode }: { isEditMode: boolean }) {
+export function TabAgressor() {
   const {
     control,
     watch,
@@ -57,7 +57,7 @@ export function TabAgressor({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).vinculoAgressor?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).vinculoAgressor?.message}</p>
         </div>
 
         {vinculoAgressor === "OUTROS" && (
@@ -68,7 +68,7 @@ export function TabAgressor({ isEditMode }: { isEditMode: boolean }) {
               control={control}
               render={({ field }) => <Input id="especificacaoOutroVinculo" {...field} value={field.value ?? ""} />}
             />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).especificacaoOutroVinculo?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).especificacaoOutroVinculo?.message}</p>
           </div>
         )}
 
@@ -92,7 +92,7 @@ export function TabAgressor({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).coabitaComAgressor?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).coabitaComAgressor?.message}</p>
         </div>
 
         <div className="space-y-2">

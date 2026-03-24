@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { CasoForm } from "../schema";
 import { SIM_NAO_OPTIONS } from "../options";
 
-export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
+export function TabFamilia() {
   const {
     control,
     formState: { errors },
@@ -49,7 +49,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.rendaFamiliar?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.rendaFamiliar?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -72,7 +72,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebePBF?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.recebePBF?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -93,7 +93,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBPC?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBPC?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -116,7 +116,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBE?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.recebeBE?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -139,7 +139,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membrosCadUnico?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.membrosCadUnico?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -163,12 +163,12 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.composicaoFamiliar?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.composicaoFamiliar?.message}</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="referenciaFamiliar">Referência Familiar</Label>
           <Controller name="referenciaFamiliar" control={control} render={({ field }) => <Input id="referenciaFamiliar" {...field} value={field.value ?? ""} />} />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.referenciaFamiliar?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.referenciaFamiliar?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -191,7 +191,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membroCarcerario?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.membroCarcerario?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -214,7 +214,7 @@ export function TabFamilia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.membroSocioeducacao?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.membroSocioeducacao?.message}</p>
         </div>
       </div>
     </div>

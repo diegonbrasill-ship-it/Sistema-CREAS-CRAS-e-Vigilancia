@@ -61,6 +61,9 @@ const tipoResidenciaEnum = z.enum(["CASA", "APARTAMENTO", "COMODO_QUITINETE", "B
 const formaOcupacaoEnum = z.enum(["PROPRIA_PAGA", "PROPRIA_EM_AQUISICAO", "ALUGADA", "CEDIDA_FAMILIAR_AMIGO", "CEDIDA_EMPREGADOR", "OCUPADA_IRREGULAR"]);
 const materialConstrucaoEnum = z.enum(["ALVENARIA_TIJOLO", "MADEIRA_APARELHADA", "MATERIAL_REAPROVEITADO", "SEM_CONSTRUCAO_PERMANENTE"]);
 
+const requiredEnumField = <T extends [string, ...string[]]>(values: T, message: string) =>
+  z.preprocess(toStr, z.string().min(1, message).pipe(z.enum(values, { error: message })));
+
 const violenciaDescricoesByTipo = {
   FISICA: [
     "ESPANCAMENTO",
@@ -147,7 +150,7 @@ export const baseSchema = z
   .object({
     data_cad: z.string().min(1, "A data do cadastro é obrigatória."),
     tec_ref: z.string().min(3, "O nome do técnico é obrigatório."),
-    tipoViolencia: z.preprocess(toStr, tipoViolenciaEnum),
+    tipoViolencia: requiredEnumField(["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"], "Selecione o tipo de violência."),
     canalDenuncia: z.preprocess(toStr, canalDenunciaEnum).optional().nullable(),
 
     nome: z.string().optional().nullable(),
@@ -230,16 +233,35 @@ export const editSchema = z
   .object({
     data_cad: z.preprocess(toStr, z.string().min(1, "A data do cadastro é obrigatória.")),
     tec_ref: z.preprocess(toStr, z.string().min(3, "O nome do técnico é obrigatório.")),
-    tipoViolencia: z.preprocess(toStr, tipoViolenciaEnum),
-    canalDenuncia: z.preprocess(toStr, canalDenunciaEnum),
+    tipoViolencia: requiredEnumField(["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"], "Selecione o tipo de violência."),
+    canalDenuncia: requiredEnumField(
+      ["DISQUE_100_180", "CONSELHO_TUTELAR", "PODER_JUDICIARIO_MINISTERIO_PUBLICO", "DELEGACIA_DE_POLICIA", "DEMANDA_ESPONTANEA", "ENCAMINHAMENTO_DA_REDE", "OUTROS"],
+      "Selecione o canal de denúncia.",
+    ),
     nome: z.preprocess(toStr, z.string().min(1, "O nome completo é obrigatório.")),
     cpf: z.preprocess(toStr, z.string().min(1, "O CPF é obrigatório.").refine(validateCPF, { message: "CPF inválido." })),
     nis: z.preprocess(toStr, z.string().min(1, "O NIS é obrigatório.").refine(validateNIS, { message: "NIS deve conter 11 dígitos." })),
     idade: z.preprocess(toStr, z.string().min(1, "A idade é obrigatória.")),
-    sexo: z.preprocess(toStr, sexoEnum),
-    racaCor: z.preprocess(toStr, racaCorEnum),
+    sexo: requiredEnumField(["MASCULINO", "FEMININO", "INTERSEXO"], "Selecione o sexo."),
+    racaCor: requiredEnumField(["BRANCA", "PRETA", "PARDA", "AMARELA", "INDIGENA", "NAO_DECLARADO"], "Selecione a raça/cor."),
     bairro: z.preprocess(toStr, z.string().min(1, "O bairro é obrigatório.")),
-    escolaridade: z.preprocess(toStr, escolaridadeEnum),
+    escolaridade: requiredEnumField(
+      [
+        "SEM_IDADE_ESCOLAR",
+        "EJA",
+        "FUNDAMENTAL_1_INCOMPLETO",
+        "FUNDAMENTAL_1_COMPLETO",
+        "FUNDAMENTAL_2_INCOMPLETO",
+        "FUNDAMENTAL_2_COMPLETO",
+        "ENSINO_MEDIO_INCOMPLETO",
+        "ENSINO_MEDIO_COMPLETO",
+        "TECNICO_INCOMPLETO",
+        "TECNICO_COMPLETO",
+        "SUPERIOR_INCOMPLETO",
+        "SUPERIOR_COMPLETO",
+      ],
+      "Selecione a escolaridade.",
+    ),
     rendaFamiliar: z.preprocess(toStr, z.string().min(1, "A renda familiar é obrigatória.")),
     recebePBF: z.preprocess(toStr, z.string().min(1, "Informe se recebe Bolsa Família.")),
     recebeBPC: z.preprocess(toStr, z.string().min(1, "Informe se recebe BPC.")),
@@ -256,12 +278,15 @@ export const editSchema = z
     tratamentoSaudeDetalhe: z.string().optional().nullable(),
     encaminhamento: z.preprocess(toStr, z.string().min(1, "Informe se houve encaminhamento.")),
     encaminhamentoDetalhe: z.string().optional().nullable(),
-    encaminhadaSCFV: z.preprocess(toStr, encaminhadaScfvEnum),
-    inseridoPAEFI: z.preprocess(toStr, simNaoEnum),
-    confirmacaoViolencia: z.preprocess(toStr, confirmacaoViolenciaEnum),
-    notificacaoSINAN: z.preprocess(toStr, simNaoEnum),
-    reincidente: z.preprocess(toStr, simNaoEnum),
+    encaminhadaSCFV: requiredEnumField(["SCFV", "CDI", "Não"], "Informe se a vítima foi encaminhada ao SCFV/CDI."),
+    inseridoPAEFI: requiredEnumField(["Sim", "Não"], "Informe se a vítima foi inserida no PAEFI."),
+    confirmacaoViolencia: requiredEnumField(["Confirmada", "Em análise", "Não confirmada"], "Selecione a confirmação da violência."),
+    notificacaoSINAN: requiredEnumField(["Sim", "Não"], "Informe se houve notificação no SINAN."),
+    reincidente: requiredEnumField(["Sim", "Não"], "Informe se é um caso de reincidência."),
     ...canonicalOptionalFields,
+    vinculoAgressor: requiredEnumField(["CONJUGE", "COMPANHEIRO", "EX_COMPANHEIRO", "PAI", "MAE", "FILHO", "IRMAO", "OUTROS"], "Selecione o vínculo com o agressor."),
+    coabitaComAgressor: requiredEnumField(["Sim", "Não"], "Informe se a vítima coabita com o agressor."),
+    sexoAgressor: requiredEnumField(["HOMEM", "MULHER", "OUTRO"], "Selecione o sexo do agressor."),
   })
   .superRefine((data: any, ctx) => {
     const descricoes = Array.isArray(data.tipoViolenciaDescricoes) ? data.tipoViolenciaDescricoes.filter((item: unknown) => !isBlank(item)) : [];
@@ -299,33 +324,55 @@ export const editSchema = z
     }
   });
 
-export type CasoForm = z.infer<typeof editSchema>;
+export const submitSchema = editSchema;
 
-export const tabFields: Record<string, (keyof CasoForm)[]> = {
-  "1. Atendimento": ["data_cad", "tec_ref", "tipoViolencia", "tipoViolenciaDescricoes", "canalDenuncia", "protocolo", "especificacaoOutroCanal"],
-  "2. Vítima": ["nome", "cpf", "nis", "idade", "sexo", "racaCor", "etniaIndigena", "bairro", "macroRegiao", "escolaridade"],
-  "3. Família": [
-    "rendaFamiliar",
-    "recebePBF",
-    "recebeBPC",
-    "recebeBE",
-    "membrosCadUnico",
-    "membroPAI",
-    "composicaoFamiliar",
-    "referenciaFamiliar",
-    "membroCarcerario",
-    "membroSocioeducacao",
-  ],
-  "4. Saúde": ["vitimaPCD", "vitimaPCDDetalhe", "tratamentoSaude", "tratamentoSaudeDetalhe"],
-  "5. Encaminhamentos": [
-    "encaminhamento",
-    "encaminhamentoDetalhe",
-    "encaminhadaSCFV",
-    "inseridoPAEFI",
-    "confirmacaoViolencia",
-    "notificacaoSINAN",
-    "reincidente",
-  ],
-  "6. Agressor": ["vinculoAgressor", "especificacaoOutroVinculo", "coabitaComAgressor", "faixaEtariaAgressor", "sexoAgressor", "bairroAgressor"],
-  "7. Moradia": ["tipoResidencia", "formaOcupacao", "materialConstrucao", "valorAluguel"],
-};
+export type CasoForm = z.infer<typeof submitSchema>;
+
+export const tabDefinitions = [
+  {
+    value: "atendimento",
+    label: "1. Atendimento",
+    fields: ["data_cad", "tec_ref", "tipoViolencia", "tipoViolenciaDescricoes", "canalDenuncia", "protocolo", "especificacaoOutroCanal"],
+  },
+  {
+    value: "vitima",
+    label: "2. Vítima",
+    fields: ["nome", "cpf", "nis", "idade", "sexo", "racaCor", "etniaIndigena", "bairro", "macroRegiao", "escolaridade"],
+  },
+  {
+    value: "familia",
+    label: "3. Família",
+    fields: [
+      "rendaFamiliar",
+      "recebePBF",
+      "recebeBPC",
+      "recebeBE",
+      "membrosCadUnico",
+      "membroPAI",
+      "composicaoFamiliar",
+      "referenciaFamiliar",
+      "membroCarcerario",
+      "membroSocioeducacao",
+    ],
+  },
+  {
+    value: "saude",
+    label: "4. Saúde",
+    fields: ["vitimaPCD", "vitimaPCDDetalhe", "tratamentoSaude", "tratamentoSaudeDetalhe"],
+  },
+  {
+    value: "encaminhamentos",
+    label: "5. Encaminhamentos",
+    fields: ["encaminhamento", "encaminhamentoDetalhe", "encaminhadaSCFV", "inseridoPAEFI", "confirmacaoViolencia", "notificacaoSINAN", "reincidente"],
+  },
+  {
+    value: "agressor",
+    label: "6. Agressor",
+    fields: ["vinculoAgressor", "especificacaoOutroVinculo", "coabitaComAgressor", "faixaEtariaAgressor", "sexoAgressor", "bairroAgressor"],
+  },
+  {
+    value: "moradia",
+    label: "7. Moradia",
+    fields: ["tipoResidencia", "formaOcupacao", "materialConstrucao", "valorAluguel"],
+  },
+] as const satisfies Array<{ value: string; label: string; fields: (keyof CasoForm)[] }>;

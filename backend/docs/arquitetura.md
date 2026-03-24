@@ -46,6 +46,7 @@ migrations/
 tests/
 ├── casos.routes.test.ts      # Testes de rota (Express + Supertest)
 ├── casos.service.test.ts     # Testes unitários de service (SQL + params)
+├── casos.http.integration.test.ts # Integração HTTP real de casos com PostgreSQL
 ├── query-builder.test.ts
 ├── smoke.test.ts
 └── schema.integration.ts     # Verifica schema e dados obrigatórios em DB real
@@ -59,6 +60,7 @@ docs/
     ├── arquitetura_caso.md
     ├── cadastro_models.md
     ├── casos-rotas-analise.md
+    ├── dashboard-drilldown-contrato-atual.md
     └── plano-melhoria-cadastro-rotas.md
 ```
 
@@ -163,6 +165,7 @@ A documentacao especifica de `casos` foi centralizada em:
 - `docs/casos/arquitetura_caso.md`
 - `docs/casos/cadastro_models.md`
 - `docs/casos/casos-rotas-analise.md`
+- `docs/casos/dashboard-drilldown-contrato-atual.md`
 - `docs/casos/plano-melhoria-cadastro-rotas.md`
 
 ### 4.2 Montagem segura de SQL com `QueryBuilder`
@@ -189,6 +192,18 @@ Funcionalidades principais:
   - Gestor: `{ whereClause: 'TRUE', params: [] }`
   - Demais: `{ whereClause: 'casos.unit_id', params: [<unit_id>] }` (ou alias equivalente)
 
+- O formato atual do filtro de acesso padronizado no projeto e:
+
+```ts
+{ whereClause: 'casos.unit_id', params: [unitId] }
+```
+
+- Componentes que consomem esse filtro precisam aceitar tambem o formato legado com placeholder:
+
+```ts
+{ whereClause: 'casos.unit_id = $X', params: [unitId] }
+```
+
 - No service, `QueryBuilder.applyAccessFilter(accessFilter)` adiciona:
 
 ```
@@ -199,6 +214,9 @@ Isso garante:
 
 - Usuários comuns veem apenas dados de sua unidade.
 - Registros globais (`unit_id IS NULL`) também são visíveis (ex.: gestor principal).
+
+- O middleware `src/middleware/caseAccess.middleware.ts` foi ajustado para resolver corretamente os dois formatos de `accessFilter` acima ao validar acesso a um caso especifico ou a itens filhos de um caso.
+- Com isso, as rotas protegidas por `checkCaseAccess(...)` e `checkItemAccessByParentCase(...)` retornam `403` quando o caso existe mas pertence a outra unidade, em vez de falhar com erro interno por interpretar `casos.unit_id` como expressao booleana invalida no SQL.
 
 ### 4.4 Filtros implementados em `GET /api/casos`
 
@@ -254,7 +272,18 @@ Campos e comportamentos mantidos na listagem:
   - o router executa middlewares mockados (`authMiddleware`, `unitAccessMiddleware`, `checkCaseAccess`)
   - o controller chama os métodos do `CasosService` com os argumentos esperados (body, querystring, `req.user`, `req.accessFilter`)
 
-### 5.3 Testes de Schema em Banco Real
+### 5.3 Testes HTTP com Banco Real
+
+- `tests/casos.http.integration.test.ts`: usa `supertest`, JWT real e PostgreSQL real do ambiente de teste para validar:
+  - insercao real de casos por `POST /api/casos`
+  - derivacao de `unit_id` a partir do usuario autenticado
+  - bloqueio de criacao em unidade diferente para usuario comum
+  - filtros reais da listagem (`search`, `mes`, `status`, `filters[...]`)
+  - isolamento por unidade na listagem
+  - visao global para `gestor`
+  - retorno `403` no detalhe de caso fora da unidade do usuario
+
+### 5.4 Testes de Schema em Banco Real
 
 - `tests/schema.integration.ts`: valida schema e dados obrigatórios em um PostgreSQL real.
 - Essa suíte verifica:
@@ -272,7 +301,7 @@ Restrições:
 - a suíte bloqueia execução quando `APP_ENV=prod`
 - a suíte depende de um banco já existente e migrado
 
-### 5.4 Scripts Principais
+### 5.5 Scripts Principais
 
 Banco e servidor:
 
@@ -298,7 +327,7 @@ Testes:
 - `npm run test:schema:dev`
 - `npm run test:schema:test`
 
-### 5.5 Fluxos Recomendados
+### 5.6 Fluxos Recomendados
 
 Desenvolvimento local com banco novo:
 

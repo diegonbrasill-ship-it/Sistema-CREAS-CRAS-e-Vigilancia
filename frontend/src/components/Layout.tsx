@@ -159,9 +159,8 @@ export default function Layout() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r flex flex-col shadow-sm">
         <div className="p-4 border-b flex items-center gap-3">
-          <img src="/logos/rmsuas-logo.svg" alt="RMSUAS Logo" className="h-10" />
           <div>
-            <h1 className="text-base font-bold text-slate-800">SUAS</h1>
+            <h1 className="text-base font-bold text-slate-800">Nobly SIMAS PRO</h1>
             <p className="text-xs text-slate-500">Patos/PB</p>
           </div>
         </div>

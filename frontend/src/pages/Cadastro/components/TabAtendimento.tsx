@@ -12,7 +12,7 @@ import {
   TIPO_VIOLENCIA_OPTIONS,
 } from "../options";
 
-export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
+export function TabAtendimento() {
   const {
     register,
     control,
@@ -47,13 +47,13 @@ export function TabAtendimento({ isEditMode }: { isEditMode: boolean }) {
       <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
         <div className="space-y-2">
           <Label htmlFor="data_cad">Data do Cadastro</Label>
-          <Input id="data_cad" type="date" {...register("data_cad")} disabled={isEditMode} />
+          <Input id="data_cad" type="date" {...register("data_cad")} />
           <p className="text-sm text-red-500 mt-1 h-4">{errors.data_cad?.message}</p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="tec_ref">Técnico Responsável</Label>
-          <Input id="tec_ref" placeholder="Nome do técnico - Cargo" {...register("tec_ref")} disabled={isEditMode} />
+          <Input id="tec_ref" placeholder="Nome do técnico - Cargo" {...register("tec_ref")} readOnly />
           <p className="text-sm text-red-500 mt-1 h-4">{errors.tec_ref?.message}</p>
         </div>
       </div>

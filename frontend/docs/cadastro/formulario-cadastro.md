@@ -15,13 +15,15 @@ Gerado a partir de:
 
 ### 1.1 Modo criação (`/cadastro`)
 
-- Somente a aba **1. Atendimento** fica disponível.
-- Ao clicar em **“Salvar e Iniciar Prontuário”**, é criado um registro inicial e o usuário é redirecionado para **modo edição** (`/cadastro/:id`).
+- Todas as abas ficam disponíveis desde o início.
+- O formulário usa a mesma validação do modo edição.
+- Ao clicar em **“Criar e Salvar Progresso”**, o frontend só cria o caso quando todos os obrigatórios estiverem válidos e redireciona para **modo edição** (`/cadastro/:id`).
+- Ao clicar em **“Criar e Ver Prontuário”**, o frontend cria o caso completo e redireciona para o detalhe (`/caso/:id`).
 
 ### 1.2 Modo edição (`/cadastro/:id`)
 
 - Todas as abas ficam disponíveis.
-- O botão **“Salvar Progresso”** salva alterações.
+- O botão **“Salvar Progresso”** salva alterações e permanece na tela de edição.
 - O botão **“Finalizar e Ver Prontuário”** salva e redireciona para o detalhe do caso.
 
 ### 1.3 Stack/padrão técnico (contexto)
@@ -38,8 +40,8 @@ Gerado a partir de:
 
 ### 2.1 Obrigatoriedade
 
-- No modo **criação**, os obrigatórios são os necessários para abrir o prontuário (aba Atendimento).
-- No modo **edição**, o schema pode exigir mais campos (depende da regra no `editSchema`).
+- No modo **criação**, os obrigatórios são os mesmos do modo **edição**.
+- O frontend só persiste o primeiro `POST /api/casos` quando o formulário completo estiver válido.
 
 ### 2.2 Campos condicionais
 

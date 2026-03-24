@@ -4,6 +4,14 @@ export type CasosSortBy = "data_cad" | "nome" | "tec_ref";
 export type CasosSortOrder = "asc" | "desc";
 export type DrilldownSource = "dashboard" | "vigilancia";
 
+export interface CasoDrilldownListItem {
+  id: number;
+  nome?: string;
+  tec_ref: string;
+  data_cad: string;
+  bairro?: string;
+}
+
 export interface CasosListParams {
   search?: string;
   searchBy?: CasosSearchBy;
@@ -263,6 +271,26 @@ function normalizeSimNao(value: string): string {
   return value.trim();
 }
 
+function normalizeRacaCor(value: string): string {
+  const normalized = normalizeDiacritics(value).trim().toUpperCase();
+
+  if (normalized === "BRANCA") return "BRANCA";
+  if (normalized === "PRETA") return "PRETA";
+  if (normalized === "PARDA") return "PARDA";
+  if (normalized === "AMARELA") return "AMARELA";
+  if (normalized === "INDIGENA") return "INDIGENA";
+  if (
+    normalized === "NAO DECLARADO" ||
+    normalized === "NAO_DECLARADO" ||
+    normalized === "NÃO DECLARADO" ||
+    normalized === "NÃO_DECLARADO"
+  ) {
+    return "NAO_DECLARADO";
+  }
+
+  return normalized;
+}
+
 function normalizeFilterValue(filterKey: string, value: string): string {
   switch (filterKey) {
     case "sexo":
@@ -279,12 +307,13 @@ function normalizeFilterValue(filterKey: string, value: string): string {
     case "vitimaPCD":
     case "membroCarcerario":
     case "confirmacaoViolencia":
-      return normalizeSimNao(value) === "Não" ? "Não" : value.trim();
+      return normalizeSimNao(value);
     case "bairro":
     case "canalDenuncia":
-    case "racaCor":
     case "faixaEtariaVitima":
       return value.trim();
+    case "racaCor":
+      return normalizeRacaCor(value);
     default:
       return value.trim();
   }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,8 +7,10 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/contexts/AuthContext";
 import { createCase, getCasoById, updateCase } from "@/services/api";
 
-import { baseSchema, editSchema, tabFields, type CasoForm } from "./schema";
+import { submitSchema, tabDefinitions, type CasoForm } from "./schema";
 import { caseToFormValues, formValuesToCreatePayload, formValuesToUpdatePayload } from "./adapters";
+
+type SubmitIntent = "save" | "finalize";
 
 export function useCadastroForm() {
   const { id } = useParams<{ id: string }>();
@@ -16,16 +18,29 @@ export function useCadastroForm() {
   const isEditMode = !!id;
   const { user } = useAuth();
 
-  const formSchema = useMemo(() => (isEditMode ? editSchema : baseSchema), [isEditMode]);
+  const tecRefFromAuth = useMemo(() => {
+    if (!user) return undefined;
+    const nomeCompleto = user.nome_completo || user.username;
+    const cargo = user.cargo || "";
+    return user.role.includes("tecnico") && cargo ? `${nomeCompleto} - ${cargo}` : nomeCompleto;
+  }, [user]);
+
+  const formSchema = useMemo(() => submitSchema, []);
+  const submitIntentRef = useRef<SubmitIntent>("save");
+  const createDefaultValues = useMemo(
+    () =>
+      ({
+        data_cad: new Date().toISOString().split("T")[0],
+        tec_ref: tecRefFromAuth ?? "",
+        tipoViolencia: "" as any,
+        canalDenuncia: "" as any,
+      }) satisfies Partial<CasoForm>,
+    [tecRefFromAuth],
+  );
 
   const form = useForm<CasoForm>({
     resolver: zodResolver(formSchema) as any,
-    defaultValues: {
-      data_cad: new Date().toISOString().split("T")[0],
-      tec_ref: "",
-      tipoViolencia: "" as any,
-      canalDenuncia: "" as any,
-    },
+    defaultValues: createDefaultValues as any,
   });
 
   const {
@@ -38,13 +53,6 @@ export function useCadastroForm() {
 
   const [isDataLoading, setIsDataLoading] = useState(isEditMode);
   const [activeTab, setActiveTab] = useState("atendimento");
-
-  const tecRefFromAuth = useMemo(() => {
-    if (!user) return undefined;
-    const nomeCompleto = user.nome_completo || user.username;
-    const cargo = user.cargo || "";
-    return user.role.includes("tecnico") && cargo ? `${nomeCompleto} - ${cargo}` : nomeCompleto;
-  }, [user]);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -68,30 +76,39 @@ export function useCadastroForm() {
 
     // modo criação
     if (user) {
-      reset({
-        data_cad: new Date().toISOString().split("T")[0],
-        tec_ref: tecRefFromAuth ?? "",
-      } as any);
+      reset(createDefaultValues as any);
       setIsDataLoading(false);
     }
-  }, [id, isEditMode, navigate, reset, user, tecRefFromAuth]);
+  }, [createDefaultValues, id, isEditMode, navigate, reset, user, tecRefFromAuth]);
 
   const onInvalid = (fieldErrors: FieldErrors<CasoForm>) => {
-    if (!isEditMode) return;
     const errorKeys = Object.keys(fieldErrors) as (keyof CasoForm)[];
-    const tabsComErro = Object.entries(tabFields)
-      .filter(([_, fields]) => fields.some((f) => errorKeys.includes(f)))
-      .map(([tabName]) => tabName);
+    const tabsComErro = tabDefinitions.filter((tab) => tab.fields.some((field) => errorKeys.includes(field)));
 
     if (tabsComErro.length > 0) {
-      toast.warn(`⚠️ Preencha todos os campos obrigatórios nas abas: ${tabsComErro.join(", ")}`, { autoClose: 6000 });
+      setActiveTab(tabsComErro[0].value);
+      toast.warn(`⚠️ Preencha todos os campos obrigatórios nas abas: ${tabsComErro.map((tab) => tab.label).join(", ")}`, { autoClose: 6000 });
     }
   };
 
+  const handleSubmitSuccessNavigation = (targetId: string | number, intent: SubmitIntent) => {
+    if (intent === "finalize") {
+      navigate(`/caso/${targetId}`);
+      return;
+    }
+    navigate(`/cadastro/${targetId}`, { replace: true });
+  };
+
   const onSubmit = async (data: CasoForm) => {
+    const submitIntent = submitIntentRef.current;
+
     try {
       if (isEditMode && id) {
         if (Object.keys(dirtyFields).length === 0) {
+          if (submitIntent === "finalize") {
+            navigate(`/caso/${id}`);
+            return;
+          }
           toast.info("Nenhuma alteração para salvar.");
           return;
         }
@@ -110,11 +127,13 @@ export function useCadastroForm() {
         const payload = formValuesToUpdatePayload(dirtyData, { tecRefFromAuth, unitIdFromAuth: user?.unit_id });
         await updateCase(id, payload);
 
-        toast.success("✅ Progresso salvo com sucesso!");
+        toast.success(submitIntent === "finalize" ? "✅ Cadastro salvo com sucesso!" : "✅ Progresso salvo com sucesso!");
         // mantém o formulário consistente com o que foi submetido (inclui tec_ref autoritativo)
-        reset({ ...data, tec_ref: tecRefFromAuth ?? data.tec_ref } as any, { keepValues: true, keepDefaultValues: true });
-        toast.success("Prontuário finalizado!");
-        navigate(`/caso/${id}`);
+        reset({ ...data, tec_ref: tecRefFromAuth ?? data.tec_ref } as any);
+        if (submitIntent === "finalize") {
+          toast.success("Prontuário finalizado!");
+          navigate(`/caso/${id}`);
+        }
         return;
       }
 
@@ -128,16 +147,20 @@ export function useCadastroForm() {
         return;
       }
 
-      toast.success("✅ Registro inicial criado! Continue preenchendo as abas.");
-      navigate(`/cadastro/${novoCasoId}`, { replace: true });
+      toast.success(submitIntent === "finalize" ? "✅ Prontuário criado com sucesso!" : "✅ Cadastro criado e salvo com sucesso!");
+      handleSubmitSuccessNavigation(novoCasoId, submitIntent);
     } catch (error: any) {
       toast.error(`❌ Falha ao salvar: ${error?.message ?? String(error)}`);
     }
   };
 
   const handleFinalize = async () => {
-    if (!id) return;
+    submitIntentRef.current = "finalize";
     await handleSubmit(onSubmit, onInvalid)();
+  };
+
+  const handleSaveProgress = () => {
+    submitIntentRef.current = "save";
   };
 
   const handleClearForm = () => {
@@ -145,7 +168,8 @@ export function useCadastroForm() {
       toast.warn("Não é possível limpar um prontuário em edição.");
       return;
     }
-    navigate("/cadastro", { replace: true });
+    reset(createDefaultValues as any);
+    setActiveTab("atendimento");
     toast.info("Formulário limpo para um novo registro.");
   };
 
@@ -162,6 +186,7 @@ export function useCadastroForm() {
     onInvalid,
     onSubmit,
     handleFinalize,
+    handleSaveProgress,
     handleClearForm,
   };
 }

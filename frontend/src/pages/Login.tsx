@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, User, Lock } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-import rmsuasLogo from "../assets/logos/rmsuas-logo.png";
 import prefeituraLogo from "../assets/logos/prefeitura.png";
 import secretariaLogo from "../assets/logos/secretaria.png";
 import creasLogo from "../assets/logos/creas.png";
@@ -66,13 +65,16 @@ export default function Login({ onLogin }: LoginProps) {
           />
         </div>
 
-        {/* Logo RMSUAS no Centro */}
+        {/* Marca do sistema no Centro */}
         <div className="header-center">
-          {/* 3. LOGO RMSUAS MAIOR (h-32 = 128px) */}
-          <img src={rmsuasLogo} alt="Logo RMSUAS" className="h-32 object-contain" />
+          <div className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Nobly</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">SIMAS PRO</h1>
+            <p className="text-sm text-slate-500">Plataforma de gestao socioassistencial</p>
+          </div>
         </div>
 
-        {/* Espaço vazio à Direita para garantir a centralização correta do logo RMSUAS */}
+        {/* Espaço vazio à Direita para garantir a centralização correta da marca */}
         <div className="header-side"></div>
       </header>
 
@@ -80,8 +82,8 @@ export default function Login({ onLogin }: LoginProps) {
       <main className="login-main-content">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="items-center text-center">
-            <CardTitle className="text-xl">Sistema de Registros e Monitoramento</CardTitle>
-            <CardDescription>Utilize seu usuário e senha institucionais.</CardDescription>
+            <CardTitle className="text-xl">Nobly SIMAS PRO</CardTitle>
+            <CardDescription>Utilize seu usuario e senha institucionais.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">

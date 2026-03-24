@@ -2,7 +2,7 @@
 // frontend/src/services/api.ts
 
 import { arrayOutputType } from "zod/v3";
-import { CasosListParams, toCasosSearchParams } from "./casosDrilldown";
+import { CasoDrilldownListItem, CasosListParams, toCasosSearchParams } from "./casosDrilldown";
 
 //adicionar if modo debug
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -14,6 +14,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export interface FiltrosBase {
     mes?: string;
     tecRef?: string;
+    tec_ref?: string;
     bairro?: string;
     unidades?: string; // Li sta de IDs separadas por vírgula (dashboardFilterUnits.join(','))
     isFiltroTotal?: boolean; // Flag para Gestor Geral
@@ -164,6 +165,58 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return response.json();
 }
 
+const DASHBOARD_NUMERIC_INDICATOR_KEYS = [
+    "totalAtendimentos",
+    "novosNoMes",
+    "inseridosPAEFI",
+    "reincidentes",
+    "recebemBolsaFamilia",
+    "recebemBPC",
+    "violenciaConfirmada",
+    "notificadosSINAN",
+] as const;
+
+const DASHBOARD_CONTEXTO_KEYS = [
+    "dependenciaFinanceira",
+    "vitimaPCD",
+    "membroCarcerario",
+    "membroSocioeducacao",
+] as const;
+
+function normalizeNumber(value: unknown): number {
+    const normalized = Number(value);
+    return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function normalizeDashboardResponse(response: ApiResponse): ApiResponse {
+    const indicadores = response?.dados?.indicadores;
+
+    if (!indicadores) {
+        return response;
+    }
+
+    const normalizedIndicadores = { ...indicadores };
+    for (const key of DASHBOARD_NUMERIC_INDICATOR_KEYS) {
+        normalizedIndicadores[key] = normalizeNumber(indicadores[key]);
+    }
+
+    const normalizedContexto = { ...(indicadores.contextoFamiliar ?? {}) } as DashboardApiDataType["indicadores"]["contextoFamiliar"];
+    for (const key of DASHBOARD_CONTEXTO_KEYS) {
+        normalizedContexto[key] = normalizeNumber(indicadores.contextoFamiliar?.[key]);
+    }
+
+    return {
+        ...response,
+        dados: {
+            ...response.dados,
+            indicadores: {
+                ...normalizedIndicadores,
+                contextoFamiliar: normalizedContexto,
+            },
+        },
+    };
+}
+
 // 🟢 Função auxiliar para adicionar parâmetros de filtro à URL (Usada nas funções de Dashboard e Vigilância)
 const appendFiltros = (filters?: FiltrosBase): string => {
     const params = new URLSearchParams();
@@ -171,11 +224,13 @@ const appendFiltros = (filters?: FiltrosBase): string => {
         Object.entries(filters).forEach(([key, value]) => {
             // Garante que apenas valores não nulos/vazios sejam anexado
             if (value !== null && value !== undefined && value !== '') {
-                params.append(key, String(value));
+                const queryKey = key === "tecRef" ? "tec_ref" : key;
+                params.append(queryKey, String(value));
             }
         });
     }
-    return `?${params.toString()}`;
+    const query = params.toString();
+    return query ? `?${query}` : "";
 };
 
 // --- FUNÇÕES DA API ---
@@ -199,7 +254,7 @@ export const updateCasoStatus = (casoId: string | number, status: string) => fet
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
 
-export const listCasosCanonicos = (params?: CasosListParams): Promise<any[]> => {
+export const listCasosCanonicos = (params?: CasosListParams): Promise<CasoDrilldownListItem[]> => {
     const searchParams = toCasosSearchParams(params ?? {});
     const query = searchParams.toString();
     return fetchWithAuth(`/api/casos${query ? `?${query}` : ''}`);
@@ -259,7 +314,7 @@ export async function generateReport(filters: { startDate: string, endDate: stri
 export const getDashboardData = (filters?: FiltrosBase): Promise<ApiResponse> => {
     // 🟢 Utiliza a função auxiliar para anexar todos os filtros (incluindo unidades)
     const paramsString = appendFiltros(filters);
-    return fetchWithAuth(`/api/dashboard${paramsString}`);
+    return fetchWithAuth(`/api/dashboard${paramsString}`).then((response) => normalizeDashboardResponse(response as ApiResponse));
 };
 
 // PAINEL DE VIGILÂNCIA

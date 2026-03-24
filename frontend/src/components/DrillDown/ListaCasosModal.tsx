@@ -3,21 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Loader2, Eye } from "lucide-react";
-
-interface CasoParaLista {
-  id: number;
-  nome?: string;
-  tec_ref: string;
-  data_cad: string;
-  bairro?: string;
-}
+import { type CasoDrilldownListItem } from "@/services/casosDrilldown";
 
 // A prop 'className' foi removida para simplificar
 interface ListaCasosModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  cases: CasoParaLista[];
+  cases: CasoDrilldownListItem[];
   isLoading: boolean;
   errorMessage?: string | null;
 }
@@ -37,7 +30,7 @@ const formatCaseDate = (value?: string) => {
   return parsed.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 };
 
-export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoading }: ListaCasosModalProps) {
+export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoading, errorMessage }: ListaCasosModalProps  ) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {/* 📌 A CORREÇÃO ESTÁ AQUI 
@@ -51,8 +44,9 @@ export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoadi
         <DialogHeader>
           <DialogTitle className="text-2xl">{title}</DialogTitle>
           <DialogDescription>
-            Lista detalhada de casos correspondentes ao indicador selecionado.
-            {cases.length > 0 && ` Total: ${cases.length} caso(s).`}
+            {errorMessage
+              ? errorMessage
+              : `Lista detalhada de casos correspondentes ao indicador selecionado.${cases.length > 0 ? ` Total: ${cases.length} caso(s).` : ""}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -61,6 +55,10 @@ export default function ListaCasosModal({ isOpen, onClose, title, cases, isLoadi
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
               <p className="ml-4 text-slate-500">Buscando casos...</p>
+            </div>
+          ) : errorMessage ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-600">
+              {errorMessage}
             </div>
           ) : (
             <Table>

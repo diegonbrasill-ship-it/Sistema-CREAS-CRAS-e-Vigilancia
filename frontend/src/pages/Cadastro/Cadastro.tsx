@@ -25,6 +25,7 @@ export default function Cadastro() {
     onSubmit,
     onInvalid,
     handleFinalize,
+    handleSaveProgress,
     handleClearForm,
   } = useCadastroForm();
 
@@ -43,8 +44,8 @@ export default function Cadastro() {
         <h1 className="text-2xl font-bold text-slate-800">{isEditMode ? "Editando Prontuário" : "Registro de Atendimento PAEFI"}</h1>
         <p className="text-slate-500">
           {isEditMode
-            ? "Altere os dados e salve o progresso. Clique em 'Finalizar' quando terminar."
-            : "Preencha as informações do caso. O técnico já foi preenchido."}
+            ? "Altere os dados, salve o progresso e finalize quando concluir o prontuário."
+            : "Preencha todas as abas e salve o cadastro completo na primeira gravação."}
         </p>
       </div>
 
@@ -53,54 +54,42 @@ export default function Cadastro() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="atendimento">1. Atendimento</TabsTrigger>
-              <TabsTrigger value="vitima" disabled={!isEditMode}>
-                2. Vítima
-              </TabsTrigger>
-              <TabsTrigger value="familia" disabled={!isEditMode}>
-                3. Família
-              </TabsTrigger>
-              <TabsTrigger value="saude" disabled={!isEditMode}>
-                4. Saúde
-              </TabsTrigger>
-              <TabsTrigger value="encaminhamentos" disabled={!isEditMode}>
-                5. Encaminhamentos
-              </TabsTrigger>
-              <TabsTrigger value="agressor" disabled={!isEditMode}>
-                6. Agressor
-              </TabsTrigger>
-              <TabsTrigger value="moradia" disabled={!isEditMode}>
-                7. Moradia
-              </TabsTrigger>
+              <TabsTrigger value="vitima">2. Vítima</TabsTrigger>
+              <TabsTrigger value="familia">3. Família</TabsTrigger>
+              <TabsTrigger value="saude">4. Saúde</TabsTrigger>
+              <TabsTrigger value="encaminhamentos">5. Encaminhamentos</TabsTrigger>
+              <TabsTrigger value="agressor">6. Agressor</TabsTrigger>
+              <TabsTrigger value="moradia">7. Moradia</TabsTrigger>
             </TabsList>
 
             <Card className="mt-4">
               <CardContent className="pt-6">
                 <TabsContent value="atendimento" className="space-y-6">
-                  <TabAtendimento isEditMode={isEditMode} />
+                  <TabAtendimento />
                 </TabsContent>
 
                 <TabsContent value="vitima" className="space-y-6">
-                  <TabVitima isEditMode={isEditMode} />
+                  <TabVitima />
                 </TabsContent>
 
                 <TabsContent value="familia" className="space-y-6">
-                  <TabFamilia isEditMode={isEditMode} />
+                  <TabFamilia />
                 </TabsContent>
 
                 <TabsContent value="saude" className="space-y-6">
-                  <TabSaude isEditMode={isEditMode} />
+                  <TabSaude />
                 </TabsContent>
 
                 <TabsContent value="encaminhamentos" className="space-y-6">
-                  <TabEncaminhamentos isEditMode={isEditMode} />
+                  <TabEncaminhamentos />
                 </TabsContent>
 
                 <TabsContent value="agressor" className="space-y-6">
-                  <TabAgressor isEditMode={isEditMode} />
+                  <TabAgressor />
                 </TabsContent>
 
                 <TabsContent value="moradia" className="space-y-6">
-                  <TabMoradia isEditMode={isEditMode} />
+                  <TabMoradia />
                 </TabsContent>
               </CardContent>
             </Card>
@@ -113,16 +102,14 @@ export default function Cadastro() {
             </Button>
 
             <div className="flex items-center gap-4">
-              <Button type="submit" disabled={isSubmitting} size="lg" variant="secondary">
+              <Button type="submit" disabled={isSubmitting} size="lg" variant="secondary" onClick={handleSaveProgress}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Salvando..." : isEditMode ? "💾 Salvar Progresso" : "💾 Salvar e Iniciar Prontuário"}
+                {isSubmitting ? "Salvando..." : isEditMode ? "Salvar Progresso" : "Criar e Salvar Progresso"}
               </Button>
 
-              {isEditMode && (
-                <Button type="button" onClick={handleFinalize} disabled={isSubmitting} size="lg">
-                  Finalizar e Ver Prontuário
-                </Button>
-              )}
+              <Button type="button" onClick={handleFinalize} disabled={isSubmitting} size="lg">
+                {isEditMode ? "Finalizar e Ver Prontuário" : "Criar e Ver Prontuário"}
+              </Button>
             </div>
           </div>
         </form>

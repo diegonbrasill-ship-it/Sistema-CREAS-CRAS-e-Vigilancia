@@ -7,19 +7,106 @@ import { Label } from "@/components/ui/label";
 import { Presentation, Minimize, Users, TrendingUp, UserCheck, AlertTriangle, HandCoins, Home, BookOpen, ShieldCheck, HeartPulse, SearchCheck, Building, Briefcase } from "lucide-react";
 import { 
     getDashboardData,
-    ApiResponse, 
-    DashboardApiDataType,
-    listCasosCanonicos
+    ApiResponse,
+    DashboardApiDataType
 } from "../services/api";
 import ListaCasosModal from "@/components/DrillDown/ListaCasosModal";
+import { useCasosDrilldown } from "@/hooks/useCasosDrilldown";
 import { toast } from "react-toastify";
 import { Loader2 } from "lucide-react";
-import { buildCasosDrilldownParams } from "@/services/casosDrilldown";
 import './Dashboard.css';
 
-interface CasoParaLista { id: number; nome?: string; tec_ref: string; data_cad: string; bairro?: string; }
+interface ChartDatum { name: string; value: number; }
 
 const COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#dc2626", "#0ea5e9", "#64748b"];
+
+function normalizeChartSeries(data?: unknown): ChartDatum[] {
+    if (Array.isArray(data)) {
+        return data.flatMap((item: any) => {
+            const label =
+                item?.name ??
+                item?.tipo ??
+                item?.fonte ??
+                item?.bairro ??
+                item?.racaCor ??
+                item?.corEtnia ??
+                item?.cor ??
+                item?.sexo ??
+                item?.faixaEtaria ??
+                item?.label;
+
+            const rawValue =
+                item?.value ??
+                item?.quantidade ??
+                item?.casos ??
+                item?.total ??
+                item?.count;
+
+            const name = typeof label === "string" ? label.trim() : "";
+            const value = Number(rawValue);
+
+            if (!name || Number.isNaN(value)) {
+                return [];
+            }
+
+            return [{ name, value }];
+        });
+    }
+
+    if (data && typeof data === "object") {
+        return Object.entries(data as Record<string, unknown>).flatMap(([key, rawValue]) => {
+            const name = key.trim();
+            const value = Number(rawValue);
+
+            if (!name || Number.isNaN(value)) {
+                return [];
+            }
+
+            return [{ name, value }];
+        });
+    }
+
+    return [];
+}
+
+function resolveChartSeries(graficos: Record<string, unknown> | undefined, possibleKeys: string[]): ChartDatum[] {
+    if (!graficos) return [];
+
+    for (const key of possibleKeys) {
+        const series = normalizeChartSeries(graficos[key]);
+        if (series.length > 0) {
+            return series;
+        }
+    }
+
+    return [];
+}
+
+function getClickedChartName(data: any): string | undefined {
+        const label =
+            data?.name ??
+            data?.tipo ??
+            data?.fonte ??
+            data?.bairro ??
+            data?.racaCor ??
+            data?.corEtnia ??
+            data?.cor ??
+            data?.sexo ??
+            data?.faixaEtaria ??
+            data?.label ??
+            data?.payload?.name ??
+            data?.payload?.tipo ??
+            data?.payload?.fonte ??
+            data?.payload?.bairro ??
+            data?.payload?.racaCor ??
+            data?.payload?.corEtnia ??
+            data?.payload?.cor ??
+            data?.payload?.sexo ??
+            data?.payload?.faixaEtaria ??
+            data?.payload?.label;
+
+    return typeof label === "string" && label.trim() ? label.trim() : undefined;
+}
 
 export default function Dashboard() {
     const [dashboardData, setDashboardData] = useState<DashboardApiDataType | null>(null);
@@ -27,12 +114,21 @@ export default function Dashboard() {
     const [filters, setFilters] = useState({ mes: "", tecRef: "", bairro: "" });
     // CORRIGIDO: Inicializa com arrays vazios
     const [filterOptions, setFilterOptions] = useState<{ meses: string[], tecnicos: string[], bairros: string[] }>({ meses: [], tecnicos: [], bairros: [] });
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalTitle, setModalTitle] = useState('');
-    const [modalCases, setModalCases] = useState<CasoParaLista[]>([]);
-    const [isModalLoading, setIsModalLoading] = useState(false);
     const [isPresentationMode, setIsPresentationMode] = useState(false);
     const dashboardRef = useRef<HTMLDivElement>(null);
+    const {
+        isOpen: isModalOpen,
+        title: modalTitle,
+        cases: modalCases,
+        isLoading: isModalLoading,
+        errorMessage: modalError,
+        openDrilldown,
+        closeDrilldown,
+    } = useCasosDrilldown({
+        onError: (message) => {
+            toast.error(`Erro ao buscar a lista de casos: ${message}`);
+        },
+    });
 
     useEffect(() => {
         async function loadDashboardData() {
@@ -57,26 +153,14 @@ export default function Dashboard() {
      * @param valor O valor do filtro (pode ser dinâmico, como o nome de um bairro clicado).
      * @param title O título do modal.
      */
-    const handleDrillDown = async (action: string, valor: string | null = null, title: string) => {
-        setModalTitle(title);
-        setIsModalOpen(true);
-        setIsModalLoading(true);
-        setModalCases([]);
-
-        try {
-            const params = buildCasosDrilldownParams({
-                source: "dashboard",
-                action,
-                value: valor,
-                uiFilters: filters,
-            });
-            const data = await listCasosCanonicos(params);
-            setModalCases(data);
-        } catch (err: any) {
-            toast.error(`Erro ao buscar a lista de casos: ${err.message}`);
-        } finally {
-            setIsModalLoading(false);
-        }
+    const handleDrillDown = (action: string, valor: string | null = null, title: string) => {
+        void openDrilldown({
+            source: "dashboard",
+            action,
+            value: valor,
+            title,
+            uiFilters: filters,
+        });
     };
     
     const renderValue = (value: number | string | null | undefined) => { 
@@ -107,6 +191,21 @@ export default function Dashboard() {
             [filterName]: value === 'todos' ? '' : value
         }));
     };
+
+    const tiposViolacaoData = resolveChartSeries(dashboardData?.graficos as Record<string, unknown> | undefined, [
+        "tiposViolacao",
+        "tiposViolencia",
+        "perfilViolacoes",
+        "perfilViolencia",
+        "tipoViolencia",
+    ]);
+    const casosPorCorData = resolveChartSeries(dashboardData?.graficos as Record<string, unknown> | undefined, [
+        "casosPorCor",
+        "casosPorCorEtnia",
+        "casosPorRacaCor",
+        "corEtnia",
+        "racaCor",
+    ]);
 
     return (
         <div ref={dashboardRef} className={`space-y-6 dashboard-container ${isPresentationMode ? 'presentation-mode' : ''}`}>
@@ -192,7 +291,7 @@ export default function Dashboard() {
                 <Card className="lg:col-span-2"><CardHeader><CardTitle>Casos por Bairro (Top 5)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart layout="vertical" data={dashboardData?.graficos?.casosPorBairro ?? []} margin={{ left: 50 }}><XAxis type="number" /><YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} /><Tooltip formatter={(value: number) => `${value} casos`}/><Bar dataKey="value" fill="#2563eb" onClick={(data: any) => handleDrillDown('por_bairro', data.name, `Casos no Bairro: ${data.name}`)} cursor="pointer" /></BarChart></ResponsiveContainer></CardContent></Card>
                 
                 {/* ⭐️ GRÁFICO 2: Tipos de Violação (Mantém 'por_violencia') */}
-                <Card><CardHeader><CardTitle>Tipos de Violação</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Tooltip formatter={(value: number) => `${value} casos`} /><Pie data={dashboardData?.graficos?.tiposViolacao ?? []} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} onClick={(data: any) => handleDrillDown('por_violencia', data.name, `Casos de Violência: ${data.name}`)} cursor="pointer">{(dashboardData?.graficos?.tiposViolacao ?? []).map((_item: any, i: number) => <Cell key={`cell-v-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie></PieChart></ResponsiveContainer></CardContent></Card>
+                <Card><CardHeader><CardTitle>Tipos de Violação</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Tooltip formatter={(value: number) => `${value} casos`} /><Pie data={tiposViolacaoData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} onClick={(data: any) => { const clickedName = getClickedChartName(data); if (clickedName) handleDrillDown('por_violencia', clickedName, `Casos de Violência: ${clickedName}`); }} cursor="pointer">{tiposViolacaoData.map((_item: any, i: number) => <Cell key={`cell-v-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie></PieChart></ResponsiveContainer></CardContent></Card>
                 
                 {/* GRÁFICO 3: Encaminhamentos (Sem Drill-down) */}
                 <Card className="lg:col-span-2"><CardHeader><CardTitle>Encaminhamentos Realizados (Top 5)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={dashboardData?.graficos?.encaminhamentosTop5 ?? []} margin={{ left: 20 }}><XAxis dataKey="name" tick={{ fontSize: 10, angle: -20, textAnchor: 'end' }} height={50} /><YAxis /><Tooltip formatter={(value: number) => `${value} casos`}/><Bar dataKey="value" fill="#16a34a" /></BarChart></ResponsiveContainer></CardContent></Card>
@@ -204,7 +303,7 @@ export default function Dashboard() {
                 <Card className="lg:col-span-3"><CardHeader><CardTitle>Canal de Denúncia</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Tooltip formatter={(value: number) => `${value} casos`}/><Pie data={dashboardData?.graficos?.canalDenuncia ?? []} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label onClick={(data: any) => handleDrillDown('canalDenuncia', data.name, `Casos por Canal de Denúncia: ${data.name}`)} cursor="pointer">{(dashboardData?.graficos?.canalDenuncia ?? []).map((_item: any, i: number) => <Cell key={`cell-canal-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie></PieChart></ResponsiveContainer></CardContent></Card>
                 
                 {/* ⭐️ GRÁFICO 6: Casos por Cor/Etnia */}
-                <Card><CardHeader><CardTitle>Casos por Cor/Etnia</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Tooltip formatter={(value: number) => `${value} casos`} /><Pie data={dashboardData?.graficos?.casosPorCor ?? []} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} onClick={(data: any) => handleDrillDown('racaCor', data.name, `Casos por Cor/Etnia: ${data.name}`)} cursor="pointer">{(dashboardData?.graficos?.casosPorCor ?? []).map((_item: any, i: number) => <Cell key={`cell-cor-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie></PieChart></ResponsiveContainer></CardContent></Card>
+                <Card><CardHeader><CardTitle>Casos por Cor/Etnia</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Tooltip formatter={(value: number) => `${value} casos`} /><Pie data={casosPorCorData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} onClick={(data: any) => { const clickedName = getClickedChartName(data); if (clickedName) handleDrillDown('racaCor', clickedName, `Casos por Cor/Etnia: ${clickedName}`); }} cursor="pointer">{casosPorCorData.map((_item: any, i: number) => <Cell key={`cell-cor-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie></PieChart></ResponsiveContainer></CardContent></Card>
                 
                 {/* ⭐️ GRÁFICO 7: Casos por Faixa Etária (Mantém 'por_faixa_etaria') */}
                 <Card className="lg:col-span-2"><CardHeader><CardTitle>Casos por Faixa Etária</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={dashboardData?.graficos?.casosPorFaixaEtaria ?? []}><XAxis dataKey="name" tick={{ fontSize: 12 }} /><YAxis /><Tooltip formatter={(value: number) => `${value} casos`}/><Bar dataKey="value" fill="#9333ea" onClick={(data: any) => handleDrillDown('por_faixa_etaria', data.name, `Casos por Faixa Etária: ${data.name}`)} cursor="pointer" /></BarChart></ResponsiveContainer></CardContent></Card>
@@ -212,10 +311,11 @@ export default function Dashboard() {
             
             <ListaCasosModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={closeDrilldown}
                 title={modalTitle}
                 cases={modalCases}
                 isLoading={isModalLoading}
+                errorMessage={modalError}
             />
         </div>
     );

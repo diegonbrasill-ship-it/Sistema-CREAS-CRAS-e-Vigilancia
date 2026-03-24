@@ -46,17 +46,23 @@ export const checkCaseAccess = (idLocation: 'params' | 'body', idName: string) =
                 return res.status(404).json({ message: "Caso não encontrado." });
             }
 
-            if (accessFilter.whereClause === 'TRUE') {
-                (req as any).casoId = casoId;
-                return next();
-            }
+          if (accessFilter.whereClause === 'TRUE') {
+              (req as any).casoId = casoId;
+              return next();
+          }
 
-            // 1. RESOLVER PLACEHOLDERS E PARÂMETROS
-            // O ID do caso (NUMÉRICO) é agora o primeiro parâmetro, $1.
-            const params: (string | number)[] = [casoId]; 
+            // Resolve tanto o formato novo ("casos.unit_id") quanto o legado ("casos.unit_id = $X").
+            const params: (string | number)[] = [casoId];
             let unitWhere = accessFilter.whereClause;
-            
-            if (accessFilter.params.length === 1) {
+
+            if (!unitWhere.includes('$') && !unitWhere.includes('=')) {
+                if (accessFilter.params.length !== 1) {
+                    return res.status(500).json({ message: "Filtro de acesso inválido." });
+                }
+
+                params.push(accessFilter.params[0]);
+                unitWhere = `${unitWhere} = $${params.length}`;
+            } else if (accessFilter.params.length === 1) {
                 unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
                 params.push(accessFilter.params[0]);
             } else if (accessFilter.params.length === 2) {
@@ -110,11 +116,17 @@ export const checkItemAccessByParentCase = (itemIdName: string, itemTableName: s
             }
             const casoId = casoResult.rows[0].casoId; // Este já deve ser um número, vindo do DB
             
-            // 2. Resolve Placeholders
             const params: (string | number)[] = [casoId];
             let unitWhere = accessFilter.whereClause;
-            
-            if (accessFilter.params.length === 1) {
+
+            if (!unitWhere.includes('$') && !unitWhere.includes('=')) {
+                if (accessFilter.params.length !== 1) {
+                    return res.status(500).json({ message: "Filtro de acesso inválido." });
+                }
+
+                params.push(accessFilter.params[0]);
+                unitWhere = `${unitWhere} = $${params.length}`;
+            } else if (accessFilter.params.length === 1) {
                 unitWhere = unitWhere.replace('$X', `$${params.length + 1}`);
                 params.push(accessFilter.params[0]);
             } else if (accessFilter.params.length === 2) {

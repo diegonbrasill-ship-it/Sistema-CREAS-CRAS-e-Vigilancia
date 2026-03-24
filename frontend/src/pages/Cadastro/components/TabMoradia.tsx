@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { CasoForm } from "../schema";
 import { FORMA_OCUPACAO_OPTIONS, MATERIAL_CONSTRUCAO_OPTIONS, TIPO_RESIDENCIA_OPTIONS } from "../options";
 
-export function TabMoradia({ isEditMode }: { isEditMode: boolean }) {
+export function TabMoradia() {
   const {
     control,
     watch,
@@ -63,7 +63,7 @@ export function TabMoradia({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoResidencia?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).tipoResidencia?.message}</p>
         </div>
 
         {tipoResidencia && tipoResidencia !== "SITUACAO_DE_RUA" && (
@@ -88,7 +88,7 @@ export function TabMoradia({ isEditMode }: { isEditMode: boolean }) {
                   </Select>
                 )}
               />
-              {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).formaOcupacao?.message}</p>}
+              <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).formaOcupacao?.message}</p>
             </div>
 
             <div className="space-y-2">
@@ -111,7 +111,7 @@ export function TabMoradia({ isEditMode }: { isEditMode: boolean }) {
                   </Select>
                 )}
               />
-              {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).materialConstrucao?.message}</p>}
+              <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).materialConstrucao?.message}</p>
             </div>
           </>
         )}
@@ -124,7 +124,7 @@ export function TabMoradia({ isEditMode }: { isEditMode: boolean }) {
               name="valorAluguel"
               render={({ field }) => <Input id="valorAluguel" type="number" step="0.01" {...field} value={field.value ?? ""} />}
             />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).valorAluguel?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).valorAluguel?.message}</p>
           </div>
         )}
       </div>

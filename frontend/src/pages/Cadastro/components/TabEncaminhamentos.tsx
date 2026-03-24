@@ -12,7 +12,7 @@ import {
   SIM_NAO_OPTIONS,
 } from "../options";
 
-export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
+export function TabEncaminhamentos() {
   const {
     control,
     watch,
@@ -48,14 +48,14 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamento?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamento?.message}</p>
         </div>
 
         {encaminhamentoValue === "Sim" && (
           <div className="space-y-2">
             <Label htmlFor="encaminhamentoDetalhe">Para onde?</Label>
             <Controller name="encaminhamentoDetalhe" control={control} render={({ field }) => <Input id="encaminhamentoDetalhe" {...field} value={field.value ?? ""} />} />
-            {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamentoDetalhe?.message}</p>}
+            <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhamentoDetalhe?.message}</p>
           </div>
         )}
 
@@ -79,7 +79,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhadaSCFV?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.encaminhadaSCFV?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -102,7 +102,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.inseridoPAEFI?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.inseridoPAEFI?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -125,7 +125,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.confirmacaoViolencia?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.confirmacaoViolencia?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -148,7 +148,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{errors.reincidente?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.reincidente?.message}</p>
         </div>
 
         <div className="space-y-2">
@@ -171,7 +171,7 @@ export function TabEncaminhamentos({ isEditMode }: { isEditMode: boolean }) {
               </Select>
             )}
           />
-          {isEditMode && <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).notificacaoSINAN?.message}</p>}
+          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).notificacaoSINAN?.message}</p>
         </div>
       </div>
     </div>
