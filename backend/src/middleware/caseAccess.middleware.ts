@@ -10,7 +10,7 @@ import pool from "../db";
  * Middleware auxiliar que checa se o usuário tem permissão de unidade para
  * interagir com um Caso específico (GET, PUT, POST, DELETE).
  * * O ID do caso pode vir de req.params.id, req.params.casoId ou req.body.caso_associado_id.
- * * @param idLocation Onde encontrar o ID na requisição ('params' ou 'body').
+ * @param idLocation Onde encontrar o ID na requisição ('params' ou 'body').
  * @param idName O nome do campo do ID ('id', 'casoId', 'caso_associado_id').
  */
 export const checkCaseAccess = (idLocation: 'params' | 'body', idName: string) => {
