@@ -8,7 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Cadastro from "./pages/Cadastro";
 import Consulta from "./pages/Consulta";
-import CasoDetalhe from "./pages/CasoDetalhe";
+import CasoDetalhe from "./pages/CasoDetalhe/CasoDetalhe";
 import PainelVigilancia from "./pages/PainelVigilancia/PainelVigilancia";
 import Relatorios from "./pages/Relatorios";
 import Integracoes from "./pages/Integracoes";
