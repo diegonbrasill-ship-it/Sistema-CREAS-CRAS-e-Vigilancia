@@ -13,7 +13,7 @@
     "seed:dev": "node scripts/run-with-env.cjs .env.dev ts-node src/seed.ts",
     "seed:test": "node scripts/run-with-env.cjs .env.test ts-node src/seed.ts",
     "start": "npm run start:prod",
-    "start:prod": "node scripts/run-with-env.cjs .env.prod node dist/index.js",
+    "start:prod": "node dist/index.js",
     "build": "rimraf dist && tsc -p .",
     "migrate:create": "node-pg-migrate create",
     "migrate": "npm run migrate:up:dev",
