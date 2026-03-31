@@ -118,6 +118,26 @@ export interface DemandaResumida {
     status: string;
 }
 
+export interface CasoEncaminhamento {
+    id: number;
+    servico_destino: string;
+    data_encaminhamento: string;
+    status: string;
+    observacoes?: string | null;
+    tec_ref: string;
+}
+
+export interface CasoAcompanhamento {
+    id: number;
+    texto: string;
+    caso_id: number;
+    user_id: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+    tec_ref: string;
+}
+
 export interface CasoDetalhado {
     id: number; 
     nome: string; 
@@ -273,9 +293,9 @@ export const searchCasosByTerm = (searchTerm: string): Promise<any[]> => {
 };
 
 // ACOMPANHAMENTOS, ENCAMINHAMENTOS, ANEXOS (MANTIDAS)
-export const getAcompanhamentos = (casoId: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`);
+export const getAcompanhamentos = (casoId: string): Promise<CasoAcompanhamento[]> => fetchWithAuth(`/api/acompanhamentos/${casoId}`);
 export const createAcompanhamento = (casoId: string, texto: string) => fetchWithAuth(`/api/acompanhamentos/${casoId}`, { method: 'POST', body: JSON.stringify({ texto }) });
-export const getEncaminhamentos = (casoId: string) => fetchWithAuth(`/api/casos/${casoId}/encaminhamentos`);
+export const getEncaminhamentos = (casoId: string): Promise<CasoEncaminhamento[]> => fetchWithAuth(`/api/casos/${casoId}/encaminhamentos`);
 export const createEncaminhamento = (data: object) => fetchWithAuth(`/api/encaminhamentos`, { method: 'POST', body: JSON.stringify(data) });
 export const updateEncaminhamento = (id: number, data: object) => fetchWithAuth(`/api/encaminhamentos/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const getAnexosByCasoId = (casoId: string) => fetchWithAuth(`/api/anexos/casos/${casoId}`);

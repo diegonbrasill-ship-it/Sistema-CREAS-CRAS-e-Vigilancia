@@ -16,6 +16,7 @@ import {
   SEXO_AGRESSOR_VALUES,
   SEXO_VALUES,
   SIM_NAO_VALUES,
+  TIPO_DEFICIENCIA_VALUES,
   TIPO_RESIDENCIA_VALUES,
   TIPO_VIOLENCIA_DESCRICOES_MAP,
   TIPO_VIOLENCIA_VALUES,
@@ -120,14 +121,14 @@ const buildModeFields = (mode: SchemaMode) => {
     recebeBPC: conditionalTextField("Informe se recebe BPC."),
     recebeBE: conditionalTextField("Informe se recebe Benefício de Erradicação."),
     membrosCadUnico: conditionalTextField("Informe se possui membros no CadÚnico."),
-    membroPAI: optionalTextField(),
+    membroPAI: conditionalEnumField(SIM_NAO_VALUES, "Informe se há membro PAI."),
     composicaoFamiliar: conditionalTextField("A composição familiar é obrigatória."),
     referenciaFamiliar: conditionalTextField("A referência familiar é obrigatória."),
     membroCarcerario: conditionalTextField("Informe se há membro em sistema carcerário."),
     membroSocioeducacao: conditionalTextField("Informe se há membro em socioeducação."),
 
     vitimaPCD: conditionalTextField("Informe se a vítima é PCD."),
-    vitimaPCDDetalhe: optionalTextField(),
+    vitimaPCDDetalhe: optionalEnumField(TIPO_DEFICIENCIA_VALUES),
     tratamentoSaude: conditionalTextField("Informe se faz tratamento de saúde."),
     tratamentoSaudeDetalhe: optionalTextField(),
 
@@ -168,6 +169,10 @@ const applySharedRefinements = (data: Record<string, any>, ctx: z.RefinementCtx,
 
   if (data.racaCor === "INDIGENA" && !data.etniaIndigena) {
     ctx.addIssue({ code: "custom", path: ["etniaIndigena"], message: "Informe a etnia indígena." });
+  }
+
+  if (data.vitimaPCD === "Sim" && isBlank(data.vitimaPCDDetalhe)) {
+    ctx.addIssue({ code: "custom", path: ["vitimaPCDDetalhe"], message: "Selecione o tipo de deficiência." });
   }
 
   if (mode === "base") {

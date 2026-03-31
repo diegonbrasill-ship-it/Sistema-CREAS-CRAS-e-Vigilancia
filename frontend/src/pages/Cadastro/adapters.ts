@@ -11,6 +11,7 @@ import {
   legacyTipoViolenciaToCanon,
   normalizeSimNao,
   normalizeText,
+  tipoDeficienciaToCanon,
   normalizeTipoViolenciaDescricoes,
   sexoLegacyToCanon,
 } from "./normalizers";
@@ -19,6 +20,7 @@ import type {
   EscolaridadeValue,
   RacaCorValue,
   SexoValue,
+  TipoDeficienciaValue,
   TipoViolenciaDescricaoValue,
   TipoViolenciaValue,
 } from "./normalizers";
@@ -60,9 +62,7 @@ function sanitizeCasePayload(values: Partial<CasoForm>) {
     "especificacaoOutroVinculo",
     "bairroAgressor",
     "referenciaFamiliar",
-    "membroPAI",
     "encaminhamentoDetalhe",
-    "vitimaPCDDetalhe",
     "tratamentoSaudeDetalhe",
   ] as const;
 
@@ -92,6 +92,14 @@ function sanitizeCasePayload(values: Partial<CasoForm>) {
     payload.escolaridade = escolaridadeLegacyToCanon(payload.escolaridade) ?? payload.escolaridade;
   }
 
+  if (payload.membroPAI !== undefined) {
+    payload.membroPAI = normalizeSimNao(payload.membroPAI) ?? payload.membroPAI;
+  }
+
+  if (payload.vitimaPCDDetalhe !== undefined) {
+    payload.vitimaPCDDetalhe = tipoDeficienciaToCanon(payload.vitimaPCDDetalhe) ?? payload.vitimaPCDDetalhe;
+  }
+
   if (payload.tipoViolenciaDescricoes !== undefined) {
     payload.tipoViolenciaDescricoes =
       normalizeTipoViolenciaDescricoes(payload.tipoViolenciaDescricoes, payload.tipoViolencia) ?? payload.tipoViolenciaDescricoes;
@@ -110,11 +118,16 @@ function sanitizeCasePayload(values: Partial<CasoForm>) {
   }
 
   if (payload.encaminhamento !== "Sim") {
-    payload.encaminhamentoDetalhe = ""; }
+    payload.encaminhamentoDetalhe = "";
+  }
 
-  if (payload.vinculoAgressor !== "OUTROS") { payload.especificacaoOutroVinculo = payload.especificacaoOutroVinculo ?? ""; }
-  
-  if (payload.racaCor !== "INDIGENA") { payload.etniaIndigena = payload.etniaIndigena ?? ""; }
+  if (payload.vinculoAgressor !== "OUTROS") {
+    payload.especificacaoOutroVinculo = payload.especificacaoOutroVinculo ?? "";
+  }
+
+  if (payload.racaCor !== "INDIGENA") {
+    payload.etniaIndigena = payload.etniaIndigena ?? "";
+  }
 
   if (payload.tipoResidencia === "SITUACAO_DE_RUA") {
     payload.formaOcupacao = "";
@@ -168,6 +181,15 @@ export function caseToFormValues(apiCaso: CasoDetalhado): Partial<CasoForm> {
     normalizeTipoViolenciaDescricoes((apiCaso as any).tipo_violencia_descricoes, tipoViolencia),
   );
 
+  const vitimaPCDDetalhe = firstDefined<TipoDeficienciaValue>(
+    tipoDeficienciaToCanon(dc.vitimaPCDDetalhe),
+    tipoDeficienciaToCanon((apiCaso as any).vitimaPCDDetalhe),
+    tipoDeficienciaToCanon((dc as any).tipoDeficiencia),
+    tipoDeficienciaToCanon((apiCaso as any).tipoDeficiencia),
+    tipoDeficienciaToCanon((dc as any).tipo_deficiencia),
+    tipoDeficienciaToCanon((apiCaso as any).tipo_deficiencia),
+  );
+
   return {
     data_cad,
     tec_ref: firstDefined<string>((apiCaso as any).tec_ref, (apiCaso as any).tecRef) ?? "",
@@ -195,14 +217,14 @@ export function caseToFormValues(apiCaso: CasoDetalhado): Partial<CasoForm> {
     recebeBPC: asOptional(normalizeSimNao(dc.recebeBPC) ?? dc.recebeBPC),
     recebeBE: asOptional(normalizeSimNao(dc.recebeBE) ?? dc.recebeBE),
     membrosCadUnico: asOptional(normalizeSimNao(dc.membrosCadUnico) ?? dc.membrosCadUnico),
-    membroPAI: asOptional(dc.membroPAI),
+    membroPAI: normalizeSimNao(dc.membroPAI) ?? undefined,
     composicaoFamiliar: asOptional(dc.composicaoFamiliar),
     referenciaFamiliar: asOptional(dc.referenciaFamiliar),
     membroCarcerario: asOptional(normalizeSimNao(dc.membroCarcerario) ?? dc.membroCarcerario),
     membroSocioeducacao: asOptional(normalizeSimNao(dc.membroSocioeducacao) ?? dc.membroSocioeducacao),
 
     vitimaPCD: asOptional(normalizeSimNao(dc.vitimaPCD) ?? dc.vitimaPCD),
-    vitimaPCDDetalhe: asOptional(dc.vitimaPCDDetalhe),
+    vitimaPCDDetalhe: vitimaPCDDetalhe ?? undefined,
     tratamentoSaude: asOptional(normalizeSimNao(dc.tratamentoSaude) ?? dc.tratamentoSaude),
     tratamentoSaudeDetalhe: asOptional(dc.tratamentoSaudeDetalhe),
 

@@ -6,6 +6,7 @@ export type CanalDenunciaValue = NonNullable<CasoForm["canalDenuncia"]>;
 export type SexoValue = NonNullable<CasoForm["sexo"]>;
 export type RacaCorValue = NonNullable<CasoForm["racaCor"]>;
 export type EscolaridadeValue = NonNullable<CasoForm["escolaridade"]>;
+export type TipoDeficienciaValue = NonNullable<CasoForm["vitimaPCDDetalhe"]>;
 
 export const isRecord = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null;
 
@@ -122,6 +123,8 @@ export const escolaridadeLegacyToCanon = (v: unknown): EscolaridadeValue | undef
   const token = normalizeToken(v);
 
   const aliases: Record<string, EscolaridadeValue> = {
+    NAO_ESTUDOU: "NAO_ESTUDOU",
+    NAO_FREQUENTOU_ESCOLA: "NAO_ESTUDOU",
     SEM_IDADE_ESCOLAR: "SEM_IDADE_ESCOLAR",
     EJA: "EJA",
     FUNDAMENTAL_1_INCOMPLETO: "FUNDAMENTAL_1_INCOMPLETO",
@@ -140,6 +143,28 @@ export const escolaridadeLegacyToCanon = (v: unknown): EscolaridadeValue | undef
     SUPERIOR_COMPLETO: "SUPERIOR_COMPLETO",
     FUNDAMENTAL_INCOMPLETO: "FUNDAMENTAL_2_INCOMPLETO",
     FUNDAMENTAL_COMPLETO: "FUNDAMENTAL_2_COMPLETO",
+  };
+
+  return aliases[token];
+};
+
+export const tipoDeficienciaToCanon = (v: unknown): TipoDeficienciaValue | undefined => {
+  const token = normalizeToken(v);
+
+  const aliases: Record<string, TipoDeficienciaValue> = {
+    DEFICIENCIA_FISICA: "DEFICIENCIA_FISICA",
+    FISICA: "DEFICIENCIA_FISICA",
+    FISICO: "DEFICIENCIA_FISICA",
+    DEFICIENCIA_VISUAL: "DEFICIENCIA_VISUAL",
+    VISUAL: "DEFICIENCIA_VISUAL",
+    DEFICIENCIA_AUDITIVA: "DEFICIENCIA_AUDITIVA",
+    AUDITIVA: "DEFICIENCIA_AUDITIVA",
+    DEFICIENCIA_PSICOSSOCIAL_MENTAL: "DEFICIENCIA_PSICOSSOCIAL_MENTAL",
+    PSICOSSOCIAL_MENTAL: "DEFICIENCIA_PSICOSSOCIAL_MENTAL",
+    PSICOSSOCIAL: "DEFICIENCIA_PSICOSSOCIAL_MENTAL",
+    MENTAL: "DEFICIENCIA_PSICOSSOCIAL_MENTAL",
+    DEFICIENCIA_MULTIPLA: "DEFICIENCIA_MULTIPLA",
+    MULTIPLA: "DEFICIENCIA_MULTIPLA",
   };
 
   return aliases[token];

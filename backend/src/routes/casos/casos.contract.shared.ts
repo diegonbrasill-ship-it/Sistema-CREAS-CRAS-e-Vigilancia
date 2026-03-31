@@ -15,6 +15,7 @@ export const CANAL_DENUNCIA = [
 export const SEXO = ["MASCULINO", "FEMININO", "INTERSEXO"] as const;
 export const RACA_COR = ["BRANCA", "PRETA", "PARDA", "AMARELA", "INDIGENA", "NAO_DECLARADO"] as const;
 export const ESCOLARIDADE = [
+  "NAO_ESTUDOU",
   "SEM_IDADE_ESCOLAR",
   "EJA",
   "FUNDAMENTAL_1_INCOMPLETO",

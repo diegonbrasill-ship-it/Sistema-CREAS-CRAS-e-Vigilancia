@@ -14,7 +14,17 @@ export const SIM_NAO_OPTIONS = [
 ] as const satisfies NonEmptyOptions;
 export const SIM_NAO_VALUES = getOptionValues(SIM_NAO_OPTIONS);
 
+export const TIPO_DEFICIENCIA_OPTIONS = [
+  { value: "DEFICIENCIA_FISICA", label: "Deficiência Física" },
+  { value: "DEFICIENCIA_VISUAL", label: "Visual" },
+  { value: "DEFICIENCIA_AUDITIVA", label: "Auditiva" },
+  { value: "DEFICIENCIA_PSICOSSOCIAL_MENTAL", label: "Psicossocial (mental)" },
+  { value: "DEFICIENCIA_MULTIPLA", label: "Deficiência Múltipla" },
+] as const satisfies NonEmptyOptions;
+export const TIPO_DEFICIENCIA_VALUES = getOptionValues(TIPO_DEFICIENCIA_OPTIONS);
+
 export const ESCOLARIDADE_OPTIONS = [
+  { value: "NAO_ESTUDOU", label: "Não estudou" },
   { value: "SEM_IDADE_ESCOLAR", label: "Sem idade escolar" },
   { value: "EJA", label: "EJA" },
   { value: "FUNDAMENTAL_1_INCOMPLETO", label: "Fundamental I incompleto" },

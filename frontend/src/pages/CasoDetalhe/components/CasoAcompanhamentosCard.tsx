@@ -3,13 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-
-type CasoAcompanhamento = {
-  id: number;
-  tecRef: string;
-  data: string;
-  texto: string;
-};
+import type { CasoAcompanhamento } from "@/services/api";
 
 type Props = {
   acompanhamentos: CasoAcompanhamento[];
@@ -54,9 +48,9 @@ export function CasoAcompanhamentosCard({
               <div key={acompanhamento.id} className="rounded-md border bg-slate-50 p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
                   <p>
-                    Registrado por: <span className="font-semibold">{acompanhamento.tecRef}</span>
+                    Registrado por: <span className="font-semibold">{acompanhamento.tec_ref}</span>
                   </p>
-                  <p>{new Date(acompanhamento.data).toLocaleString("pt-BR")}</p>
+                  <p>{new Date(acompanhamento.created_at).toLocaleString("pt-BR")}</p>
                 </div>
                 <p className="whitespace-pre-wrap text-sm text-slate-700">{acompanhamento.texto}</p>
               </div>

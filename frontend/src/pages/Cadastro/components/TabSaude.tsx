@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import type { CasoForm } from "../schema";
-import { SIM_NAO_OPTIONS } from "../options";
+import { SIM_NAO_OPTIONS, TIPO_DEFICIENCIA_OPTIONS } from "../options";
 
 export function TabSaude() {
   const {
@@ -64,8 +64,25 @@ export function TabSaude() {
 
         {vitimaPCDValue === "Sim" && (
           <div className="space-y-2">
-            <Label htmlFor="vitimaPCDDetalhe">Qual?</Label>
-            <Controller name="vitimaPCDDetalhe" control={control} render={({ field }) => <Input id="vitimaPCDDetalhe" {...field} value={field.value ?? ""} />} />
+            <Label>Tipo de deficiência</Label>
+            <Controller
+              name="vitimaPCDDetalhe"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPO_DEFICIENCIA_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             <p className="text-sm text-red-500 mt-1 h-4">{errors.vitimaPCDDetalhe?.message}</p>
           </div>
         )}

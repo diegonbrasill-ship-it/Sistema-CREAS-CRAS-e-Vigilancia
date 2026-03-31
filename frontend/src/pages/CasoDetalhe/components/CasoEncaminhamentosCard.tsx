@@ -5,15 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type CasoEncaminhamento = {
-  id: number;
-  servicoDestino: string;
-  dataEncaminhamento: string;
-  status: string;
-  observacoes: string;
-  tecRef: string;
-};
+import type { CasoEncaminhamento } from "@/services/api";
 
 const LISTA_DE_SERVICOS = [
   "CRAS",
@@ -129,10 +121,10 @@ export function CasoEncaminhamentosCard({
                 <div key={encaminhamento.id} className="rounded-md border bg-white p-4 shadow-sm">
                   <div className="mb-2 flex items-start justify-between">
                     <div>
-                      <p className="font-bold text-slate-800">{encaminhamento.servicoDestino}</p>
+                      <p className="font-bold text-slate-800">{encaminhamento.servico_destino}</p>
                       <p className="text-xs text-slate-500">
-                        Encaminhado por: <span className="font-semibold">{encaminhamento.tecRef}</span> em{" "}
-                        {new Date(encaminhamento.dataEncaminhamento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                        Encaminhado por: <span className="font-semibold">{encaminhamento.tec_ref}</span> em{" "}
+                        {new Date(encaminhamento.data_encaminhamento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                       </p>
                     </div>
                     <span

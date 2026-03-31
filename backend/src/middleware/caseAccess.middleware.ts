@@ -92,7 +92,8 @@ export const checkCaseAccess = (idLocation: 'params' | 'body', idName: string) =
  * ...
  */
 export const checkItemAccessByParentCase = (itemIdName: string, itemTableName: string) => {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    
+        return async (req: Request, res: Response, next: NextFunction) => {
         const rawId = req.params[itemIdName]; 
         const itemIdString = rawId ? String(rawId) : undefined;
         
@@ -110,7 +111,10 @@ export const checkItemAccessByParentCase = (itemIdName: string, itemTableName: s
         
         try {
             // 1. Encontra o casoId associado ao item filho (usando o itemId NUMÉRICO)
-            const casoResult = await pool.query(`SELECT "casoId" FROM ${itemTableName} WHERE id = $1`, [itemId]);
+            const casoResult = await pool.query(
+                `SELECT caso_id AS "casoId" FROM ${itemTableName} WHERE id = $1 AND deleted_at IS NULL`,
+                [itemId]
+            );
             if (casoResult.rowCount === 0) {
                 return res.status(404).json({ message: `${itemTableName} não encontrado.` });
             }
@@ -135,7 +139,7 @@ export const checkItemAccessByParentCase = (itemIdName: string, itemTableName: s
             }
             
             // 3. Checa a permissão de unidade para o caso
-            const checkQuery = `SELECT id FROM casos WHERE id = $1::INTEGER AND ${unitWhere}`;
+            const checkQuery = `SELECT id FROM casos WHERE id = $1::INTEGER AND deleted_at IS NULL AND ${unitWhere}`;
             const checkResult = await pool.query(checkQuery, params);
 
             if (checkResult.rowCount === 0) {

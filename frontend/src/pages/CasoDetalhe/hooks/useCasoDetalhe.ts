@@ -13,25 +13,11 @@ import {
   updateCasoStatus,
   updateEncaminhamento,
   uploadAnexoParaCaso,
+  type CasoAcompanhamento,
   type Anexo,
+  type CasoEncaminhamento,
   type CasoDetalhado,
 } from "@/services/api";
-
-export interface CasoAcompanhamento {
-  id: number;
-  tecRef: string;
-  data: string;
-  texto: string;
-}
-
-export interface CasoEncaminhamento {
-  id: number;
-  servicoDestino: string;
-  dataEncaminhamento: string;
-  status: string;
-  observacoes: string;
-  tecRef: string;
-}
 
 type UseCasoDetalheParams = {
   id?: string;

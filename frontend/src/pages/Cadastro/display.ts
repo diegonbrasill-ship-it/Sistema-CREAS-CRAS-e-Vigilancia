@@ -11,8 +11,10 @@ import {
   MATERIAL_CONSTRUCAO_OPTIONS,
   ORIENTACAO_SEXUAL_OPTIONS,
   RACA_COR_OPTIONS,
+  SIM_NAO_OPTIONS,
   SEXO_AGRESSOR_OPTIONS,
   SEXO_OPTIONS,
+  TIPO_DEFICIENCIA_OPTIONS,
   TIPO_RESIDENCIA_OPTIONS,
   TIPO_VIOLENCIA_DESCRICOES_MAP,
   TIPO_VIOLENCIA_OPTIONS,
@@ -98,6 +100,9 @@ const OPTION_LABEL_MAPS: Partial<Record<CadastroField, Record<string, string>>> 
   identidadeGenero: buildOptionLabelMap(IDENTIDADE_GENERO_OPTIONS),
   racaCor: buildOptionLabelMap(RACA_COR_OPTIONS),
   escolaridade: buildOptionLabelMap(ESCOLARIDADE_OPTIONS),
+  membroPAI: buildOptionLabelMap(SIM_NAO_OPTIONS),
+  vitimaPCD: buildOptionLabelMap(SIM_NAO_OPTIONS),
+  vitimaPCDDetalhe: buildOptionLabelMap(TIPO_DEFICIENCIA_OPTIONS),
   encaminhadaSCFV: buildOptionLabelMap(ENCAMINHADA_SCFV_OPTIONS),
   confirmacaoViolencia: buildOptionLabelMap(CONFIRMACAO_VIOLENCIA_OPTIONS),
   vinculoAgressor: buildOptionLabelMap(VINCULO_AGRESSOR_OPTIONS),
@@ -147,4 +152,3 @@ export const formatCadastroFieldValue = (field: CadastroField, value: CasoForm[C
 
   return String(value);
 };
-

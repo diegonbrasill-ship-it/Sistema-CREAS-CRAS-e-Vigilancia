@@ -37,10 +37,11 @@ export const unitAccessMiddleware = (tableName: string, unitIdColumn: string = '
             console.error(`ERRO DE SEGURANÇA: Usuário sem unit_id.`);
             return res.status(403).json({ message: "Acesso negado. Servidor sem unidade definida." });
         }
-        const userUnitId = user.unit_id;
 
+        const userUnitId = user.unit_id;
         let unitParams: (string | number)[] = [];
         let unitWhereClause = '';
+        
         // O usuário só acessa dados da sua Unidade.
         unitParams.push(userUnitId);
         // unitWhereClause usa o prefixo adaptativo (ex: "casos.unit_id" ou "c.unit_id")

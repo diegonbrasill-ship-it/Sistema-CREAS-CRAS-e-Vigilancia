@@ -1,6 +1,6 @@
 // backend/src/routes/encaminhamentos.ts
 
-import express, { Router, Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import pool from '../db';
 import { authMiddleware } from '../middleware/auth/auth';
 import { logAction } from '../services/logger';
@@ -33,10 +33,10 @@ router.post('/', checkCaseAccess('body', 'casoId'), async (req: Request, res: Re
   try {
     const query = cleanSqlString(`
       INSERT INTO encaminhamentos
-        ("casoId", user_id, "servicoDestino", "dataEncaminhamento", observacoes)
+        (caso_id, user_id, servico_destino, data_encaminhamento, observacoes)
       VALUES
         ($1, $2, $3, $4, $5)
-      RETURNING id, "servicoDestino";
+      RETURNING id, servico_destino AS "servicoDestino";
     `);
     const result = await pool.query(query, [casoId, user_id, servicoDestino, dataEncaminhamento, observacoes]);
     const novoEncaminhamento = result.rows[0];
@@ -83,9 +83,9 @@ router.put('/:id', checkItemAccessByParentCase('id', 'encaminhamentos'), async (
       UPDATE encaminhamentos
       SET 
         status = $1,
-        "dataRetorno" = $2
+        data_retorno = $2
       WHERE id = $3
-      RETURNING id, "casoId", "servicoDestino";
+      RETURNING id, caso_id AS "casoId", servico_destino AS "servicoDestino";
     `);
     const result = await pool.query(query, [status, dataRetorno, id]);
 

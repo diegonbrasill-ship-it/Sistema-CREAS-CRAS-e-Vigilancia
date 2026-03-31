@@ -1,12 +1,12 @@
 import { Controller, useFormContext } from "react-hook-form";
 
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import type { CasoForm } from "../schema";
 import { SIM_NAO_OPTIONS } from "../options";
+import { Input } from "@/components/ui/input";
 
 export function TabFamilia() {
   const {
@@ -144,8 +144,25 @@ export function TabFamilia() {
 
         <div className="space-y-2">
           <Label htmlFor="membroPAI">Membro PAI</Label>
-          <Controller name="membroPAI" control={control} render={({ field }) => <Input id="membroPAI" {...field} value={field.value ?? ""} />} />
-          <p className="text-sm text-red-500 mt-1 h-4">{(errors as any).membroPAI?.message}</p>
+          <Controller
+            control={control}
+            name="membroPAI"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <SelectTrigger>
+                  <SelectValue placeholder="..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIM_NAO_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-sm text-red-500 mt-1 h-4">{errors.membroPAI?.message}</p>
         </div>
 
         <div className="space-y-2">

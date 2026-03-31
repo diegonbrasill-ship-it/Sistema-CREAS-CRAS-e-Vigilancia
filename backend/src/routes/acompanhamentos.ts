@@ -54,7 +54,7 @@ router.post("/:casoId", checkCaseAccess('params', 'casoId'), async (req, res) =>
 
     try {
         const query = cleanSqlString(`
-            INSERT INTO acompanhamentos (texto, "casoId", user_id) VALUES ($1, $2, $3) RETURNING *
+            INSERT INTO acompanhamentos (texto, caso_id, user_id) VALUES ($1, $2, $3) RETURNING *
         `);
         const result = await pool.query(query, [texto, casoId, user_id]);
         const novoAcompanhamento = result.rows[0];
