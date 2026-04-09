@@ -5,12 +5,14 @@ import { Bar, BarChart, Cell, LabelList, Legend, Pie, PieChart, Tooltip, XAxis, 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardApiDataType } from "@/services/api";
 
-import { type ChartDatum, getClickedChartName } from "../adapters/dashboardCharts";
+import { type ChartDatum, getClickedChartSelection } from "../adapters/dashboardCharts";
 
 interface DashboardChartSectionProps {
   dashboardData: DashboardApiDataType | null;
   tiposViolacaoData: ChartDatum[];
   casosPorCorData: ChartDatum[];
+  canalDenunciaData: ChartDatum[];
+  casosPorSexoData: ChartDatum[];
   isPrintMode: boolean;
   onDrillDown: (action: string, value: string | null, title: string) => void;
 }
@@ -157,6 +159,8 @@ export function DashboardChartSection({
   dashboardData,
   tiposViolacaoData,
   casosPorCorData,
+  canalDenunciaData,
+  casosPorSexoData,
   isPrintMode,
   onDrillDown,
 }: DashboardChartSectionProps) {
@@ -216,9 +220,9 @@ export function DashboardChartSection({
                     labelLine={false}
                     isAnimationActive={!isPrintMode}
                     onClick={(data: any) => {
-                      const clickedName = getClickedChartName(data);
-                      if (clickedName) {
-                        onDrillDown("por_violencia", clickedName, `Casos de Violência: ${clickedName}`);
+                      const clickedSelection = getClickedChartSelection(data);
+                      if (clickedSelection) {
+                        onDrillDown("por_violencia", clickedSelection.value, `Casos de Violência: ${clickedSelection.label}`);
                       }
                     }}
                     cursor="pointer"
@@ -262,10 +266,10 @@ export function DashboardChartSection({
                   <Legend
                     verticalAlign="bottom"
                     height={36}
-                    formatter={(value) => formatLegendLabel(String(value), dashboardData?.graficos?.casosPorSexo ?? [])}
+                    formatter={(value) => formatLegendLabel(String(value), casosPorSexoData)}
                   />
                   <Pie
-                    data={dashboardData?.graficos?.casosPorSexo ?? []}
+                    data={casosPorSexoData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -276,10 +280,15 @@ export function DashboardChartSection({
                     label={renderPieValueLabel}
                     labelLine={false}
                     isAnimationActive={!isPrintMode}
-                    onClick={(data: any) => onDrillDown("sexo", data.name, `Casos por Sexo: ${data.name}`)}
+                    onClick={(data: any) => {
+                      const clickedSelection = getClickedChartSelection(data);
+                      if (clickedSelection) {
+                        onDrillDown("sexo", clickedSelection.value, `Casos por Sexo: ${clickedSelection.label}`);
+                      }
+                    }}
                     cursor="pointer"
                   >
-                    {(dashboardData?.graficos?.casosPorSexo ?? []).map((_item, index) => (
+                    {casosPorSexoData.map((_item, index) => (
                       <Cell key={`cell-s-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -294,14 +303,14 @@ export function DashboardChartSection({
           <CardContent className="dashboard-chart-card-content">
             {isPrintMode ? (
               <div className="dashboard-print-chart-layout dashboard-print-chart-layout--canal">
-                {renderPrintLegendList(dashboardData?.graficos?.canalDenuncia ?? [])}
+                {renderPrintLegendList(canalDenunciaData)}
                 <div className="dashboard-print-chart-canvas">
                   <ChartViewport isPrintMode={isPrintMode} height={300} printHeight={300}>
                     {({ width, height }) => (
                       <PieChart width={width} height={height}>
                         <Tooltip formatter={(value: number) => `${value} casos`} />
                         <Pie
-                          data={dashboardData?.graficos?.canalDenuncia ?? []}
+                          data={canalDenunciaData}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
@@ -310,10 +319,15 @@ export function DashboardChartSection({
                           label={renderPieValueLabel}
                           labelLine={false}
                           isAnimationActive={false}
-                          onClick={(data: any) => onDrillDown("canalDenuncia", data.name, `Casos por Canal de Denúncia: ${data.name}`)}
+                          onClick={(data: any) => {
+                            const clickedSelection = getClickedChartSelection(data);
+                            if (clickedSelection) {
+                              onDrillDown("canalDenuncia", clickedSelection.value, `Casos por Canal de Denúncia: ${clickedSelection.label}`);
+                            }
+                          }}
                           cursor="pointer"
                         >
-                          {(dashboardData?.graficos?.canalDenuncia ?? []).map((_item, index) => (
+                          {canalDenunciaData.map((_item, index) => (
                             <Cell key={`cell-canal-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
@@ -332,10 +346,10 @@ export function DashboardChartSection({
                       layout="horizontal"
                       verticalAlign="bottom"
                       height={36}
-                      formatter={(value) => formatLegendLabel(String(value), dashboardData?.graficos?.canalDenuncia ?? [])}
+                      formatter={(value) => formatLegendLabel(String(value), canalDenunciaData)}
                     />
                     <Pie
-                      data={dashboardData?.graficos?.canalDenuncia ?? []}
+                      data={canalDenunciaData}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
@@ -344,10 +358,15 @@ export function DashboardChartSection({
                       label={renderPieValueLabel}
                       labelLine={false}
                       isAnimationActive={!isPrintMode}
-                      onClick={(data: any) => onDrillDown("canalDenuncia", data.name, `Casos por Canal de Denúncia: ${data.name}`)}
+                      onClick={(data: any) => {
+                        const clickedSelection = getClickedChartSelection(data);
+                        if (clickedSelection) {
+                          onDrillDown("canalDenuncia", clickedSelection.value, `Casos por Canal de Denúncia: ${clickedSelection.label}`);
+                        }
+                      }}
                       cursor="pointer"
                     >
-                      {(dashboardData?.graficos?.canalDenuncia ?? []).map((_item, index) => (
+                      {canalDenunciaData.map((_item, index) => (
                         <Cell key={`cell-canal-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -381,9 +400,9 @@ export function DashboardChartSection({
                     labelLine={false}
                     isAnimationActive={!isPrintMode}
                     onClick={(data: any) => {
-                      const clickedName = getClickedChartName(data);
-                      if (clickedName) {
-                        onDrillDown("racaCor", clickedName, `Casos por Cor/Etnia: ${clickedName}`);
+                      const clickedSelection = getClickedChartSelection(data);
+                      if (clickedSelection) {
+                        onDrillDown("racaCor", clickedSelection.value, `Casos por Cor/Etnia: ${clickedSelection.label}`);
                       }
                     }}
                     cursor="pointer"

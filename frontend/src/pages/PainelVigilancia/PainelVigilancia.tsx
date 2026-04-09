@@ -8,6 +8,8 @@ import GraficoBarras from "../../components/vigilancia/GraficoBarras";
 import GraficoPizza from "../../components/vigilancia/GraficoPizza";
 import ListaCasosModal from "../../components/DrillDown/ListaCasosModal";
 import { useCasosDrilldown } from "@/hooks/useCasosDrilldown";
+import { formatOptionLabel } from "@/utils/cadastroOptionLabels";
+import { getClickedChartSelection } from "../dashboard/adapters/dashboardCharts";
 import {
   getVigilanciaFluxoDemanda,
   getVigilanciaSobrecargaEquipe,
@@ -212,8 +214,17 @@ const PainelVigilancia: React.FC = () => {
           <h2 className="painel-subtitle">Perfil das Violações</h2>
           {painelData?.perfilViolacoes && (
             <GraficoPizza
-              data={painelData.perfilViolacoes.map((item) => ({ name: item.tipo, value: item.quantidade }))}
-              onSliceClick={(data) => handleDrillDown("por_violencia", data.name, `Tipo de Violência: ${data.name}`)}
+              data={painelData.perfilViolacoes.map((item) => ({
+                name: formatOptionLabel("tipoViolencia", item.tipo),
+                rawName: item.tipo,
+                value: item.quantidade,
+              }))}
+              onSliceClick={(data) => {
+                const clickedSelection = getClickedChartSelection(data);
+                if (clickedSelection) {
+                  handleDrillDown("por_violencia", clickedSelection.value, `Tipo de Violência: ${clickedSelection.label}`);
+                }
+              }}
             />
           )}
         </div>

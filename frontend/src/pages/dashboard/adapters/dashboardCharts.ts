@@ -1,9 +1,12 @@
+import { formatOptionLabel } from "@/utils/cadastroOptionLabels";
+
 export interface ChartDatum {
   name: string;
   value: number;
+  rawName?: string;
 }
 
-function getChartLabel(item: any): string {
+function getRawChartLabel(item: any): string {
   const label =
     item?.name ??
     item?.tipo ??
@@ -19,6 +22,16 @@ function getChartLabel(item: any): string {
   return typeof label === "string" ? label.trim() : "";
 }
 
+function getFormattedChartLabel(item: any, labelField?: string): string {
+  const rawLabel = getRawChartLabel(item);
+
+  if (!labelField || !rawLabel) {
+    return rawLabel;
+  }
+
+  return formatOptionLabel(labelField, rawLabel);
+}
+
 function getChartValue(item: any): number {
   const rawValue =
     item?.value ??
@@ -30,30 +43,32 @@ function getChartValue(item: any): number {
   return Number(rawValue);
 }
 
-export function normalizeChartSeries(data?: unknown): ChartDatum[] {
+export function normalizeChartSeries(data?: unknown, labelField?: string): ChartDatum[] {
   if (Array.isArray(data)) {
     return data.flatMap((item: any) => {
-      const name = getChartLabel(item);
+      const rawName = getRawChartLabel(item);
+      const name = getFormattedChartLabel(item, labelField);
       const value = getChartValue(item);
 
       if (!name || Number.isNaN(value)) {
         return [];
       }
 
-      return [{ name, value }];
+      return [{ name, value, rawName: rawName || name }];
     });
   }
 
   if (data && typeof data === "object") {
     return Object.entries(data as Record<string, unknown>).flatMap(([key, rawValue]) => {
-      const name = key.trim();
+      const rawName = key.trim();
+      const name = labelField ? formatOptionLabel(labelField, rawName) : rawName;
       const value = Number(rawValue);
 
       if (!name || Number.isNaN(value)) {
         return [];
       }
 
-      return [{ name, value }];
+      return [{ name, value, rawName: rawName || name }];
     });
   }
 
@@ -63,11 +78,12 @@ export function normalizeChartSeries(data?: unknown): ChartDatum[] {
 export function resolveChartSeries(
   graficos: Record<string, unknown> | undefined,
   possibleKeys: string[],
+  labelField?: string,
 ): ChartDatum[] {
   if (!graficos) return [];
 
   for (const key of possibleKeys) {
-    const series = normalizeChartSeries(graficos[key]);
+    const series = normalizeChartSeries(graficos[key], labelField);
     if (series.length > 0) {
       return series;
     }
@@ -76,7 +92,23 @@ export function resolveChartSeries(
   return [];
 }
 
-export function getClickedChartName(data: any): string | undefined {
-  const label = getChartLabel(data) || getChartLabel(data?.payload);
-  return label || undefined;
+export function getClickedChartSelection(data: any): { label: string; value: string } | undefined {
+  const payload = data?.payload ?? data;
+  const label =
+    getFormattedChartLabel(payload) ||
+    getFormattedChartLabel(data);
+  const value =
+    (typeof payload?.rawName === "string" && payload.rawName.trim()) ||
+    (typeof data?.rawName === "string" && data.rawName.trim()) ||
+    getRawChartLabel(payload) ||
+    getRawChartLabel(data);
+
+  if (!label) {
+    return undefined;
+  }
+
+  return {
+    label,
+    value: value || label,
+  };
 }

@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { useCasosDrilldown } from "@/hooks/useCasosDrilldown";
 
-import { resolveChartSeries } from "./adapters/dashboardCharts";
+import { normalizeChartSeries, resolveChartSeries } from "./adapters/dashboardCharts";
 import { DashboardChartSection } from "./components/DashboardChartSection";
 import { DashboardFilters } from "./components/DashboardFilters";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -129,14 +129,16 @@ export default function Dashboard() {
     "perfilViolacoes",
     "perfilViolencia",
     "tipoViolencia",
-  ]);
+  ], "tipoViolencia");
   const casosPorCorData = resolveChartSeries(dashboardData?.graficos as Record<string, unknown> | undefined, [
     "casosPorCor",
     "casosPorCorEtnia",
     "casosPorRacaCor",
     "corEtnia",
     "racaCor",
-  ]);
+  ], "racaCor");
+  const canalDenunciaData = normalizeChartSeries(dashboardData?.graficos?.canalDenuncia ?? [], "canalDenuncia");
+  const casosPorSexoData = normalizeChartSeries(dashboardData?.graficos?.casosPorSexo ?? [], "sexo");
 
   return (
     <div
@@ -191,6 +193,8 @@ export default function Dashboard() {
             dashboardData={dashboardData}
             tiposViolacaoData={tiposViolacaoData}
             casosPorCorData={casosPorCorData}
+            canalDenunciaData={canalDenunciaData}
+            casosPorSexoData={casosPorSexoData}
             isPrintMode={isPrintMode}
             onDrillDown={handleDrillDown}
           />
