@@ -1,9 +1,11 @@
 // backend/src/middleware/unitAccess.middleware.ts
 
 import { Request, Response, NextFunction } from "express";
-import { UNIT_ID_CREAS, UNIT_ID_VIGILANCIA } from "../utils/constants";
-import pool from "../db";
 import { AuthenticatedUser } from "./auth/authenticated.user";
+
+interface UnitAccessOptions {
+    allowCrossUnitForVigilancia?: boolean;
+}
 
 /**
  * Middleware para gerar a cláusula WHERE de restrição de acesso por Unidade.
@@ -11,7 +13,11 @@ import { AuthenticatedUser } from "./auth/authenticated.user";
  * @param unitIdColumn O nome da coluna de ID da unidade na tabela (ex: 'unit_id').
  * @returns Um middleware do Express.
  */
-export const unitAccessMiddleware = (tableName: string, unitIdColumn: string = 'unit_id') => {
+export const unitAccessMiddleware = (
+    tableName: string,
+    unitIdColumn: string = 'unit_id',
+    options: UnitAccessOptions = {}
+) => {
 
     const tablePrefix = (tableName === 'casos' || tableName === 'users') ? tableName : 'c';
 
@@ -25,6 +31,14 @@ export const unitAccessMiddleware = (tableName: string, unitIdColumn: string = '
 
         // se for gestor não tem filtros //TODO: trocar ao migrar cargos para talela roles no db
         if (user.role === 'gestor') {
+            req.accessFilter = {
+                whereClause: 'TRUE',
+                params: [],
+            };
+            return next();
+        }
+
+        if (options.allowCrossUnitForVigilancia && user.role === 'vigilancia') {
             req.accessFilter = {
                 whereClause: 'TRUE',
                 params: [],

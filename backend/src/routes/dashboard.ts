@@ -7,7 +7,7 @@ import { DashboardService } from "../services/dashboard.service";
 
 const router = Router();
 
-router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id'));
+router.use(authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }));
 
 // =======================================================================
 // ROTA PRINCIPAL: GET / (Busca Dados do Dashboard)

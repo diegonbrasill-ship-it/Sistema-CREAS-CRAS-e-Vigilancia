@@ -44,7 +44,7 @@ const buildFilterClause = (
 // ROTAS DO PAINEL DE VIGILÂNCIA (KPIs e GRÁFICOS)
 // =======================================================================
 
-router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     try {
@@ -63,7 +63,7 @@ router.get("/fluxo-demanda", authMiddleware, unitAccessMiddleware('casos', 'unit
     }
 });
 
-router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
@@ -96,7 +96,7 @@ router.get("/sobrecarga-equipe", authMiddleware, unitAccessMiddleware('casos', '
 });
 
 
-router.get("/incidencia-bairros", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/incidencia-bairros", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
@@ -122,7 +122,7 @@ router.get("/incidencia-bairros", authMiddleware, unitAccessMiddleware('casos', 
     }
 });
 
-router.get("/fontes-acionamento", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/fontes-acionamento", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
@@ -148,7 +148,7 @@ router.get("/fontes-acionamento", authMiddleware, unitAccessMiddleware('casos', 
     }
 });
 
-router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
@@ -171,7 +171,7 @@ router.get("/taxa-reincidencia", authMiddleware, unitAccessMiddleware('casos', '
     }
 });
 
-router.get("/perfil-violacoes", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/perfil-violacoes", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     const [unitFilterContent, unitParams] = buildFilterClause(accessFilter, 0);
@@ -201,7 +201,7 @@ router.get("/perfil-violacoes", authMiddleware, unitAccessMiddleware('casos', 'u
  * ⭐️ NOVA ROTA: GET /casos-filtrados (Endpoint para Drill-Down do Painel)
  * @desc Recebe filtro e valor da query string para listar casos detalhadamente.
  */
-router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'unit_id'), async (req: Request, res: Response) => {
+router.get("/casos-filtrados", authMiddleware, unitAccessMiddleware('casos', 'unit_id', { allowCrossUnitForVigilancia: true }), async (req: Request, res: Response) => {
     const accessFilter = req.accessFilter!;
 
     // ⭐️ CORREÇÃO: Trata a query string como potencial array de filtros

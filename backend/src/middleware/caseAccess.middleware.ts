@@ -119,6 +119,11 @@ export const checkItemAccessByParentCase = (itemIdName: string, itemTableName: s
                 return res.status(404).json({ message: `${itemTableName} não encontrado.` });
             }
             const casoId = casoResult.rows[0].casoId; // Este já deve ser um número, vindo do DB
+
+          if (accessFilter.whereClause === 'TRUE') {
+              (req as any).casoId = casoId;
+              return next();
+          }
             
             const params: (string | number)[] = [casoId];
             let unitWhere = accessFilter.whereClause;
