@@ -54,7 +54,7 @@ function renderKpiCard(
     <Card
       key={card.title}
       onClick={isClickable ? () => onDrillDown(card.action!, null, card.drilldownTitle!) : undefined}
-      className={clickableClassName}
+      className={`dashboard-kpi-card print-card ${clickableClassName}`.trim()}
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
@@ -234,12 +234,12 @@ export function DashboardKpiSection({
   return (
     <>
       {sections.map((section) => (
-        <div key={section.title}>
-          <h2 className="text-lg font-semibold text-slate-700 pt-4">{section.title}</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <section key={section.title} className="dashboard-kpi-group">
+          <h2 className="dashboard-kpi-group-title text-lg font-semibold text-slate-700 pt-4">{section.title}</h2>
+          <div className="dashboard-kpi-grid grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {section.cards.map((card) => renderKpiCard(card, renderValue, onDrillDown))}
           </div>
-        </div>
+        </section>
       ))}
     </>
   );

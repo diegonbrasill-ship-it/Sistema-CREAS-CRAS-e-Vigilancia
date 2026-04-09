@@ -6,6 +6,32 @@ body {
   @apply bg-gray-100 text-gray-800;
 }
 
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block !important;
+    min-height: auto !important;
+    background: white !important;
+  }
+
+  .app-content-shell {
+    display: block !important;
+    width: 100% !important;
+    min-height: auto !important;
+  }
+
+  .app-main-content {
+    overflow: visible !important;
+    width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+}
+
 
 
 @layer base {

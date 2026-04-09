@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -14,6 +16,9 @@ import { useDashboardData } from "./hooks/useDashboardData";
 import { useDashboardPresentation } from "./hooks/useDashboardPresentation";
 
 export default function Dashboard() {
+  const [isPrintMode, setIsPrintMode] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printGeneratedAt, setPrintGeneratedAt] = useState<string | null>(null);
   const {
     dashboardData,
     isLoading,
@@ -57,6 +62,67 @@ export default function Dashboard() {
     return value;
   };
 
+  const generatedAtLabel = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(printGeneratedAt ? new Date(printGeneratedAt) : new Date());
+
+  const printFilterSummary = [
+    { label: "Período", value: filters.mes || "Todos os períodos" },
+    { label: "Técnico de Referência", value: filters.tecRef || "Todos os técnicos" },
+    { label: "Bairro", value: filters.bairro || "Todos os bairros" },
+  ];
+
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      closeDrilldown();
+      setPrintGeneratedAt(new Date().toISOString());
+      setIsPrintMode(true);
+      setIsPrinting(true);
+    };
+
+    const handleAfterPrint = () => {
+      setIsPrintMode(false);
+      setIsPrinting(false);
+    };
+
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, [closeDrilldown]);
+
+  useEffect(() => {
+    document.body.classList.toggle("dashboard-print-active", isPrintMode);
+
+    return () => {
+      document.body.classList.remove("dashboard-print-active");
+    };
+  }, [isPrintMode]);
+
+  const handlePrint = () => {
+    if (isLoading || !dashboardData || isPrinting) {
+      return;
+    }
+
+    closeDrilldown();
+    setPrintGeneratedAt(new Date().toISOString());
+    setIsPrintMode(true);
+    setIsPrinting(true);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+        window.setTimeout(() => {
+          window.print();
+        }, 150);
+      });
+    });
+  };
+
   const tiposViolacaoData = resolveChartSeries(dashboardData?.graficos as Record<string, unknown> | undefined, [
     "tiposViolacao",
     "tiposViolencia",
@@ -73,28 +139,63 @@ export default function Dashboard() {
   ]);
 
   return (
-    <div ref={dashboardRef} className={`space-y-6 dashboard-container ${isPresentationMode ? "presentation-mode" : ""}`}>
+    <div
+      ref={dashboardRef}
+      className={`space-y-6 dashboard-container dashboard-print-root ${isPresentationMode ? "presentation-mode" : ""} ${isPrintMode ? "print-mode" : ""}`}
+    >
       <DashboardHeader
         isPresentationMode={isPresentationMode}
+        isPrinting={isPrinting}
+        canPrint={!isLoading && !!dashboardData}
         onTogglePresentationMode={togglePresentationMode}
+        onPrint={handlePrint}
       />
-      <DashboardFilters
-        filters={filters}
-        filterOptions={filterOptions}
-        onFilterChange={handleFilterChange}
-        onClearFilters={clearFilters}
-      />
-      <DashboardKpiSection
-        dashboardData={dashboardData}
-        renderValue={renderValue}
-        onDrillDown={handleDrillDown}
-      />
-      <DashboardChartSection
-        dashboardData={dashboardData}
-        tiposViolacaoData={tiposViolacaoData}
-        casosPorCorData={casosPorCorData}
-        onDrillDown={handleDrillDown}
-      />
+      <section className="print-only dashboard-print-report-header">
+        <div className="dashboard-print-report-title-row">
+          <div>
+            <h2 className="dashboard-print-report-title">Relatório do Dashboard PAEFI</h2>
+            <p className="dashboard-print-report-subtitle">
+              Exportação da visualização atual do dashboard em formato para impressão.
+            </p>
+          </div>
+          <div className="dashboard-print-report-meta">
+            <span className="dashboard-print-report-meta-label">Gerado em</span>
+            <strong>{generatedAtLabel}</strong>
+          </div>
+        </div>
+        <div className="dashboard-print-filter-list">
+          {printFilterSummary.map((item) => (
+            <div key={item.label} className="dashboard-print-filter-item">
+              <span className="dashboard-print-filter-label">{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="dashboard-print-content">
+        <DashboardFilters
+          filters={filters}
+          filterOptions={filterOptions}
+          onFilterChange={handleFilterChange}
+          onClearFilters={clearFilters}
+        />
+        <section className="dashboard-print-section dashboard-print-section--kpis">
+          <DashboardKpiSection
+            dashboardData={dashboardData}
+            renderValue={renderValue}
+            onDrillDown={handleDrillDown}
+          />
+        </section>
+        <section className="dashboard-print-section dashboard-print-section--charts">
+          <DashboardChartSection
+            dashboardData={dashboardData}
+            tiposViolacaoData={tiposViolacaoData}
+            casosPorCorData={casosPorCorData}
+            isPrintMode={isPrintMode}
+            onDrillDown={handleDrillDown}
+          />
+        </section>
+      </div>
       <DashboardModal
         isOpen={isModalOpen}
         onClose={closeDrilldown}

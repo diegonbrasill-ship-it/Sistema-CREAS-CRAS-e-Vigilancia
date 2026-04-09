@@ -155,9 +155,9 @@ export default function Layout() {
       );
   };
   return (
-    <div className="min-h-screen w-full bg-slate-100 flex">
+    <div className="app-shell min-h-screen w-full bg-slate-100 flex">
       {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r flex flex-col shadow-sm">
+      <aside className="app-sidebar no-print w-64 bg-white border-r flex flex-col shadow-sm">
         <div className="p-4 border-b flex items-center gap-3">
           <div>
             <h1 className="text-base font-bold text-slate-800">Nobly SIMAS PRO</h1>
@@ -214,8 +214,8 @@ export default function Layout() {
       </aside>
 
       {/* ÁREA DE CONTEÚDO */}
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white border-b h-16 flex items-center justify-end px-6">
+      <div className="app-content-shell flex-1 flex flex-col">
+        <header className="app-topbar no-print bg-white border-b h-16 flex items-center justify-end px-6">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-auto justify-start gap-2">
@@ -238,7 +238,7 @@ export default function Layout() {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="app-main-content flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
         
