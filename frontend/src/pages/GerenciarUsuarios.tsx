@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { getUsers, createUser, updateUserStatus, reassignUserCases, User } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Units, Roles, UNIT_OPTIONS, ROLE_OPTIONS } from '../utils/constants';
+import { PROFILE_LABELS } from '@/utils/roles';
 // Importações de UI e ícones
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,9 +21,6 @@ import ReassignCasesModal from '@/components/users/ReassignCasesModal';
 
 
 // Helpers para pegar o nome pelo ID
-const getRoleLabel = (roleId: number | string) => {
-    return Roles[Number(roleId) as keyof typeof Roles] || 'Não definido';
-};
 const getUnitLabel = (unitId: number | string) => {
     return Units[Number(unitId) as keyof typeof Units] || 'Não atribuída';
 };
@@ -40,7 +38,10 @@ const PROFILE_OPTIONS = [
 ];
 
 const getProfileLabel = (roleValue: string) => {
-    return PROFILE_OPTIONS.find(p => p.value === roleValue)?.label || roleValue;
+    return PROFILE_LABELS[roleValue as keyof typeof PROFILE_LABELS]
+        || PROFILE_OPTIONS.find(p => p.value === roleValue)?.label
+        || roleValue
+        || 'Não identificado';
 };
 
 interface NewUserState {
@@ -258,7 +259,7 @@ export default function GerenciarUsuarios() {
                                     <TableCell className="font-medium">{user.nome_completo}</TableCell>
                                     <TableCell>{user.cargo}</TableCell>
                                     <TableCell>{user.username}</TableCell>
-                                    <TableCell>{getRoleLabel(user.role)}</TableCell>
+                                    <TableCell>{getProfileLabel(user.role)}</TableCell>
                                     <TableCell>{UNIT_OPTIONS.find(u => u.id === user.unit_id)?.nome}</TableCell>
                                     <TableCell><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'Ativo' : 'Inativo'}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">

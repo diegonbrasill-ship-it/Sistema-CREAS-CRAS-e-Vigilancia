@@ -84,7 +84,7 @@ export default function Login({ onLogin }: LoginProps) {
           <CardHeader className="items-center text-center">
             <CardTitle className="text-xl">Nobly SIMAS PRO</CardTitle>
             <CardDescription>Utilize seu usuario e senha institucionais.</CardDescription>
-          </CardHeader>-
+          </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">

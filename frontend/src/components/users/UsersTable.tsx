@@ -28,6 +28,9 @@ export function UsersTable({
     onToggleStatus,
     onReassign,
 }: Props) {
+    const getProfileLabel = (role: string) =>
+        PROFILE_LABELS[role as keyof typeof PROFILE_LABELS] || role || 'Não identificado';
+
     return (
         <Table>
             <TableHeader>
@@ -47,7 +50,7 @@ export function UsersTable({
                         <TableCell>{user.nome_completo}</TableCell>
                         <TableCell>{user.cargo}</TableCell>
                         <TableCell>{user.username}</TableCell>
-                        <TableCell>{PROFILE_LABELS[user.role as keyof typeof PROFILE_LABELS]}</TableCell>
+                        <TableCell>{getProfileLabel(user.role)}</TableCell>
                         <TableCell>{getUnitName(user.unit_id)}</TableCell>
                         <TableCell>
                             <Badge variant={user.is_active ? 'default' : 'destructive'}>
