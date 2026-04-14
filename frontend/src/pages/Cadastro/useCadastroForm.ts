@@ -8,21 +8,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createCase, getCasoById, updateCase } from "@/services/api";
 import { formatDateForInput } from "@/utils/dateUtils";
 
-import { submitSchema, tabDefinitions, type CasoForm } from "./schema";
+import { submitSchema, tabDefinitions as legacyTabDefinitions, type CasoForm } from "./schema";
 import { caseToFormValues, formValuesToCreatePayload, formValuesToUpdatePayload } from "./adapters";
+import { useCasoFormSchema } from "./hooks/useCasoFormSchema";
+import { buildRuntimeTabDefinitions, getClearableHiddenFrontendFields } from "./schema-runtime";
 
 export function useCadastroForm() {
+  const casoSchema = useCasoFormSchema();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditMode = !!id;
   const { user } = useAuth();
+  const userId = user?.id;
 
   const tecRefFromAuth = useMemo(() => {
     if (!user) return undefined;
     const nomeCompleto = user.nome_completo || user.username;
     const cargo = user.cargo || "";
     return user.role.includes("tecnico") && cargo ? `${nomeCompleto} - ${cargo}` : nomeCompleto;
-  }, [user]);
+  }, [user?.cargo, user?.nome_completo, user?.role, user?.username]);
 
   const createDefaultValues = useMemo<DefaultValues<CasoForm>>(
     () => ({
@@ -43,11 +47,17 @@ export function useCadastroForm() {
     reset,
     watch,
     getValues,
+    setValue,
     formState: { dirtyFields, isSubmitting },
   } = form;
+  const watchedValues = watch();
 
   const [isDataLoading, setIsDataLoading] = useState(isEditMode);
-  const [activeTab, setActiveTab] = useState<(typeof tabDefinitions)[number]["value"]>("atendimento");
+  const runtimeTabDefinitions = useMemo(
+    () => buildRuntimeTabDefinitions(casoSchema.schema, legacyTabDefinitions),
+    [casoSchema.schema]
+  );
+  const [activeTab, setActiveTab] = useState<string>(runtimeTabDefinitions[0]?.value ?? "atendimento");
 
   const normalizeFieldValue = <K extends keyof CasoForm>(value: CasoForm[K] | null | undefined): CasoForm[K] => (value ?? "") as CasoForm[K];
   const createResetValues = useCallback(
@@ -83,11 +93,40 @@ export function useCadastroForm() {
       reset(createDefaultValues);
       setIsDataLoading(false);
     }
-  }, [createDefaultValues, id, isEditMode, navigate, reset, user, createResetValues]);
+  }, [createDefaultValues, id, isEditMode, navigate, reset, createResetValues, userId]);
+
+  useEffect(() => {
+    if (!runtimeTabDefinitions.some((tab) => tab.value === activeTab)) {
+      setActiveTab(runtimeTabDefinitions[0]?.value ?? "atendimento");
+    }
+  }, [activeTab, runtimeTabDefinitions]);
+
+  useEffect(() => {
+    const clearableHiddenFields = getClearableHiddenFrontendFields(
+      casoSchema.schema,
+      watchedValues as Partial<Record<string, unknown>>
+    );
+
+    for (const field of clearableHiddenFields) {
+      const currentValue = getValues(field.key as keyof CasoForm);
+      const nextValue = field.value;
+      const isSameArray =
+        Array.isArray(currentValue) &&
+        Array.isArray(nextValue) &&
+        currentValue.length === nextValue.length &&
+        currentValue.every((item, index) => item === nextValue[index]);
+
+      if (isSameArray || currentValue === nextValue) {
+        continue;
+      }
+
+      setValue(field.key as keyof CasoForm, nextValue as never, { shouldDirty: true });
+    }
+  }, [casoSchema.schema, getValues, setValue, watchedValues]);
 
   const onInvalid = (fieldErrors: FieldErrors<CasoForm>) => {
     const errorKeys = Object.keys(fieldErrors) as (keyof CasoForm)[];
-    const tabsComErro = tabDefinitions.filter((tab) => tab.fields.some((field) => errorKeys.includes(field)));
+    const tabsComErro = runtimeTabDefinitions.filter((tab) => tab.fields.some((field) => errorKeys.includes(field)));
 
     if (tabsComErro.length > 0) {
       setActiveTab(tabsComErro[0].value);
@@ -156,6 +195,8 @@ export function useCadastroForm() {
   };
 
   return {
+    casoSchema,
+    runtimeTabDefinitions,
     form,
     isEditMode,
     isSubmitting,

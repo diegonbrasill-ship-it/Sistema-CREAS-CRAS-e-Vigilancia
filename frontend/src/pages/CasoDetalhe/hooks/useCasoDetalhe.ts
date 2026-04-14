@@ -18,6 +18,7 @@ import {
   type CasoEncaminhamento,
   type CasoDetalhado,
 } from "@/services/api";
+import { useCasoFormSchema } from "@/pages/Cadastro/hooks/useCasoFormSchema";
 
 type UseCasoDetalheParams = {
   id?: string;
@@ -26,6 +27,7 @@ type UseCasoDetalheParams = {
 };
 
 export function useCasoDetalhe({ id, isOperacional, canDelete }: UseCasoDetalheParams) {
+  const casoSchema = useCasoFormSchema();
   const navigate = useNavigate();
 
   const [currentCaso, setCaso] = useState<CasoDetalhado | null>(null);
@@ -271,6 +273,7 @@ export function useCasoDetalhe({ id, isOperacional, canDelete }: UseCasoDetalheP
   };
 
   return {
+    casoSchema,
     currentCaso,
     acompanhamentos,
     novoAcompanhamento,

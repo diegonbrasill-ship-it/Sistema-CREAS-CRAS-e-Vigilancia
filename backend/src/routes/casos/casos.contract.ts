@@ -8,6 +8,7 @@ import {
   NormalizedCaseMutationInput,
   NormalizedCaseUpdateInput,
   SIM_NAO,
+  TIPO_VIOLENCIA_DETALHES,
   TIPO_VIOLENCIA,
 } from "./casos.contract.shared";
 import {
@@ -28,11 +29,45 @@ export * from "./casos.contract.utils";
 export * from "./casos.filters";
 
 export function validateCasePayload(payload: CasePayload) {
+  const tiposViolencia = Array.isArray(payload.tiposViolencia) ? payload.tiposViolencia : [];
+  if (tiposViolencia.length === 0) {
+    throw new CasoValidationError("tiposViolencia deve conter ao menos um item.");
+  }
+
+  for (const item of tiposViolencia) {
+    ensureEnum("tiposViolencia", item, TIPO_VIOLENCIA);
+  }
+
   ensureEnum("tipoViolencia", payload.tipoViolencia, TIPO_VIOLENCIA);
 
-  const tipoViolenciaDescricoes = payload.tipoViolenciaDescricoes;
-  if (!Array.isArray(tipoViolenciaDescricoes) || tipoViolenciaDescricoes.length === 0) {
+  if (!Array.isArray(payload.tipoViolenciaDescricoes) || payload.tipoViolenciaDescricoes.length === 0) {
     throw new CasoValidationError("tipoViolenciaDescricoes deve conter ao menos um item.");
+  }
+
+  if (payload.detalhesViolencia !== undefined) {
+    if (!isRecord(payload.detalhesViolencia)) {
+      throw new CasoValidationError("detalhesViolencia deve ser um objeto.");
+    }
+
+    for (const selectedType of tiposViolencia) {
+      const selectedDetails = payload.detalhesViolencia[selectedType];
+      const detailOptions = TIPO_VIOLENCIA_DETALHES[selectedType as keyof typeof TIPO_VIOLENCIA_DETALHES] as readonly string[];
+      if (!Array.isArray(selectedDetails) || selectedDetails.length === 0) {
+        throw new CasoValidationError(`detalhesViolencia.${selectedType} deve conter ao menos um item.`);
+      }
+
+      for (const detail of selectedDetails) {
+        if (typeof detail !== "string" || !detailOptions.includes(detail)) {
+          throw new CasoValidationError(`detalhesViolencia.${selectedType} contém valor inválido.`);
+        }
+      }
+    }
+
+    for (const detailType of Object.keys(payload.detalhesViolencia)) {
+      if (!tiposViolencia.includes(detailType)) {
+        throw new CasoValidationError(`detalhesViolencia.${detailType} não corresponde a um tipo selecionado.`);
+      }
+    }
   }
 
   for (const [fieldName, allowedValues] of CASE_OPTIONAL_ENUM_FIELDS) {
@@ -106,6 +141,36 @@ export function normalizeUpdateCasoInput(data: unknown): NormalizedCaseUpdateInp
   }
 
   ensureOptionalEnum("tipoViolencia", normalizedPayload.tipoViolencia, TIPO_VIOLENCIA);
+
+  if (normalizedPayload.tiposViolencia !== undefined) {
+    if (!Array.isArray(normalizedPayload.tiposViolencia) || normalizedPayload.tiposViolencia.length === 0) {
+      throw new CasoValidationError("tiposViolencia deve conter ao menos um item.");
+    }
+    for (const item of normalizedPayload.tiposViolencia) {
+      ensureEnum("tiposViolencia", item, TIPO_VIOLENCIA);
+    }
+  }
+
+  if (normalizedPayload.detalhesViolencia !== undefined) {
+    if (!isRecord(normalizedPayload.detalhesViolencia)) {
+      throw new CasoValidationError("detalhesViolencia deve ser um objeto.");
+    }
+
+    for (const [tipo, descricoes] of Object.entries(normalizedPayload.detalhesViolencia)) {
+      ensureEnum("detalhesViolencia", tipo, TIPO_VIOLENCIA);
+      const detailOptions = TIPO_VIOLENCIA_DETALHES[tipo as keyof typeof TIPO_VIOLENCIA_DETALHES] as readonly string[];
+
+      if (!Array.isArray(descricoes) || descricoes.length === 0) {
+        throw new CasoValidationError(`detalhesViolencia.${tipo} deve conter ao menos um item.`);
+      }
+
+      for (const descricao of descricoes) {
+        if (typeof descricao !== "string" || !detailOptions.includes(descricao)) {
+          throw new CasoValidationError(`detalhesViolencia.${tipo} contém valor inválido.`);
+        }
+      }
+    }
+  }
 
   for (const [fieldName, allowedValues] of CASE_OPTIONAL_ENUM_FIELDS) {
     ensureOptionalEnum(fieldName, normalizedPayload[fieldName], allowedValues);

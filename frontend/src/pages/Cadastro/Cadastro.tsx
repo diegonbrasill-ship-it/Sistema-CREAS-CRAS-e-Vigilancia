@@ -15,23 +15,35 @@ import { TabEncaminhamentos } from "./components/TabEncaminhamentos";
 import { TabAgressor } from "./components/TabAgressor";
 import { TabMoradia } from "./components/TabMoradia";
 
-const isCadastroTab = (value: string): value is (typeof tabDefinitions)[number]["value"] => tabDefinitions.some((tab) => tab.value === value);
+const tabContentMap: Record<string, JSX.Element> = {
+  atendimento: <TabAtendimento />,
+  vitima: <TabVitima />,
+  familia: <TabFamilia />,
+  saude: <TabSaude />,
+  encaminhamentos: <TabEncaminhamentos />,
+  agressor: <TabAgressor />,
+  moradia: <TabMoradia />,
+};
 
 export default function Cadastro() {
   const {
+    casoSchema,
     form,
     isEditMode,
     isSubmitting,
     isDataLoading,
     activeTab,
     setActiveTab,
+    runtimeTabDefinitions,
     onSubmit,
     onInvalid,
     handleCancel,
     handleClearForm,
   } = useCadastroForm();
 
-  if (isDataLoading) {
+  const isCadastroTab = (value: string) => runtimeTabDefinitions.some((tab) => tab.value === value);
+
+  if (isDataLoading || (casoSchema.isLoading && runtimeTabDefinitions.length === 0)) {
     return (
       <div className="text-center p-10">
         <Loader2 className="h-8 w-8 animate-spin mx-auto" />
@@ -63,44 +75,27 @@ export default function Cadastro() {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="atendimento">1. Atendimento</TabsTrigger>
-              <TabsTrigger value="vitima">2. Vítima</TabsTrigger>
-              <TabsTrigger value="familia">3. Família</TabsTrigger>
-              <TabsTrigger value="saude">4. Saúde</TabsTrigger>
-              <TabsTrigger value="encaminhamentos">5. Encaminhamentos</TabsTrigger>
-              <TabsTrigger value="agressor">6. Agressor</TabsTrigger>
-              <TabsTrigger value="moradia">7. Moradia</TabsTrigger>
+              {runtimeTabDefinitions.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             <Card className="mt-4">
               <CardContent className="pt-6">
-                <TabsContent value="atendimento" className="space-y-6">
-                  <TabAtendimento />
-                </TabsContent>
+                {runtimeTabDefinitions.map((tab) => {
+                  const content = tabContentMap[tab.value];
+                  if (!content) {
+                    return null;
+                  }
 
-                <TabsContent value="vitima" className="space-y-6">
-                  <TabVitima />
-                </TabsContent>
-
-                <TabsContent value="familia" className="space-y-6">
-                  <TabFamilia />
-                </TabsContent>
-
-                <TabsContent value="saude" className="space-y-6">
-                  <TabSaude />
-                </TabsContent>
-
-                <TabsContent value="encaminhamentos" className="space-y-6">
-                  <TabEncaminhamentos />
-                </TabsContent>
-
-                <TabsContent value="agressor" className="space-y-6">
-                  <TabAgressor />
-                </TabsContent>
-
-                <TabsContent value="moradia" className="space-y-6">
-                  <TabMoradia />
-                </TabsContent>
+                  return (
+                    <TabsContent key={tab.value} value={tab.value} className="space-y-6">
+                      {content}
+                    </TabsContent>
+                  );
+                })}
               </CardContent>
             </Card>
           </Tabs>

@@ -3,6 +3,7 @@
 
 import { arrayOutputType } from "zod/v3";
 import { CasoDrilldownListItem, CasosListParams, toCasosSearchParams } from "./casosDrilldown";
+import type { CasoFormSchema } from "@/types/casoFormSchema";
 
 //adicionar if modo debug
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -273,6 +274,7 @@ export const updateCase = (id: number | string, casoData: any) => fetchWithAuth(
 export const updateCasoStatus = (casoId: string | number, status: string) => fetchWithAuth(`/api/casos/${casoId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export const deleteCaso = (casoId: string | number) => fetchWithAuth(`/api/casos/${casoId}`, { method: 'DELETE' });
 export const getCasoById = (id: string): Promise<CasoDetalhado> => fetchWithAuth(`/api/casos/${id}`);
+export const getCasoFormSchema = (): Promise<CasoFormSchema> => fetchWithAuth(`/api/casos/schema`);
 
 export const listCasosCanonicos = (params?: CasosListParams): Promise<CasoDrilldownListItem[]> => {
     const searchParams = toCasosSearchParams(params ?? {});

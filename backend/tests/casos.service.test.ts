@@ -229,6 +229,42 @@ describe("CasosService (queries)", () => {
     expect(pool.query).not.toHaveBeenCalled();
   });
 
+  it("createCaso() deve aceitar o novo modelo cumulativo de violência e persistir shape novo + legado derivado", async () => {
+    (pool.query as unknown as jest.Mock).mockResolvedValueOnce({
+      rows: [{ id: 8, nome: "Ana", unit_id: 42 }],
+      rowCount: 1,
+    });
+
+    await CasosService.createCaso(
+      {
+        data_cad: "2026-04-14",
+        tec_ref: "Tecnica Nova",
+        dados_completos_payload: {
+          nome: "Ana",
+          tiposViolencia: ["FISICA", "PSICOLOGICA"],
+          detalhesViolencia: {
+            FISICA: ["CHUTES", "ESPANCAMENTO"],
+            PSICOLOGICA: ["AMEACA"],
+          },
+          canalDenuncia: "DEMANDA_ESPONTANEA",
+          racaCor: "PARDA",
+        },
+      },
+      { id: 1, username: "tester", role: "tecnico_superior", unit_id: 42, permissions: [], role_id: 1 }
+    );
+
+    const [, params] = (pool.query as unknown as jest.Mock).mock.calls[0];
+    const parsedPayload = JSON.parse(params[6]);
+
+    expect(parsedPayload.tiposViolencia).toEqual(["FISICA", "PSICOLOGICA"]);
+    expect(parsedPayload.detalhesViolencia).toEqual({
+      FISICA: ["CHUTES", "ESPANCAMENTO"],
+      PSICOLOGICA: ["AMEACA"],
+    });
+    expect(parsedPayload.tipoViolencia).toBe("FISICA");
+    expect(parsedPayload.tipoViolenciaDescricoes).toEqual(["CHUTES", "ESPANCAMENTO", "AMEACA"]);
+  });
+
   it("updateCaso() deve fazer merge parcial apenas em dados_completos_payload", async () => {
     (pool.query as unknown as jest.Mock)
       .mockResolvedValueOnce({
@@ -304,6 +340,87 @@ describe("CasosService (queries)", () => {
       dados_completos: {
         nome: "Maria",
         bairro: "Jatobá",
+        tipoViolencia: "FISICA",
+      },
+    });
+  });
+
+  it("updateCaso() deve aceitar atualização parcial no novo modelo cumulativo de violência", async () => {
+    (pool.query as unknown as jest.Mock)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 11,
+            data_cad: "2026-04-10",
+            tec_ref: "Tec Atual",
+            nome: "Caso Novo",
+            dados_completos: {
+              nome: "Caso Novo",
+              tiposViolencia: ["FISICA"],
+              detalhesViolencia: {
+                FISICA: ["CHUTES"],
+              },
+              tipoViolencia: "FISICA",
+              tipoViolenciaDescricoes: ["CHUTES"],
+              canalDenuncia: "DEMANDA_ESPONTANEA",
+              racaCor: "PARDA",
+            },
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 11,
+            data_cad: "2026-04-10",
+            tec_ref: "Tec Atual",
+            nome: "Caso Novo",
+            dados_completos: {
+              nome: "Caso Novo",
+              tiposViolencia: ["FISICA", "MORAL"],
+              detalhesViolencia: {
+                FISICA: ["CHUTES"],
+                MORAL: ["CALUNIA"],
+              },
+              tipoViolencia: "FISICA",
+              tipoViolenciaDescricoes: ["CHUTES", "CALUNIA"],
+              canalDenuncia: "DEMANDA_ESPONTANEA",
+              racaCor: "PARDA",
+            },
+          },
+        ],
+        rowCount: 1,
+      });
+
+    const updated = await CasosService.updateCaso(
+      "11",
+      {
+        dados_completos_payload: {
+          tiposViolencia: ["FISICA", "MORAL"],
+          detalhesViolencia: {
+            FISICA: ["CHUTES"],
+            MORAL: ["CALUNIA"],
+          },
+        },
+      },
+      { id: 1, username: "tester", role: "tecnico_superior", unit_id: 42, permissions: [], role_id: 1 }
+    );
+
+    const [, params] = (pool.query as unknown as jest.Mock).mock.calls[1];
+    const mergedPayload = JSON.parse(params[3]);
+
+    expect(mergedPayload.tiposViolencia).toEqual(["FISICA", "MORAL"]);
+    expect(mergedPayload.detalhesViolencia).toEqual({
+      FISICA: ["CHUTES"],
+      MORAL: ["CALUNIA"],
+    });
+    expect(mergedPayload.tipoViolencia).toBe("FISICA");
+    expect(mergedPayload.tipoViolenciaDescricoes).toEqual(["CHUTES", "CALUNIA"]);
+    expect(updated).toMatchObject({
+      id: 11,
+      dados_completos: {
+        tiposViolencia: ["FISICA", "MORAL"],
         tipoViolencia: "FISICA",
       },
     });

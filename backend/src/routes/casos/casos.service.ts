@@ -19,6 +19,7 @@ type AccessFilter = { whereClause: string; params: any[] };
 export class CasosService {
 
     static async createCaso(data: unknown, admin: AuthenticatedUser) {
+        
         const normalized = normalizeCreateCasoInput(data, admin);
         const user_id = admin.id;
         const username = admin.username;

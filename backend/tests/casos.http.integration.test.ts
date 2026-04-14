@@ -97,6 +97,33 @@ function buildCasoPayload(input: {
   };
 }
 
+function buildCasoPayloadCumulativo(input: {
+  nome: string;
+  tec_ref: string;
+  data_cad: string;
+  bairro: string;
+  idade: string;
+}) {
+  return {
+    data_cad: input.data_cad,
+    tec_ref: input.tec_ref,
+    dados_completos_payload: {
+      nome: input.nome,
+      bairro: input.bairro,
+      idade: input.idade,
+      tiposViolencia: ["FISICA", "PSICOLOGICA"],
+      detalhesViolencia: {
+        FISICA: ["CHUTES", "ESPANCAMENTO"],
+        PSICOLOGICA: ["AMEACA"],
+      },
+      canalDenuncia: "DEMANDA_ESPONTANEA",
+      racaCor: "PARDA",
+      recebePBF: "Não",
+      notificacaoSINAN: "Não",
+    },
+  };
+}
+
 type DashboardCasoInput = {
   nome: string;
   data_cad: string;
@@ -272,6 +299,44 @@ describe("Integração HTTP /api/casos", () => {
 
     const count = await pool.query<{ total: string }>("SELECT COUNT(*)::text AS total FROM casos");
     expect(count.rows[0].total).toBe("1");
+  });
+
+  it("aceita por HTTP o novo payload cumulativo de violência e devolve shape normalizado", async () => {
+    const token = makeToken(tecnicoUnidade2);
+
+    const created = await request(app)
+      .post("/api/casos")
+      .set("Authorization", `Bearer ${token}`)
+      .send(
+        buildCasoPayloadCumulativo({
+          nome: "Caso Cumulativo",
+          tec_ref: "Tecnica A",
+          data_cad: "2026-04-14",
+          bairro: "Centro",
+          idade: "16",
+        })
+      );
+
+    expect(created.status).toBe(201);
+    expect(created.body.unit_id).toBe(2);
+    expect(created.body.dados_completos.tiposViolencia).toEqual(["FISICA", "PSICOLOGICA"]);
+    expect(created.body.dados_completos.detalhesViolencia).toEqual({
+      FISICA: ["CHUTES", "ESPANCAMENTO"],
+      PSICOLOGICA: ["AMEACA"],
+    });
+    expect(created.body.dados_completos.tipoViolencia).toBe("FISICA");
+    expect(created.body.dados_completos.tipoViolenciaDescricoes).toEqual(["CHUTES", "ESPANCAMENTO", "AMEACA"]);
+
+    const fetched = await request(app)
+      .get(`/api/casos/${created.body.id}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(fetched.status).toBe(200);
+    expect(fetched.body.dados_completos.tiposViolencia).toEqual(["FISICA", "PSICOLOGICA"]);
+    expect(fetched.body.dados_completos.detalhesViolencia).toEqual({
+      FISICA: ["CHUTES", "ESPANCAMENTO"],
+      PSICOLOGICA: ["AMEACA"],
+    });
   });
 
   it("aplica filtros reais na listagem e mantém o isolamento por unidade do usuário", async () => {

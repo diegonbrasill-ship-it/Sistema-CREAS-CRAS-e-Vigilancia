@@ -3,6 +3,7 @@ import request from "supertest";
 
 import casosRouter from "../src/routes/casos";
 import { CasoValidationError } from "../src/routes/casos/casos.contract";
+import { CASO_FORM_SCHEMA } from "../src/routes/casos/casos.form-schema";
 
 jest.mock("../src/middleware/auth/auth", () => {
   return {
@@ -83,6 +84,21 @@ describe("Rotas /api/casos", () => {
     expect(arg.search).toBe("maria");
     expect(arg.searchBy).toBe("q");
     expect(arg.filters).toEqual({ bairro: "Centro" });
+  });
+
+  it("GET /api/casos/schema retorna o schema declarativo alvo do formulário", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .get("/api/casos/schema")
+      .set("Authorization", "Bearer x");
+
+    expect(res.status).toBe(200);
+    expect(res.body.schemaKey).toBe("casos.form");
+    expect(res.body.version).toBe(CASO_FORM_SCHEMA.version);
+    expect(res.body.fields.some((current: any) => current.key === "tiposViolencia")).toBe(true);
+    expect(res.body.fields.some((current: any) => current.key === "detalhesViolencia")).toBe(true);
+    expect(res.body.groupedOptionSets.detalhes_violencia.FISICA.length).toBeGreaterThan(0);
+    expect(CasosService.getCasoById).not.toHaveBeenCalled();
   });
 
   it("GET /api/casos converte formato legado filtro/valor para o mesmo shape interno", async () => {

@@ -1,44 +1,25 @@
 export type CasePayload = Record<string, unknown>;
 export type AccessScope = { whereClause: string; params: (string | number)[] };
 
+import { CASO_GROUPED_OPTION_VALUES, CASO_OPTION_VALUES } from "./casos.option-catalog";
+
 export const CASE_STATUS = ["Ativo", "Desligado", "Arquivado"] as const;
-export const TIPO_VIOLENCIA = ["FISICA", "PSICOLOGICA", "SEXUAL", "PATRIMONIAL", "MORAL"] as const;
-export const CANAL_DENUNCIA = [
-  "DISQUE_100_180",
-  "CONSELHO_TUTELAR",
-  "PODER_JUDICIARIO_MINISTERIO_PUBLICO",
-  "DELEGACIA_DE_POLICIA",
-  "DEMANDA_ESPONTANEA",
-  "ENCAMINHAMENTO_DA_REDE",
-  "OUTROS",
-] as const;
-export const SEXO = ["MASCULINO", "FEMININO", "INTERSEXO"] as const;
-export const RACA_COR = ["BRANCA", "PRETA", "PARDA", "AMARELA", "INDIGENA", "NAO_DECLARADO"] as const;
-export const ESCOLARIDADE = [
-  "NAO_ESTUDOU",
-  "SEM_IDADE_ESCOLAR",
-  "EJA",
-  "FUNDAMENTAL_1_INCOMPLETO",
-  "FUNDAMENTAL_1_COMPLETO",
-  "FUNDAMENTAL_2_INCOMPLETO",
-  "FUNDAMENTAL_2_COMPLETO",
-  "ENSINO_MEDIO_INCOMPLETO",
-  "ENSINO_MEDIO_COMPLETO",
-  "TECNICO_INCOMPLETO",
-  "TECNICO_COMPLETO",
-  "SUPERIOR_INCOMPLETO",
-  "SUPERIOR_COMPLETO",
-] as const;
-export const VINCULO_AGRESSOR = ["CONJUGE", "COMPANHEIRO", "EX_COMPANHEIRO", "PAI", "MAE", "FILHO", "IRMAO", "OUTROS"] as const;
-export const FAIXA_ETARIA_AGRESSOR = ["MENOR_18", "FAIXA_18_30", "FAIXA_31_40", "FAIXA_41_50", "FAIXA_51_60", "FAIXA_61_MAIS"] as const;
-export const SEXO_AGRESSOR = ["HOMEM", "MULHER", "OUTRO"] as const;
-export const TIPO_RESIDENCIA = ["CASA", "APARTAMENTO", "COMODO_QUITINETE", "BARRACO_OCUPACAO", "UNIDADE_INSTITUCIONAL", "SITUACAO_DE_RUA"] as const;
-export const FORMA_OCUPACAO = ["PROPRIA_PAGA", "PROPRIA_EM_AQUISICAO", "ALUGADA", "CEDIDA_FAMILIAR_AMIGO", "CEDIDA_EMPREGADOR", "OCUPADA_IRREGULAR"] as const;
-export const MATERIAL_CONSTRUCAO = ["ALVENARIA_TIJOLO", "MADEIRA_APARELHADA", "MATERIAL_REAPROVEITADO", "SEM_CONSTRUCAO_PERMANENTE"] as const;
-export const ENCAMINHADA_SCFV = ["SCFV", "CDI", "Não"] as const;
-export const CONFIRMACAO_VIOLENCIA = ["Confirmada", "Em análise", "Não confirmada"] as const;
-export const SIM_NAO = ["Sim", "Não"] as const;
-export const RECEBE_BPC = ["Idoso", "PCD", "Não"] as const;
+export const TIPO_VIOLENCIA = CASO_OPTION_VALUES.tipo_violencia;
+export const TIPO_VIOLENCIA_DETALHES = CASO_GROUPED_OPTION_VALUES.detalhes_violencia;
+export const CANAL_DENUNCIA = CASO_OPTION_VALUES.canal_denuncia;
+export const SEXO = CASO_OPTION_VALUES.sexo;
+export const RACA_COR = CASO_OPTION_VALUES.raca_cor;
+export const ESCOLARIDADE = CASO_OPTION_VALUES.escolaridade;
+export const VINCULO_AGRESSOR = CASO_OPTION_VALUES.vinculo_agressor;
+export const FAIXA_ETARIA_AGRESSOR = CASO_OPTION_VALUES.faixa_etaria_agressor;
+export const SEXO_AGRESSOR = CASO_OPTION_VALUES.sexo_agressor;
+export const TIPO_RESIDENCIA = CASO_OPTION_VALUES.tipo_residencia;
+export const FORMA_OCUPACAO = CASO_OPTION_VALUES.forma_ocupacao;
+export const MATERIAL_CONSTRUCAO = CASO_OPTION_VALUES.material_construcao;
+export const ENCAMINHADA_SCFV = CASO_OPTION_VALUES.encaminhada_scfv;
+export const CONFIRMACAO_VIOLENCIA = CASO_OPTION_VALUES.confirmacao_violencia;
+export const SIM_NAO = CASO_OPTION_VALUES.sim_nao;
+export const RECEBE_BPC = CASO_OPTION_VALUES.recebe_bpc;
 
 export const META_FIELDS = new Set(["nome", "data_cad", "tec_ref", "status", "unit_id", "dados_completos_payload"]);
 

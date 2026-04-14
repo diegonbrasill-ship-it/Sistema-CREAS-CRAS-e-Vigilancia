@@ -4,6 +4,8 @@ import {
   LEGACY_KEY_MAP,
   LEGACY_VALUE_MAP,
   META_FIELDS,
+  TIPO_VIOLENCIA,
+  TIPO_VIOLENCIA_DETALHES,
 } from "./casos.contract.shared";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,6 +48,78 @@ function normalizeViolenceDescriptions(value: unknown): string[] {
     .map((item) => LEGACY_VALUE_MAP.tipoViolenciaDescricoes[item] ?? item);
 
   return [...new Set(normalized)];
+}
+
+function normalizeViolenceTypes(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    throw new CasoValidationError("tiposViolencia deve ser um array.");
+  }
+
+  const normalized = value
+    .map((item) => trimString(item))
+    .filter((item): item is string => typeof item === "string" && item.length > 0);
+
+  for (const item of normalized) {
+    if (!TIPO_VIOLENCIA.includes(item as (typeof TIPO_VIOLENCIA)[number])) {
+      throw new CasoValidationError("tiposViolencia contém valor inválido.");
+    }
+  }
+
+  return [...new Set(normalized)];
+}
+
+function normalizeViolenceDetailsMap(value: unknown): Record<string, string[]> {
+  if (!isRecord(value)) {
+    throw new CasoValidationError("detalhesViolencia deve ser um objeto.");
+  }
+
+  const normalized: Record<string, string[]> = {};
+
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const key = trimString(rawKey);
+    if (typeof key !== "string" || !TIPO_VIOLENCIA.includes(key as (typeof TIPO_VIOLENCIA)[number])) {
+      throw new CasoValidationError("detalhesViolencia contém tipo de violência inválido.");
+    }
+
+    normalized[key] = normalizeViolenceDescriptions(rawValue);
+  }
+
+  return normalized;
+}
+
+function flattenViolenceDetails(selectedTypes: string[], detailsMap: Record<string, string[]>) {
+  const flattened = selectedTypes.flatMap((type) => detailsMap[type] ?? []);
+  return [...new Set(flattened)];
+}
+
+function normalizeViolenceModel(payload: CasePayload): CasePayload {
+  const next = { ...payload };
+
+  const selectedTypes =
+    next.tiposViolencia !== undefined
+      ? normalizeViolenceTypes(next.tiposViolencia)
+      : typeof next.tipoViolencia === "string" && next.tipoViolencia.length > 0
+        ? [next.tipoViolencia]
+        : [];
+
+  const detailsMap =
+    next.detalhesViolencia !== undefined
+      ? normalizeViolenceDetailsMap(next.detalhesViolencia)
+      : next.tipoViolenciaDescricoes !== undefined && selectedTypes.length === 1
+        ? { [selectedTypes[0]]: normalizeViolenceDescriptions(next.tipoViolenciaDescricoes) }
+        : {};
+
+  if (selectedTypes.length > 0) {
+    next.tiposViolencia = selectedTypes;
+    next.tipoViolencia = selectedTypes[0];
+  }
+
+  if (Object.keys(detailsMap).length > 0) {
+    next.detalhesViolencia = detailsMap;
+    next.tipoViolenciaDescricoes = flattenViolenceDetails(selectedTypes, detailsMap);
+  }
+
+  return next;
 }
 
 export function ensureDate(value: unknown): string {
@@ -128,6 +202,16 @@ function normalizePayloadKeys(payload: CasePayload): CasePayload {
       continue;
     }
 
+    if (key === "tiposViolencia" && value !== undefined) {
+      normalized[key] = normalizeViolenceTypes(value);
+      continue;
+    }
+
+    if (key === "detalhesViolencia" && value !== undefined) {
+      normalized[key] = normalizeViolenceDetailsMap(value);
+      continue;
+    }
+
     if (key === "sexo" && typeof value === "string") {
       normalized[key] = LEGACY_VALUE_MAP.sexo[value] ?? value;
       continue;
@@ -136,7 +220,7 @@ function normalizePayloadKeys(payload: CasePayload): CasePayload {
     normalized[key] = value;
   }
 
-  return normalized;
+  return normalizeViolenceModel(normalized);
 }
 
 function cleanupConditionalFields(payload: CasePayload): CasePayload {

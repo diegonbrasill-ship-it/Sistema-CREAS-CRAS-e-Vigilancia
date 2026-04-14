@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { CasosService } from "./casos.service";
 import { CasoValidationError, parseCasoListQuery } from "./casos.contract";
+import { getCasoFormSchema } from "./casos.form-schema";
 
 function handleCasosError(res: Response, err: unknown, fallbackMessage: string) {
     if (err instanceof CasoValidationError) {
@@ -12,7 +13,11 @@ function handleCasosError(res: Response, err: unknown, fallbackMessage: string) 
     return res.status(500).json({ message: fallbackMessage });
 }
 
-export class CasosCrontroller {
+export class CasosController {
+
+    static getSchema(_req: Request, res: Response) {
+        return res.status(200).json(getCasoFormSchema());
+    }
 
     static async create(req: Request, res: Response) {
         try {
